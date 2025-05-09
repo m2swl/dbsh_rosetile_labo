@@ -111,31 +111,31 @@
             font-size: 1.25rem; 
             margin: 0;
             flex-grow: 1;
-            font-weight: 500; /* Noto Sans JPだと少し太めが良いかも */
+            font-weight: 500; /* Noto Sans JP */
         }
         .theme-switch-container {
             display: flex;
             align-items: center;
         }
-        .theme-switch-container span {
+        .theme-switch-container md-icon { /* アイコンの色を調整 */
+            color: var(--md-sys-color-on-surface-variant);
+        }
+        .theme-switch-container span { /* 古いコードの残骸なので削除しても良い */
              margin-right: 8px;
         }
 
         md-card {
             margin-bottom: 16px;
             background-color: var(--md-sys-color-surface);
-            /* MWC Cardの背景色設定 (最新のMWCでは不要な場合もある) */
             --md-card-container-color: var(--md-sys-color-surface); 
-            /* MWC Cardの角丸 (M3のCardは角丸が大きいことが多い) */
             border-radius: 12px; 
+            overflow: hidden; /* 角丸と影を綺麗に見せるため */
         }
         
         .card-header {
             display: flex;
             align-items: center;
             padding: 16px;
-            /* M3ではCardのHeaderに線がないことが多いのでコメントアウト、またはより薄い色に */
-            /* border-bottom: 1px solid var(--md-sys-color-outline); */
         }
         .card-header md-icon {
             margin-right: 12px;
@@ -144,31 +144,31 @@
         .card-header h2 {
             margin: 0;
             font-size: 1rem; 
-            color: var(--md-sys-color-on-surface-variant);
+            color: var(--md-sys-color-on-surface-variant); /* ヘッダータイトルは少し薄めに */
             font-weight: 500; /* Noto Sans JP */
         }
 
         .card-content {
             padding: 16px;
-            padding-top: 0; /* Headerとのスペース調整 */
+            padding-top: 0; 
         }
         .sensor-value {
             font-size: 0.9rem;
             margin-bottom: 8px;
-            color: var(--md-sys-color-on-surface-variant);
+            color: var(--md-sys-color-on-surface-variant); /* 数値のラベルも少し薄めに */
         }
-        .sensor-value strong {
+        .sensor-value strong { /* 値そのものははっきりと */
             color: var(--md-sys-color-on-surface);
-            min-width: 80px;
+            min-width: 80px; /* ラベルの幅を揃える */
             display: inline-block;
             font-weight: 500; /* Noto Sans JP */
         }
         .status-text {
             font-size: 0.8rem;
-            color: var(--md-sys-color-secondary);
+            color: var(--md-sys-color-secondary); /* ステータスはセカンダリカラー */
             margin-top: 8px;
         }
-        .error { color: var(--md-sys-color-error) !important; }
+        .error { color: var(--md-sys-color-error) !important; font-weight: 500; }
         .not-supported { color: var(--md-sys-color-outline) !important; }
 
         /* 3D Cube for Orientation */
@@ -193,7 +193,7 @@
             background-color: color-mix(in srgb, var(--md-sys-color-primary-container) 70%, transparent);
             color: var(--md-sys-color-on-primary-container);
             font-size: calc(var(--cube-size) / 3);
-            font-weight: bold; /* キューブの文字は太字のまま */
+            font-weight: bold; 
             display: flex;
             justify-content: center;
             align-items: center;
@@ -213,6 +213,7 @@
             align-items: flex-end;
             height: var(--bar-max-height);
             margin-top: 10px;
+            margin-bottom: 25px; /* ラベル分のスペース */
         }
         .bar {
             width: 25%;
@@ -220,7 +221,7 @@
             transition: height 0.1s ease-out;
             text-align: center;
             position: relative;
-            border-radius: 4px 4px 0 0; /* バーの上部を少し丸める */
+            border-radius: 4px 4px 0 0; 
         }
         .bar-label {
             position: absolute;
@@ -240,8 +241,8 @@
             font-size: 48px; 
             transition: color 0.3s ease;
         }
-        #light-icon-sun { color: #FFC107; } /* 太陽の色を少し調整 (緑テーマに合わせて) */
-        #light-icon-moon { color: #90A4AE; } /* 月の色を少し調整 */
+        #light-icon-sun { color: #FFC107; } 
+        #light-icon-moon { color: #90A4AE; } 
 
         /* Permission Button */
         #permissionButtonContainer {
@@ -249,52 +250,481 @@
             margin-bottom: 20px;
         }
         
-        /* MWC Switchのトラックの色などをテーマに合わせる (必要に応じて) */
         md-switch {
-            --md-switch-selected-track-color: var(--md-sys-color-primary);
             --md-switch-selected-handle-color: var(--md-sys-color-on-primary);
-            --md-switch-selected-focus-track-color: var(--md-sys-color-primary);
+            --md-switch-selected-hover-handle-color: var(--md-sys-color-on-primary);
+            --md-switch-selected-pressed-handle-color: var(--md-sys-color-on-primary);
+            --md-switch-selected-track-color: var(--md-sys-color-primary);
             --md-switch-selected-hover-track-color: var(--md-sys-color-primary);
             --md-switch-selected-pressed-track-color: var(--md-sys-color-primary);
-            /* 他にも多くのカスタムプロパティがあります */
+            --md-switch-selected-focus-track-color: var(--md-sys-color-primary);
+            --md-switch-unselected-handle-color: var(--md-sys-color-outline);
+            --md-switch-unselected-hover-handle-color: var(--md-sys-color-outline);
+            /* 他多数 */
+        }
+        md-filled-button {
+            --md-filled-button-container-color: var(--md-sys-color-primary);
+            --md-filled-button-label-text-color: var(--md-sys-color-on-primary);
+            /* 他多数 */
         }
     </style>
 </head>
-<body data-theme="light"> <!-- 初期テーマ -->
+<body data-theme="light"> 
 
-    <!-- HTMLの構造は前回と同じなので省略 -->
-    <!-- ... (AppBar, AppContainer, Cards etc.) ... -->
+    <div class="app-bar">
+        <h1>センサービューア</h1>
+        <div class="theme-switch-container">
+            <md-icon>light_mode</md-icon>
+            <md-switch id="themeSwitch"></md-switch>
+            <md-icon>dark_mode</md-icon>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <div id="permissionButtonContainer">
+             <!-- iOS Safariなどでセンサー許可を促すボタンがここに追加されます -->
+        </div>
+
+        <!-- Device Orientation Card -->
+        <md-card>
+            <div class="card-header">
+                <md-icon>screen_rotation</md-icon>
+                <h2>デバイスの向き</h2>
+            </div>
+            <div class="card-content">
+                <div class="cube-container">
+                    <div class="cube" id="orientationCube">
+                        <div class="cube__face cube__face--front">前</div>
+                        <div class="cube__face cube__face--back">後</div>
+                        <div class="cube__face cube__face--right">右</div>
+                        <div class="cube__face cube__face--left">左</div>
+                        <div class="cube__face cube__face--top">上</div>
+                        <div class="cube__face cube__face--bottom">下</div>
+                    </div>
+                </div>
+                <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="orient-alpha">-</span> °</p>
+                <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="orient-beta">-</span> °</p>
+                <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="orient-gamma">-</span> °</p>
+                <p class="status-text" id="orient-status">待機中...</p>
+            </div>
+        </md-card>
+
+        <!-- Accelerometer Card -->
+        <md-card>
+            <div class="card-header">
+                <md-icon>vibration</md-icon>
+                <h2>加速度 (重力含む)</h2>
+            </div>
+            <div class="card-content">
+                <div class="bars-container">
+                    <div class="bar" id="accel-bar-x"><span class="bar-label">X</span></div>
+                    <div class="bar" id="accel-bar-y"><span class="bar-label">Y</span></div>
+                    <div class="bar" id="accel-bar-z"><span class="bar-label">Z</span></div>
+                </div>
+                <p class="sensor-value"><strong>X:</strong> <span id="accel-x">-</span> m/s²</p>
+                <p class="sensor-value"><strong>Y:</strong> <span id="accel-y">-</span> m/s²</p>
+                <p class="sensor-value"><strong>Z:</strong> <span id="accel-z">-</span> m/s²</p>
+                <p class="status-text" id="accel-status">待機中...</p>
+            </div>
+        </md-card>
+        
+        <!-- Gyroscope Card -->
+        <md-card>
+            <div class="card-header">
+                <md-icon>explore</md-icon> 
+                <h2>ジャイロスコープ (回転速度)</h2>
+            </div>
+            <div class="card-content">
+                <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="gyro-alpha">-</span> °/s</p>
+                <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta">-</span> °/s</p>
+                <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="gyro-gamma">-</span> °/s</p>
+                <p class="status-text" id="gyro-status">待機中...</p>
+            </div>
+        </md-card>
+
+        <!-- Light Sensor Card -->
+        <md-card>
+            <div class="card-header">
+                <md-icon>lightbulb</md-icon>
+                <h2>光センサー</h2>
+            </div>
+            <div class="card-content">
+                <div class="light-viz">
+                    <md-icon id="light-icon-sun" style="display:none;">wb_sunny</md-icon>
+                    <md-icon id="light-icon-moon" style="display:none;">nightlight_round</md-icon>
+                </div>
+                <p class="sensor-value"><strong>明るさ:</strong> <span id="light-value">-</span> lux</p>
+                <p class="status-text" id="light-status">待機中...</p>
+            </div>
+        </md-card>
+
+        <p style="font-size: 0.8em; text-align: center; margin-top: 20px; color: var(--md-sys-color-on-surface-variant);">
+            注意: センサーの利用にはブラウザからの許可が必要な場合があります。また、お使いのデバイスやブラウザによっては一部センサーが利用できないことがあります。
+        </p>
+    </div>
 
     <script type="module">
-        // JavaScript部分も前回とほぼ同じなので、変更点はコメントで示します
-        // 基本的にDOM要素の取得やイベントリスナーのロジックは変わりません。
-
-        // ... (DOM Elements取得部分は変更なし) ...
+        // MWCコンポーネントの参照 (all.jsを読み込んでいるので個別のimportは不要)
         
+        // DOM Elements
+        const body = document.body;
+        const themeSwitch = document.getElementById('themeSwitch');
+        const permissionButtonContainer = document.getElementById('permissionButtonContainer');
+
+        // Orientation
+        const orientationCube = document.getElementById('orientationCube');
+        const orientAlphaEl = document.getElementById('orient-alpha');
+        const orientBetaEl = document.getElementById('orient-beta');
+        const orientGammaEl = document.getElementById('orient-gamma');
+        const orientStatusEl = document.getElementById('orient-status');
+
+        // Accelerometer
+        const accelXEl = document.getElementById('accel-x');
+        const accelYEl = document.getElementById('accel-y');
+        const accelZEl = document.getElementById('accel-z');
+        const accelStatusEl = document.getElementById('accel-status');
+        const accelBarX = document.getElementById('accel-bar-x');
+        const accelBarY = document.getElementById('accel-bar-y');
+        const accelBarZ = document.getElementById('accel-bar-z');
+        const BAR_MAX_ACCEL = 20; // m/s^2 (バーの最大値の目安、デバイスによって調整)
+
+        // Gyroscope
+        const gyroAlphaEl = document.getElementById('gyro-alpha');
+        const gyroBetaEl = document.getElementById('gyro-beta');
+        const gyroGammaEl = document.getElementById('gyro-gamma');
+        const gyroStatusEl = document.getElementById('gyro-status');
+
+        // Light Sensor
+        const lightValueEl = document.getElementById('light-value');
+        const lightStatusEl = document.getElementById('light-status');
+        const lightIconSun = document.getElementById('light-icon-sun');
+        const lightIconMoon = document.getElementById('light-icon-moon');
+
+
         // --- Theme Switch Logic ---
-        // (変更なし)
-        // function applyTheme(theme) { ... }
-        // const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-        // const currentTheme = ... ;
-        // applyTheme(currentTheme);
-        // prefersDarkScheme.addEventListener('change', ...);
-        // themeSwitch.addEventListener('change', ...);
+        function applyTheme(theme) {
+            body.dataset.theme = theme;
+            localStorage.setItem('theme', theme);
+            if (themeSwitch) { // themeSwitchがDOMに存在するかの確認
+                themeSwitch.selected = (theme === 'dark');
+                themeSwitch.ariaLabel = theme === 'dark' ? 'ライトテーマに切り替え' : 'ダークテーマに切り替え';
+            }
+        }
 
-        // --- Sensor Logic ---
-        // (変更なし)
-        // let motionPermissionGranted = false;
-        // let orientationPermissionGranted = false;
-        // function requestSensorPermissions() { ... }
-        // if ((typeof DeviceMotionEvent ...)) { ... } else { requestSensorPermissions(); }
+        const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+        // localStorageに保存されたテーマがあればそれを優先、なければOSの設定に従う
+        const savedTheme = localStorage.getItem('theme');
+        const currentTheme = savedTheme || (prefersDarkScheme.matches ? 'dark' : 'light');
+        applyTheme(currentTheme);
 
-        // --- Event Handlers (handleMotionEvent, handleOrientationEvent) ---
-        // (変更なし)
-        // function handleMotionEvent(event) { ... }
-        // function handleOrientationEvent(event) { ... }
+        prefersDarkScheme.addEventListener('change', (e) => {
+            // 手動でテーマが設定されていない場合のみOS設定に追従
+            if (!localStorage.getItem('theme')) {
+                 applyTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+        
+        if (themeSwitch) {
+            themeSwitch.addEventListener('change', () => {
+                applyTheme(themeSwitch.selected ? 'dark' : 'light');
+            });
+        }
 
-        // --- Light Sensor Logic ---
-        // (変更なし)
-        // if ('AmbientLightSensor' in window) { ... }
+        // --- Sensor Permission and Initialization ---
+        let motionPermissionGranted = false;
+        let orientationPermissionGranted = false;
+        let sensorsInitialized = false; // センサー初期化済みフラグ
+
+        function initializeSensors() {
+            if (sensorsInitialized) return; // 既に初期化済みなら何もしない
+
+            // Device Motion (Accelerometer, Gyroscope)
+            if (motionPermissionGranted) {
+                window.addEventListener('devicemotion', handleMotionEvent, { passive: true });
+                accelStatusEl.textContent = "監視中...";
+                gyroStatusEl.textContent = "監視中...";
+            } else if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function') {
+                // requestPermissionがないブラウザでは暗黙的に許可されているとみなす
+                window.addEventListener('devicemotion', handleMotionEvent, { passive: true });
+                accelStatusEl.textContent = "監視中...";
+                gyroStatusEl.textContent = "監視中...";
+                motionPermissionGranted = true; // フラグを立てる
+            } else if (!window.DeviceMotionEvent) {
+                accelStatusEl.textContent = '加速度センサーはサポートされていません。';
+                accelStatusEl.classList.add('not-supported');
+                gyroStatusEl.textContent = 'ジャイロスコープはサポートされていません。';
+                gyroStatusEl.classList.add('not-supported');
+            }
+
+
+            // Device Orientation
+            if (orientationPermissionGranted) {
+                window.addEventListener('deviceorientation', handleOrientationEvent, { passive: true });
+                orientStatusEl.textContent = "監視中...";
+            } else if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function') {
+                 // requestPermissionがないブラウザでは暗黙的に許可されているとみなす
+                window.addEventListener('deviceorientation', handleOrientationEvent, { passive: true });
+                orientStatusEl.textContent = "監視中...";
+                orientationPermissionGranted = true; // フラグを立てる
+            } else if(!window.DeviceOrientationEvent) {
+                orientStatusEl.textContent = '向きセンサーはサポートされていません。';
+                orientStatusEl.classList.add('not-supported');
+            }
+            
+            // Light Sensor (Generic Sensor API)
+            initializeLightSensor(); // Light Sensorの初期化は別途行う
+
+            sensorsInitialized = true;
+            if (permissionButtonContainer.firstChild) {
+                 permissionButtonContainer.firstChild.remove(); // 許可ボタンを削除
+            }
+        }
+
+
+        function requestSensorPermissions() {
+            const promises = [];
+            let needsDeviceMotionPermission = window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function';
+            let needsDeviceOrientationPermission = window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function';
+
+            if (needsDeviceMotionPermission) {
+                promises.push(
+                    DeviceMotionEvent.requestPermission().then(state => {
+                        if (state === 'granted') {
+                            motionPermissionGranted = true;
+                        } else {
+                            accelStatusEl.textContent = '加速度センサーへのアクセスが拒否されました。';
+                            accelStatusEl.classList.add('error');
+                            gyroStatusEl.textContent = 'ジャイロスコープへのアクセスが拒否されました。';
+                            gyroStatusEl.classList.add('error');
+                        }
+                    }).catch(err => {
+                        console.error("DeviceMotionEvent permission error:", err);
+                        accelStatusEl.textContent = `加速度センサーエラー`;
+                        accelStatusEl.classList.add('error');
+                        gyroStatusEl.textContent = `ジャイロスコープエラー`;
+                        gyroStatusEl.classList.add('error');
+                    })
+                );
+            }
+
+            if (needsDeviceOrientationPermission) {
+                promises.push(
+                    DeviceOrientationEvent.requestPermission().then(state => {
+                        if (state === 'granted') {
+                            orientationPermissionGranted = true;
+                        } else {
+                            orientStatusEl.textContent = '向きセンサーへのアクセスが拒否されました。';
+                            orientStatusEl.classList.add('error');
+                        }
+                    }).catch(err => {
+                        console.error("DeviceOrientationEvent permission error:", err);
+                        orientStatusEl.textContent = `向きセンサーエラー`;
+                        orientStatusEl.classList.add('error');
+                    })
+                );
+            }
+
+            if (promises.length > 0) {
+                Promise.allSettled(promises).then(() => { // allSettledで全ての結果を待つ
+                    initializeSensors();
+                });
+            } else {
+                // パーミッションリクエストが不要な場合 (requestPermissionがないブラウザなど)
+                initializeSensors();
+            }
+        }
+        
+        // パーミッションボタンの生成と表示ロジック
+        if ((window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') ||
+            (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function')) {
+            
+            // 既に許可されているか確認 (一部ブラウザでは再表示時に不要な場合がある)
+            Promise.all([
+                navigator.permissions && navigator.permissions.query({ name: "accelerometer" }).catch(()=>({state:'prompt'})), // accelerometerは'generic-sensor' APIだが参考
+                navigator.permissions && navigator.permissions.query({ name: "gyroscope" }).catch(()=>({state:'prompt'})),
+                // DeviceOrientationには標準のPermission API名がないので、ここではDeviceMotionに依存
+            ]).then(results => {
+                const motionGranted = results[0]?.state === 'granted' && results[1]?.state === 'granted';
+                // DeviceOrientationEvent.requestPermission があるが、上記で既に許可されているかどうかの明確な Permission API Query がない
+                // そのため、ボタンは表示し、押された時に requestPermission を呼ぶのが安全
+                
+                // 常にボタンを表示し、押された時にパーミッションを要求する
+                // (iOSではユーザーインタラクションが必要なため)
+                const permissionButton = document.createElement('md-filled-button');
+                permissionButton.textContent = 'センサーアクセスを開始';
+                permissionButton.id = 'sensorPermissionButton';
+                permissionButton.addEventListener('click', requestSensorPermissions, { once: true }); // 一度押されたらリスナー解除
+                permissionButtonContainer.appendChild(permissionButton);
+
+                accelStatusEl.textContent = "ボタンを押してアクセスを許可";
+                gyroStatusEl.textContent = "ボタンを押してアクセスを許可";
+                orientStatusEl.textContent = "ボタンを押してアクセスを許可";
+            });
+
+        } else {
+             // パーミッションボタンが不要な場合は直接センサー監視を開始
+            requestSensorPermissions();
+        }
+
+
+        // Motion Event (Accelerometer & Gyroscope)
+        function handleMotionEvent(event) {
+            if (!motionPermissionGranted && !(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function')) {
+                 // requestPermission があり、まだ許可されていない場合は何もしない
+                 return;
+            }
+
+            // Accelerometer
+            if (event.accelerationIncludingGravity) {
+                const { x, y, z } = event.accelerationIncludingGravity;
+                accelXEl.textContent = x ? x.toFixed(2) : '-';
+                accelYEl.textContent = y ? y.toFixed(2) : '-';
+                accelZEl.textContent = z ? z.toFixed(2) : '-';
+
+                requestAnimationFrame(() => { // DOM操作はrequestAnimationFrame内で行う
+                    accelBarX.style.height = `${Math.min(100, (Math.abs(x || 0) / BAR_MAX_ACCEL) * 100)}%`;
+                    accelBarY.style.height = `${Math.min(100, (Math.abs(y || 0) / BAR_MAX_ACCEL) * 100)}%`;
+                    accelBarZ.style.height = `${Math.min(100, (Math.abs(z || 0) / BAR_MAX_ACCEL) * 100)}%`;
+                });
+                if (accelStatusEl.textContent !== "監視中...") accelStatusEl.textContent = "監視中...";
+            } else if (accelStatusEl.classList.contains('not-supported') === false && accelStatusEl.textContent.includes("ボタンを")) {
+                // サポートされていて、まだボタン待ちの場合のみ表示更新
+                accelStatusEl.textContent = '加速度データ利用不可';
+            }
+
+            // Gyroscope
+            if (event.rotationRate) {
+                const { alpha, beta, gamma } = event.rotationRate;
+                gyroAlphaEl.textContent = alpha ? alpha.toFixed(2) : '-';
+                gyroBetaEl.textContent = beta ? beta.toFixed(2) : '-';
+                gyroGammaEl.textContent = gamma ? gamma.toFixed(2) : '-';
+                if (gyroStatusEl.textContent !== "監視中...") gyroStatusEl.textContent = "監視中...";
+            } else if (gyroStatusEl.classList.contains('not-supported') === false && gyroStatusEl.textContent.includes("ボタンを")) {
+                 gyroStatusEl.textContent = 'ジャイロスコープデータ利用不可';
+            }
+        }
+
+        // Orientation Event
+        function handleOrientationEvent(event) {
+            if (!orientationPermissionGranted && !(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function')) {
+                return;
+            }
+            const { alpha, beta, gamma } = event; // absoluteは今回は使わない
+            orientAlphaEl.textContent = alpha ? alpha.toFixed(1) : '-';
+            orientBetaEl.textContent = beta ? beta.toFixed(1) : '-';
+            orientGammaEl.textContent = gamma ? gamma.toFixed(1) : '-';
+            
+            if (beta !== null && gamma !== null && alpha !== null) {
+                requestAnimationFrame(() => {
+                    orientationCube.style.transform = `rotateX(${beta.toFixed(1)}deg) rotateY(${gamma.toFixed(1)}deg) rotateZ(${alpha.toFixed(1)}deg)`;
+                });
+            }
+             if (orientStatusEl.textContent !== "監視中...") orientStatusEl.textContent = "監視中...";
+        }
+
+        // Light Sensor (Generic Sensor API)
+        function initializeLightSensor() {
+            if (!('AmbientLightSensor' in window)) {
+                lightStatusEl.textContent = '光センサー API はサポートされていません。';
+                lightStatusEl.classList.add('not-supported');
+                return;
+            }
+
+            lightStatusEl.textContent = "アクセス許可を待っています...";
+            
+            const startSensor = () => {
+                try {
+                    const sensor = new AmbientLightSensor({ frequency: 1 }); 
+                    sensor.addEventListener('reading', () => {
+                        const illuminance = sensor.illuminance;
+                        lightValueEl.textContent = illuminance ? illuminance.toFixed(0) : '-';
+                        lightStatusEl.textContent = "監視中...";
+                        lightStatusEl.classList.remove('error', 'not-supported');
+
+                        if (illuminance === null || typeof illuminance === 'undefined') {
+                            lightIconSun.style.display = 'none';
+                            lightIconMoon.style.display = 'none';
+                            return;
+                        }
+                        if (illuminance > 100) { 
+                            lightIconSun.style.display = 'inline-block';
+                            lightIconMoon.style.display = 'none';
+                        } else if (illuminance < 10) { 
+                            lightIconSun.style.display = 'none';
+                            lightIconMoon.style.display = 'inline-block';
+                        } else { 
+                            lightIconSun.style.display = 'none';
+                            lightIconMoon.style.display = 'none';
+                        }
+                    });
+                    sensor.addEventListener('error', event => {
+                        console.error("AmbientLightSensor error:", event.error);
+                        lightValueEl.textContent = `-`;
+                        if (event.error.name === 'NotAllowedError') {
+                            lightStatusEl.textContent = '光センサー: アクセスが許可されていません。';
+                        } else if (event.error.name === 'NotReadableError') {
+                            lightStatusEl.textContent = '光センサー: センサーからデータを読み取れません。';
+                        } else {
+                            lightStatusEl.textContent = `光センサーエラー: ${event.error.name}`;
+                        }
+                        lightStatusEl.classList.add('error');
+                        lightIconSun.style.display = 'none';
+                        lightIconMoon.style.display = 'none';
+                    });
+                    sensor.start();
+                } catch (error) {
+                    console.error("AmbientLightSensor initialization error:", error);
+                    lightValueEl.textContent = `-`;
+                    if (error.name === 'SecurityError') {
+                         lightStatusEl.textContent = '光センサー: 安全でないコンテキスト(非HTTPS)では利用できません。';
+                    } else if (error.name === 'ReferenceError') { // API自体がない場合
+                         lightStatusEl.textContent = '光センサー: APIがブラウザでサポートされていません。';
+                    } else {
+                        lightStatusEl.textContent = `光センサー初期化失敗: ${error.name}`;
+                    }
+                    lightStatusEl.classList.add('error');
+                }
+            };
+            
+            // Generic Sensor APIはパーミッションAPIと連携
+            if (navigator.permissions && navigator.permissions.query) {
+                navigator.permissions.query({ name: 'ambient-light-sensor' })
+                    .then(permissionStatus => {
+                        if (permissionStatus.state === 'granted') {
+                            startSensor();
+                        } else if (permissionStatus.state === 'prompt') {
+                            lightStatusEl.textContent = '光センサー: ブラウザがアクセス許可を求めています。';
+                            // 通常、AmbientLightSensorコンストラクタ呼び出し時にプロンプトが出るが、
+                            // 明示的にボタンなどでトリガーした方が良い場合もある。
+                            // ここでは、他のセンサーの許可ボタンが押された後にstartSensorが呼ばれることを期待
+                        } else { // denied
+                            lightStatusEl.textContent = '光センサーへのアクセスが拒否されました。';
+                            lightStatusEl.classList.add('error');
+                        }
+                        permissionStatus.onchange = () => { 
+                            if(permissionStatus.state === 'granted') {
+                                startSensor();
+                            } else if (permissionStatus.state === 'denied') {
+                                lightStatusEl.textContent = '光センサーへのアクセスが拒否されました。';
+                                lightStatusEl.classList.add('error');
+                            }
+                        };
+                    })
+                    .catch(e => { 
+                         console.warn("Permissions API for ambient-light-sensor not supported, trying to start sensor directly.", e);
+                         // permissions.queryが失敗しても、センサーAPI自体は存在するかもしれない
+                         // ただし、この場合プロンプトが出ない可能性も。
+                         // 多くのブラウザでは、ユーザーインタラクションがないとGeneric Sensor APIのプロンプトも出ない
+                         // そのため、他のセンサーの許可ボタンが押された後に呼ばれる initializeSensors 内で
+                         // initializeLightSensor を呼ぶことで、ユーザーインタラクションのコンテキストで実行されることを期待
+                         startSensor(); // 試行的に開始
+                    });
+            } else {
+                // パーミッションAPIがない古いブラウザの場合、直接試行
+                console.warn("Permissions API not supported, trying to start ambient-light-sensor directly.");
+                startSensor();
+            }
+        } // end of initializeLightSensor
 
     </script>
 </body>
