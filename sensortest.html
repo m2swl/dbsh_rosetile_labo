@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>センサーテスト</title>
+<style>
+  body { font-family: sans-serif; }
+  .sensor-data { margin-bottom: 10px; }
+</style>
+</head>
+<body>
+  <h1>センサー情報</h1>
+  <div id="accelerometer" class="sensor-data">加速度: X: -, Y: -, Z: -</div>
+  <div id="gyroscope" class="sensor-data">ジャイロ: X: -, Y: -, Z: -</div>
+  <div id="light" class="sensor-data">光センサー: -</div>
+
+  <script>
+    // 加速度センサー
+    if (window.DeviceMotionEvent) {
+      window.addEventListener('devicemotion', function(event) {
+        document.getElementById('accelerometer').textContent =
+          `加速度: X: ${event.accelerationIncludingGravity.x.toFixed(2)}, Y: ${event.accelerationIncludingGravity.y.toFixed(2)}, Z: ${event.accelerationIncludingGravity.z.toFixed(2)}`;
+      });
+    } else {
+      document.getElementById('accelerometer').textContent = '加速度センサーはサポートされていません。';
+    }
+
+    // ジャイロスコープ
+    if (window.DeviceOrientationEvent) { // DeviceMotionEventで角速度(rotationRate)も取れる場合が多い
+        window.addEventListener('devicemotion', function(event) {
+            if (event.rotationRate) {
+                document.getElementById('gyroscope').textContent =
+                `ジャイロ: α: ${event.rotationRate.alpha.toFixed(2)}, β: ${event.rotationRate.beta.toFixed(2)}, γ: ${event.rotationRate.gamma.toFixed(2)}`;
+            } else {
+                document.getElementById('gyroscope').textContent = 'ジャイロスコープの角速度データは利用できません。';
+            }
+        });
+    } else {
+      document.getElementById('gyroscope').textContent = 'ジャイロスコープはサポートされていません。';
+    }
+
+    // 光センサー (Generic Sensor API)
+    if ('AmbientLightSensor' in window) {
+      try {
+        const sensor = new AmbientLightSensor({frequency: 1}); // 1秒間に1回更新
+        sensor.addEventListener('reading', () => {
+          document.getElementById('light').textContent = `光センサー: ${sensor.illuminance.toFixed(2)} lux`;
+        });
+        sensor.addEventListener('error', event => {
+          document.getElementById('light').textContent = `光センサーエラー: ${event.error.name} ${event.error.message}`;
+        });
+        sensor.start();
+      } catch (error) {
+        document.getElementById('light').textContent = `光センサーの初期化に失敗: ${error.name} ${error.message}`;
+      }
+    } else {
+      document.getElementById('light').textContent = '光センサーはサポートされていません。';
+    }
+  </script>
+</body>
+</html>
