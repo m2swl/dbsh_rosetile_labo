@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>スマホセンサービューア (M3 Green)</title>
+    <title>スマホセンサービューア (M3 Green) - CSV出力機能付き</title>
     
     <!-- Material Web Components (MWC) - CDNから読み込み -->
     <script type="module" src="https://unpkg.com/@material/web/all.js?module"></script>
@@ -119,9 +119,6 @@
         }
         .theme-switch-container md-icon { /* アイコンの色を調整 */
             color: var(--md-sys-color-on-surface-variant);
-        }
-        .theme-switch-container span { /* 古いコードの残骸なので削除しても良い */
-             margin-right: 8px;
         }
 
         md-card {
@@ -250,6 +247,24 @@
             margin-bottom: 20px;
         }
         
+        /* Recording Controls */
+        .recording-controls {
+            display: flex;
+            gap: 10px; /* ボタン間のスペース */
+            align-items: center;
+            justify-content: center; /* 中央揃え */
+            margin-bottom: 10px;
+        }
+        .recording-controls md-filled-button,
+        .recording-controls md-outlined-button {
+             margin: 0 4px; /* ボタンの左右マージン */
+        }
+        #recordingStatus {
+            font-size: 0.9em;
+            margin-top: 8px;
+            color: var(--md-sys-color-secondary);
+        }
+
         md-switch {
             --md-switch-selected-handle-color: var(--md-sys-color-on-primary);
             --md-switch-selected-hover-handle-color: var(--md-sys-color-on-primary);
@@ -260,12 +275,15 @@
             --md-switch-selected-focus-track-color: var(--md-sys-color-primary);
             --md-switch-unselected-handle-color: var(--md-sys-color-outline);
             --md-switch-unselected-hover-handle-color: var(--md-sys-color-outline);
-            /* 他多数 */
         }
         md-filled-button {
             --md-filled-button-container-color: var(--md-sys-color-primary);
             --md-filled-button-label-text-color: var(--md-sys-color-on-primary);
-            /* 他多数 */
+        }
+        md-outlined-button { /* アウトラインボタンのテーマ対応 */
+            --md-outlined-button-label-text-color: var(--md-sys-color-primary);
+            --md-outlined-button-outline-color: var(--md-sys-color-outline);
+            /* ホバーやフォーカス時の色も必要に応じて設定 */
         }
     </style>
 </head>
@@ -284,6 +302,32 @@
         <div id="permissionButtonContainer">
              <!-- iOS Safariなどでセンサー許可を促すボタンがここに追加されます -->
         </div>
+
+        <!-- Recording Card -->
+        <md-card>
+            <div class="card-header">
+                <md-icon>fiber_manual_record</md-icon>
+                <h2>データ記録 (CSV)</h2>
+            </div>
+            <div class="card-content">
+                <div class="recording-controls">
+                    <md-filled-button id="startRecordingButton">
+                        <md-icon slot="icon">play_arrow</md-icon>
+                        記録開始
+                    </md-filled-button>
+                    <md-outlined-button id="stopRecordingButton" disabled>
+                        <md-icon slot="icon">stop</md-icon>
+                        記録停止
+                    </md-outlined-button>
+                    <md-filled-button id="downloadCSVButton" disabled>
+                        <md-icon slot="icon">download</md-icon>
+                        CSVダウンロード
+                    </md-filled-button>
+                </div>
+                <p class="status-text" id="recordingStatus">待機中。センサーアクセスを許可してください。</p>
+            </div>
+        </md-card>
+
 
         <!-- Device Orientation Card -->
         <md-card>
@@ -359,7 +403,7 @@
         </md-card>
 
         <p style="font-size: 0.8em; text-align: center; margin-top: 20px; color: var(--md-sys-color-on-surface-variant);">
-            注意: センサーの利用にはブラウザからの許可が必要な場合があります。また、お使いのデバイスやブラウザによっては一部センサーが利用できないことがあります。
+            注意: センサーの利用にはブラウザからの許可が必要な場合があります。また、お使いのデバイスやブラウザによっては一部センサーが利用できないことがあります。記録されたデータはCSV形式でダウンロードできます。
         </p>
     </div>
 
@@ -370,6 +414,12 @@
         const body = document.body;
         const themeSwitch = document.getElementById('themeSwitch');
         const permissionButtonContainer = document.getElementById('permissionButtonContainer');
+
+        // Recording Elements
+        const startRecordingButton = document.getElementById('startRecordingButton');
+        const stopRecordingButton = document.getElementById('stopRecordingButton');
+        const downloadCSVButton = document.getElementById('downloadCSVButton');
+        const recordingStatusEl = document.getElementById('recordingStatus');
 
         // Orientation
         const orientationCube = document.getElementById('orientationCube');
@@ -400,25 +450,36 @@
         const lightIconSun = document.getElementById('light-icon-sun');
         const lightIconMoon = document.getElementById('light-icon-moon');
 
+        // --- Recording Variables ---
+        let isRecording = false;
+        let recordedData = [];
+        let recordingIntervalId = null;
+        const RECORDING_INTERVAL_MS = 100; // 100ms ごとにデータを記録 (10Hz)
+        let currentSensorValues = {
+            timestamp: null,
+            accelX: null, accelY: null, accelZ: null,
+            orientAlpha: null, orientBeta: null, orientGamma: null,
+            gyroAlpha: null, gyroBeta: null, gyroGamma: null,
+            illuminance: null
+        };
+
 
         // --- Theme Switch Logic ---
         function applyTheme(theme) {
             body.dataset.theme = theme;
             localStorage.setItem('theme', theme);
-            if (themeSwitch) { // themeSwitchがDOMに存在するかの確認
+            if (themeSwitch) { 
                 themeSwitch.selected = (theme === 'dark');
                 themeSwitch.ariaLabel = theme === 'dark' ? 'ライトテーマに切り替え' : 'ダークテーマに切り替え';
             }
         }
 
         const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-        // localStorageに保存されたテーマがあればそれを優先、なければOSの設定に従う
         const savedTheme = localStorage.getItem('theme');
         const currentTheme = savedTheme || (prefersDarkScheme.matches ? 'dark' : 'light');
         applyTheme(currentTheme);
 
         prefersDarkScheme.addEventListener('change', (e) => {
-            // 手動でテーマが設定されていない場合のみOS設定に追従
             if (!localStorage.getItem('theme')) {
                  applyTheme(e.matches ? 'dark' : 'light');
             }
@@ -433,22 +494,53 @@
         // --- Sensor Permission and Initialization ---
         let motionPermissionGranted = false;
         let orientationPermissionGranted = false;
-        let sensorsInitialized = false; // センサー初期化済みフラグ
+        let sensorsInitialized = false; 
+        let anySensorSupported = false; // いずれかのセンサーが利用可能か
+
+        function updateRecordingButtonState() {
+            if (!startRecordingButton) return; // DOM読み込み前は実行しない
+
+            if (anySensorSupported) {
+                startRecordingButton.disabled = isRecording;
+                stopRecordingButton.disabled = !isRecording;
+                downloadCSVButton.disabled = isRecording || recordedData.length === 0;
+                if (isRecording) {
+                    recordingStatusEl.textContent = `記録中... (${recordedData.length}件)`;
+                } else if (recordedData.length > 0) {
+                    recordingStatusEl.textContent = `記録停止中。${recordedData.length}件のデータを記録済み。CSVをダウンロードできます。`;
+                } else if (sensorsInitialized) {
+                     recordingStatusEl.textContent = "センサー監視中。記録を開始できます。";
+                }
+            } else {
+                startRecordingButton.disabled = true;
+                stopRecordingButton.disabled = true;
+                downloadCSVButton.disabled = true;
+                if (sensorsInitialized) { // 初期化試行後
+                    recordingStatusEl.textContent = "利用可能なセンサーがないため記録できません。";
+                } else {
+                    recordingStatusEl.textContent = "センサーのアクセス許可待ち、または利用できません。";
+                }
+            }
+        }
+
 
         function initializeSensors() {
-            if (sensorsInitialized) return; // 既に初期化済みなら何もしない
+            if (sensorsInitialized) return;
+
+            anySensorSupported = false; // リセット
 
             // Device Motion (Accelerometer, Gyroscope)
             if (motionPermissionGranted) {
                 window.addEventListener('devicemotion', handleMotionEvent, { passive: true });
                 accelStatusEl.textContent = "監視中...";
                 gyroStatusEl.textContent = "監視中...";
+                anySensorSupported = true;
             } else if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function') {
-                // requestPermissionがないブラウザでは暗黙的に許可されているとみなす
                 window.addEventListener('devicemotion', handleMotionEvent, { passive: true });
                 accelStatusEl.textContent = "監視中...";
                 gyroStatusEl.textContent = "監視中...";
-                motionPermissionGranted = true; // フラグを立てる
+                motionPermissionGranted = true;
+                anySensorSupported = true;
             } else if (!window.DeviceMotionEvent) {
                 accelStatusEl.textContent = '加速度センサーはサポートされていません。';
                 accelStatusEl.classList.add('not-supported');
@@ -461,23 +553,24 @@
             if (orientationPermissionGranted) {
                 window.addEventListener('deviceorientation', handleOrientationEvent, { passive: true });
                 orientStatusEl.textContent = "監視中...";
+                anySensorSupported = true;
             } else if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function') {
-                 // requestPermissionがないブラウザでは暗黙的に許可されているとみなす
                 window.addEventListener('deviceorientation', handleOrientationEvent, { passive: true });
                 orientStatusEl.textContent = "監視中...";
-                orientationPermissionGranted = true; // フラグを立てる
+                orientationPermissionGranted = true;
+                anySensorSupported = true;
             } else if(!window.DeviceOrientationEvent) {
                 orientStatusEl.textContent = '向きセンサーはサポートされていません。';
                 orientStatusEl.classList.add('not-supported');
             }
             
-            // Light Sensor (Generic Sensor API)
-            initializeLightSensor(); // Light Sensorの初期化は別途行う
+            initializeLightSensor(); 
 
             sensorsInitialized = true;
             if (permissionButtonContainer.firstChild) {
-                 permissionButtonContainer.firstChild.remove(); // 許可ボタンを削除
+                 permissionButtonContainer.firstChild.remove(); 
             }
+            updateRecordingButtonState(); // 初期状態のボタンを更新
         }
 
 
@@ -525,91 +618,90 @@
             }
 
             if (promises.length > 0) {
-                Promise.allSettled(promises).then(() => { // allSettledで全ての結果を待つ
+                Promise.allSettled(promises).then(() => {
                     initializeSensors();
                 });
             } else {
-                // パーミッションリクエストが不要な場合 (requestPermissionがないブラウザなど)
                 initializeSensors();
             }
         }
         
-        // パーミッションボタンの生成と表示ロジック
         if ((window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') ||
             (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function')) {
             
-            // 既に許可されているか確認 (一部ブラウザでは再表示時に不要な場合がある)
             Promise.all([
-                navigator.permissions && navigator.permissions.query({ name: "accelerometer" }).catch(()=>({state:'prompt'})), // accelerometerは'generic-sensor' APIだが参考
+                navigator.permissions && navigator.permissions.query({ name: "accelerometer" }).catch(()=>({state:'prompt'})),
                 navigator.permissions && navigator.permissions.query({ name: "gyroscope" }).catch(()=>({state:'prompt'})),
-                // DeviceOrientationには標準のPermission API名がないので、ここではDeviceMotionに依存
-            ]).then(results => {
-                const motionGranted = results[0]?.state === 'granted' && results[1]?.state === 'granted';
-                // DeviceOrientationEvent.requestPermission があるが、上記で既に許可されているかどうかの明確な Permission API Query がない
-                // そのため、ボタンは表示し、押された時に requestPermission を呼ぶのが安全
-                
-                // 常にボタンを表示し、押された時にパーミッションを要求する
-                // (iOSではユーザーインタラクションが必要なため)
+            ]).then(() => {
                 const permissionButton = document.createElement('md-filled-button');
                 permissionButton.textContent = 'センサーアクセスを開始';
                 permissionButton.id = 'sensorPermissionButton';
-                permissionButton.addEventListener('click', requestSensorPermissions, { once: true }); // 一度押されたらリスナー解除
+                permissionButton.addEventListener('click', requestSensorPermissions, { once: true }); 
                 permissionButtonContainer.appendChild(permissionButton);
 
                 accelStatusEl.textContent = "ボタンを押してアクセスを許可";
                 gyroStatusEl.textContent = "ボタンを押してアクセスを許可";
                 orientStatusEl.textContent = "ボタンを押してアクセスを許可";
+                recordingStatusEl.textContent = "ボタンを押してセンサーアクセスを許可してください。";
             });
 
         } else {
-             // パーミッションボタンが不要な場合は直接センサー監視を開始
             requestSensorPermissions();
         }
 
-
-        // Motion Event (Accelerometer & Gyroscope)
+        // --- Sensor Event Handlers (Update currentSensorValues) ---
         function handleMotionEvent(event) {
             if (!motionPermissionGranted && !(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function')) {
-                 // requestPermission があり、まだ許可されていない場合は何もしない
                  return;
             }
 
-            // Accelerometer
             if (event.accelerationIncludingGravity) {
                 const { x, y, z } = event.accelerationIncludingGravity;
+                currentSensorValues.accelX = x;
+                currentSensorValues.accelY = y;
+                currentSensorValues.accelZ = z;
                 accelXEl.textContent = x ? x.toFixed(2) : '-';
                 accelYEl.textContent = y ? y.toFixed(2) : '-';
                 accelZEl.textContent = z ? z.toFixed(2) : '-';
 
-                requestAnimationFrame(() => { // DOM操作はrequestAnimationFrame内で行う
+                requestAnimationFrame(() => { 
                     accelBarX.style.height = `${Math.min(100, (Math.abs(x || 0) / BAR_MAX_ACCEL) * 100)}%`;
                     accelBarY.style.height = `${Math.min(100, (Math.abs(y || 0) / BAR_MAX_ACCEL) * 100)}%`;
                     accelBarZ.style.height = `${Math.min(100, (Math.abs(z || 0) / BAR_MAX_ACCEL) * 100)}%`;
                 });
                 if (accelStatusEl.textContent !== "監視中...") accelStatusEl.textContent = "監視中...";
-            } else if (accelStatusEl.classList.contains('not-supported') === false && accelStatusEl.textContent.includes("ボタンを")) {
-                // サポートされていて、まだボタン待ちの場合のみ表示更新
-                accelStatusEl.textContent = '加速度データ利用不可';
+            } else {
+                currentSensorValues.accelX = null; currentSensorValues.accelY = null; currentSensorValues.accelZ = null;
+                if (accelStatusEl.classList.contains('not-supported') === false && accelStatusEl.textContent.includes("ボタンを")) {
+                    accelStatusEl.textContent = '加速度データ利用不可';
+                }
             }
 
-            // Gyroscope
             if (event.rotationRate) {
                 const { alpha, beta, gamma } = event.rotationRate;
+                currentSensorValues.gyroAlpha = alpha;
+                currentSensorValues.gyroBeta = beta;
+                currentSensorValues.gyroGamma = gamma;
                 gyroAlphaEl.textContent = alpha ? alpha.toFixed(2) : '-';
                 gyroBetaEl.textContent = beta ? beta.toFixed(2) : '-';
                 gyroGammaEl.textContent = gamma ? gamma.toFixed(2) : '-';
                 if (gyroStatusEl.textContent !== "監視中...") gyroStatusEl.textContent = "監視中...";
-            } else if (gyroStatusEl.classList.contains('not-supported') === false && gyroStatusEl.textContent.includes("ボタンを")) {
-                 gyroStatusEl.textContent = 'ジャイロスコープデータ利用不可';
+            } else {
+                 currentSensorValues.gyroAlpha = null; currentSensorValues.gyroBeta = null; currentSensorValues.gyroGamma = null;
+                 if (gyroStatusEl.classList.contains('not-supported') === false && gyroStatusEl.textContent.includes("ボタンを")) {
+                     gyroStatusEl.textContent = 'ジャイロスコープデータ利用不可';
+                }
             }
         }
 
-        // Orientation Event
         function handleOrientationEvent(event) {
             if (!orientationPermissionGranted && !(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function')) {
                 return;
             }
-            const { alpha, beta, gamma } = event; // absoluteは今回は使わない
+            const { alpha, beta, gamma } = event;
+            currentSensorValues.orientAlpha = alpha;
+            currentSensorValues.orientBeta = beta;
+            currentSensorValues.orientGamma = gamma;
             orientAlphaEl.textContent = alpha ? alpha.toFixed(1) : '-';
             orientBetaEl.textContent = beta ? beta.toFixed(1) : '-';
             orientGammaEl.textContent = gamma ? gamma.toFixed(1) : '-';
@@ -619,14 +711,14 @@
                     orientationCube.style.transform = `rotateX(${beta.toFixed(1)}deg) rotateY(${gamma.toFixed(1)}deg) rotateZ(${alpha.toFixed(1)}deg)`;
                 });
             }
-             if (orientStatusEl.textContent !== "監視中...") orientStatusEl.textContent = "監視中...";
+            if (orientStatusEl.textContent !== "監視中...") orientStatusEl.textContent = "監視中...";
         }
 
-        // Light Sensor (Generic Sensor API)
         function initializeLightSensor() {
             if (!('AmbientLightSensor' in window)) {
                 lightStatusEl.textContent = '光センサー API はサポートされていません。';
                 lightStatusEl.classList.add('not-supported');
+                currentSensorValues.illuminance = null;
                 return;
             }
 
@@ -637,6 +729,10 @@
                     const sensor = new AmbientLightSensor({ frequency: 1 }); 
                     sensor.addEventListener('reading', () => {
                         const illuminance = sensor.illuminance;
+                        currentSensorValues.illuminance = illuminance;
+                        anySensorSupported = true; // 光センサーも利用可能とみなす
+                        updateRecordingButtonState();
+
                         lightValueEl.textContent = illuminance ? illuminance.toFixed(0) : '-';
                         lightStatusEl.textContent = "監視中...";
                         lightStatusEl.classList.remove('error', 'not-supported');
@@ -659,6 +755,7 @@
                     });
                     sensor.addEventListener('error', event => {
                         console.error("AmbientLightSensor error:", event.error);
+                        currentSensorValues.illuminance = null;
                         lightValueEl.textContent = `-`;
                         if (event.error.name === 'NotAllowedError') {
                             lightStatusEl.textContent = '光センサー: アクセスが許可されていません。';
@@ -670,23 +767,25 @@
                         lightStatusEl.classList.add('error');
                         lightIconSun.style.display = 'none';
                         lightIconMoon.style.display = 'none';
+                        updateRecordingButtonState();
                     });
                     sensor.start();
                 } catch (error) {
                     console.error("AmbientLightSensor initialization error:", error);
+                    currentSensorValues.illuminance = null;
                     lightValueEl.textContent = `-`;
                     if (error.name === 'SecurityError') {
                          lightStatusEl.textContent = '光センサー: 安全でないコンテキスト(非HTTPS)では利用できません。';
-                    } else if (error.name === 'ReferenceError') { // API自体がない場合
+                    } else if (error.name === 'ReferenceError') { 
                          lightStatusEl.textContent = '光センサー: APIがブラウザでサポートされていません。';
                     } else {
                         lightStatusEl.textContent = `光センサー初期化失敗: ${error.name}`;
                     }
                     lightStatusEl.classList.add('error');
+                     updateRecordingButtonState();
                 }
             };
             
-            // Generic Sensor APIはパーミッションAPIと連携
             if (navigator.permissions && navigator.permissions.query) {
                 navigator.permissions.query({ name: 'ambient-light-sensor' })
                     .then(permissionStatus => {
@@ -694,10 +793,8 @@
                             startSensor();
                         } else if (permissionStatus.state === 'prompt') {
                             lightStatusEl.textContent = '光センサー: ブラウザがアクセス許可を求めています。';
-                            // 通常、AmbientLightSensorコンストラクタ呼び出し時にプロンプトが出るが、
-                            // 明示的にボタンなどでトリガーした方が良い場合もある。
-                            // ここでは、他のセンサーの許可ボタンが押された後にstartSensorが呼ばれることを期待
-                        } else { // denied
+                            // ユーザーインタラクション後に呼ばれることを期待
+                        } else { 
                             lightStatusEl.textContent = '光センサーへのアクセスが拒否されました。';
                             lightStatusEl.classList.add('error');
                         }
@@ -708,23 +805,113 @@
                                 lightStatusEl.textContent = '光センサーへのアクセスが拒否されました。';
                                 lightStatusEl.classList.add('error');
                             }
+                             updateRecordingButtonState();
                         };
                     })
                     .catch(e => { 
                          console.warn("Permissions API for ambient-light-sensor not supported, trying to start sensor directly.", e);
-                         // permissions.queryが失敗しても、センサーAPI自体は存在するかもしれない
-                         // ただし、この場合プロンプトが出ない可能性も。
-                         // 多くのブラウザでは、ユーザーインタラクションがないとGeneric Sensor APIのプロンプトも出ない
-                         // そのため、他のセンサーの許可ボタンが押された後に呼ばれる initializeSensors 内で
-                         // initializeLightSensor を呼ぶことで、ユーザーインタラクションのコンテキストで実行されることを期待
-                         startSensor(); // 試行的に開始
+                         startSensor(); 
                     });
             } else {
-                // パーミッションAPIがない古いブラウザの場合、直接試行
                 console.warn("Permissions API not supported, trying to start ambient-light-sensor directly.");
                 startSensor();
             }
-        } // end of initializeLightSensor
+        }
+
+        // --- Recording Logic ---
+        function recordCurrentData() {
+            if (!isRecording) return;
+
+            const now = Date.now();
+            currentSensorValues.timestamp = now;
+
+            // currentSensorValues のコピーを記録 (参照ではなく値)
+            recordedData.push({ ...currentSensorValues });
+            
+            if (recordedData.length % 10 === 0) { // 1秒ごとくらいに表示更新 (10Hzの場合)
+                 recordingStatusEl.textContent = `記録中... (${recordedData.length}件)`;
+            }
+        }
+
+        function startRecording() {
+            if (!anySensorSupported) {
+                recordingStatusEl.textContent = "利用可能なセンサーがないため記録を開始できません。";
+                alert("利用可能なセンサーがないか、センサーへのアクセスが許可されていません。");
+                return;
+            }
+            isRecording = true;
+            recordedData = []; // 新規記録開始時にデータをクリア
+            recordingStatusEl.textContent = "記録を開始しました...";
+            
+            // 既存のインターバルがあればクリア
+            if (recordingIntervalId) {
+                clearInterval(recordingIntervalId);
+            }
+            recordingIntervalId = setInterval(recordCurrentData, RECORDING_INTERVAL_MS);
+            updateRecordingButtonState();
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            if (recordingIntervalId) {
+                clearInterval(recordingIntervalId);
+                recordingIntervalId = null;
+            }
+            recordingStatusEl.textContent = `記録を停止しました。${recordedData.length}件のデータを記録。`;
+            updateRecordingButtonState();
+        }
+
+        function downloadCSV() {
+            if (recordedData.length === 0) {
+                alert("記録データがありません。");
+                return;
+            }
+
+            const header = "timestamp,accelX,accelY,accelZ,orientAlpha,orientBeta,orientGamma,gyroAlpha,gyroBeta,gyroGamma,illuminance";
+            const rows = recordedData.map(row => {
+                return [
+                    row.timestamp,
+                    row.accelX !== null ? row.accelX.toFixed(3) : '',
+                    row.accelY !== null ? row.accelY.toFixed(3) : '',
+                    row.accelZ !== null ? row.accelZ.toFixed(3) : '',
+                    row.orientAlpha !== null ? row.orientAlpha.toFixed(2) : '',
+                    row.orientBeta !== null ? row.orientBeta.toFixed(2) : '',
+                    row.orientGamma !== null ? row.orientGamma.toFixed(2) : '',
+                    row.gyroAlpha !== null ? row.gyroAlpha.toFixed(3) : '',
+                    row.gyroBeta !== null ? row.gyroBeta.toFixed(3) : '',
+                    row.gyroGamma !== null ? row.gyroGamma.toFixed(3) : '',
+                    row.illuminance !== null ? row.illuminance.toFixed(0) : ''
+                ].join(',');
+            });
+
+            const csvContent = header + "\n" + rows.join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            const link = document.createElement("a");
+            if (link.download !== undefined) { // feature detection
+                const url = URL.createObjectURL(blob);
+                const now = new Date();
+                const timestampStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
+                link.setAttribute("href", url);
+                link.setAttribute("download", `sensor_data_${timestampStr}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                recordingStatusEl.textContent = `CSVファイルをダウンロードしました。 (${recordedData.length}件)`;
+            } else {
+                alert("お使いのブラウザでは自動ダウンロードがサポートされていません。");
+            }
+        }
+
+        // --- Event Listeners for Recording Controls ---
+        if(startRecordingButton) startRecordingButton.addEventListener('click', startRecording);
+        if(stopRecordingButton) stopRecordingButton.addEventListener('click', stopRecording);
+        if(downloadCSVButton) downloadCSVButton.addEventListener('click', downloadCSV);
+
+        // 初期ボタン状態の更新
+        updateRecordingButtonState();
 
     </script>
 </body>
