@@ -15,8 +15,8 @@
 
     <!-- iOS specific meta tags for PWA (optional but good to have) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default"> <!-- or black, black-translucent -->
-    <meta name="apple-mobile-web-app-title" content="Sensor Demo"> <!-- ホーム画面でのタイトル (manifest.jsonのshort_nameと合わせる) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Sensor Demo"> 
 
     <!-- Material Web Components (MWC) - CDNから読み込み -->
     <script type="module" src="https://unpkg.com/@material/web/all.js?module"></script>
@@ -28,280 +28,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 
     <style>
-        :root {
-            /* --- Green Light Theme --- */
-            --md-sys-color-primary: #006D3A; /* Primary Green */
-            --md-sys-color-on-primary: #FFFFFF;
-            --md-sys-color-primary-container: #9EF2B3; /* Light Green */
-            --md-sys-color-on-primary-container: #00210C;
-            --md-sys-color-secondary: #4F6353; /* Desaturated Green/Gray */
-            --md-sys-color-on-secondary: #FFFFFF;
-            --md-sys-color-secondary-container: #D2E8D3;
-            --md-sys-color-on-secondary-container: #0C1F13;
-            --md-sys-color-tertiary: #3E6374; /* Bluish Green/Gray */
-            --md-sys-color-on-tertiary: #FFFFFF;
-            --md-sys-color-tertiary-container: #C1E8FA;
-            --md-sys-color-on-tertiary-container: #001F2A;
-            --md-sys-color-error: #BA1A1A;
-            --md-sys-color-on-error: #FFFFFF;
-            --md-sys-color-error-container: #FFDAD6;
-            --md-sys-color-on-error-container: #410002;
-            --md-sys-color-background: #FCFDF7;
-            --md-sys-color-on-background: #1A1C1A;
-            --md-sys-color-surface: #FCFDF7;
-            --md-sys-color-on-surface: #1A1C1A;
-            --md-sys-color-surface-variant: #DDE5DA; /* Light Grayish Green */
-            --md-sys-color-on-surface-variant: #414941;
-            --md-sys-color-outline: #717971;
-            --md-sys-color-shadow: #000000;
-            --md-sys-color-inverse-surface: #2F312E;
-            --md-sys-color-inverse-on-surface: #F0F1EC;
-            --md-sys-color-inverse-primary: #83D599; /* Light Green for Dark Theme Primary */
-            
-            /* Custom properties */
-            --app-font-family: 'Noto Sans JP', sans-serif; /* Noto Sans JP for all text */
-            --app-bar-height: 56px;
-            --cube-size: 100px;
-            --bar-max-height: 50px;
-        }
-
-        [data-theme="dark"] {
-            /* --- Green Dark Theme --- */
-            --md-sys-color-primary: #83D599; /* Light Green */
-            --md-sys-color-on-primary: #00391A;
-            --md-sys-color-primary-container: #005229; /* Dark Green */
-            --md-sys-color-on-primary-container: #9EF2B3;
-            --md-sys-color-secondary: #B6CCB8;
-            --md-sys-color-on-secondary: #223527;
-            --md-sys-color-secondary-container: #384B3C;
-            --md-sys-color-on-secondary-container: #D2E8D3;
-            --md-sys-color-tertiary: #A6CDDE;
-            --md-sys-color-on-tertiary: #093544;
-            --md-sys-color-tertiary-container: #254C5B;
-            --md-sys-color-on-tertiary-container: #C1E8FA;
-            --md-sys-color-error: #FFB4AB;
-            --md-sys-color-on-error: #690005;
-            --md-sys-color-error-container: #93000A;
-            --md-sys-color-on-error-container: #FFDAD6;
-            --md-sys-color-background: #1A1C1A;
-            --md-sys-color-on-background: #E2E3DE;
-            --md-sys-color-surface: #1A1C1A; 
-            --md-sys-color-on-surface: #E2E3DE;
-            --md-sys-color-surface-variant: #414941;
-            --md-sys-color-on-surface-variant: #C1C9BF;
-            --md-sys-color-outline: #8B938A;
-        }
-
-        body {
-            font-family: var(--app-font-family); /* Apply Noto Sans JP */
-            margin: 0;
-            background-color: var(--md-sys-color-background);
-            color: var(--md-sys-color-on-background);
-            transition: background-color 0.3s ease, color 0.3s ease;
-            overscroll-behavior-y: contain;
-        }
-
-        .app-container {
-            padding: 16px;
-            padding-top: calc(var(--app-bar-height) + 16px);
-        }
-        
-        .app-bar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: var(--app-bar-height);
-            background-color: var(--md-sys-color-surface-variant);
-            color: var(--md-sys-color-on-surface-variant);
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            z-index: 1000;
-        }
-        .app-bar h1 {
-            font-size: 1.25rem; 
-            margin: 0;
-            flex-grow: 1;
-            font-weight: 500; /* Noto Sans JP */
-        }
-        .theme-switch-container {
-            display: flex;
-            align-items: center;
-        }
-        .theme-switch-container md-icon { /* アイコンの色を調整 */
-            color: var(--md-sys-color-on-surface-variant);
-        }
-
-        md-card {
-            margin-bottom: 16px;
-            background-color: var(--md-sys-color-surface);
-            --md-card-container-color: var(--md-sys-color-surface); 
-            border-radius: 12px; 
-            overflow: hidden; /* 角丸と影を綺麗に見せるため */
-        }
-        
-        .card-header {
-            display: flex;
-            align-items: center;
-            padding: 16px;
-        }
-        .card-header md-icon {
-            margin-right: 12px;
-            color: var(--md-sys-color-primary);
-        }
-        .card-header h2 {
-            margin: 0;
-            font-size: 1rem; 
-            color: var(--md-sys-color-on-surface-variant); /* ヘッダータイトルは少し薄めに */
-            font-weight: 500; /* Noto Sans JP */
-        }
-
-        .card-content {
-            padding: 16px;
-            padding-top: 0; 
-        }
-        .sensor-value {
-            font-size: 0.9rem;
-            margin-bottom: 8px;
-            color: var(--md-sys-color-on-surface-variant); /* 数値のラベルも少し薄めに */
-        }
-        .sensor-value strong { /* 値そのものははっきりと */
-            color: var(--md-sys-color-on-surface);
-            min-width: 80px; /* ラベルの幅を揃える */
-            display: inline-block;
-            font-weight: 500; /* Noto Sans JP */
-        }
-        .status-text {
-            font-size: 0.8rem;
-            color: var(--md-sys-color-secondary); /* ステータスはセカンダリカラー */
-            margin-top: 8px;
-        }
-        .error { color: var(--md-sys-color-error) !important; font-weight: 500; }
-        .not-supported { color: var(--md-sys-color-outline) !important; }
-
-        /* 3D Cube for Orientation */
-        .cube-container {
-            width: var(--cube-size);
-            height: var(--cube-size);
-            margin: 20px auto;
-            perspective: 600px; 
-        }
-        .cube {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            transform-style: preserve-3d;
-            transition: transform 0.1s linear; 
-        }
-        .cube__face {
-            position: absolute;
-            width: var(--cube-size);
-            height: var(--cube-size);
-            border: 1px solid var(--md-sys-color-outline);
-            background-color: color-mix(in srgb, var(--md-sys-color-primary-container) 70%, transparent);
-            color: var(--md-sys-color-on-primary-container);
-            font-size: calc(var(--cube-size) / 3);
-            font-weight: bold; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            opacity: 0.9;
-        }
-        .cube__face--front  { transform: rotateY(  0deg) translateZ(calc(var(--cube-size) / 2)); }
-        .cube__face--right  { transform: rotateY( 90deg) translateZ(calc(var(--cube-size) / 2)); }
-        .cube__face--back   { transform: rotateY(180deg) translateZ(calc(var(--cube-size) / 2)); }
-        .cube__face--left   { transform: rotateY(-90deg) translateZ(calc(var(--cube-size) / 2)); }
-        .cube__face--top    { transform: rotateX( 90deg) translateZ(calc(var(--cube-size) / 2)); }
-        .cube__face--bottom { transform: rotateX(-90deg) translateZ(calc(var(--cube-size) / 2)); }
-
-        /* Accelerometer Bars */
-        .bars-container {
-            display: flex;
-            justify-content: space-around;
-            align-items: flex-end;
-            height: var(--bar-max-height);
-            margin-top: 10px;
-            margin-bottom: 25px; /* ラベル分のスペース */
-        }
-        .bar {
-            width: 25%;
-            background-color: var(--md-sys-color-secondary-container);
-            transition: height 0.1s ease-out;
-            text-align: center;
-            position: relative;
-            border-radius: 4px 4px 0 0; 
-        }
-        .bar-label {
-            position: absolute;
-            bottom: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 0.8em;
-            color: var(--md-sys-color-on-surface-variant);
-        }
-        
-        /* Light Sensor Visualization */
-        .light-viz {
-            text-align: center;
-            margin-top: 10px;
-        }
-        .light-viz md-icon {
-            font-size: 48px; 
-            transition: color 0.3s ease;
-        }
-        #light-icon-sun { color: #FFC107; } 
-        #light-icon-moon { color: #90A4AE; } 
-
-        /* Permission Button */
-        #permissionButtonContainer {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        
-        /* Recording Controls */
-        .recording-controls {
-            display: flex;
-            gap: 10px; /* ボタン間のスペース */
-            align-items: center;
-            justify-content: center; /* 中央揃え */
-            margin-bottom: 10px;
-        }
-        .recording-controls md-filled-button,
-        .recording-controls md-outlined-button {
-             margin: 0 4px; /* ボタンの左右マージン */
-        }
-        #recordingStatus {
-            font-size: 0.9em;
-            margin-top: 8px;
-            color: var(--md-sys-color-secondary);
-        }
-
-        md-switch {
-            --md-switch-selected-handle-color: var(--md-sys-color-on-primary);
-            --md-switch-selected-hover-handle-color: var(--md-sys-color-on-primary);
-            --md-switch-selected-pressed-handle-color: var(--md-sys-color-on-primary);
-            --md-switch-selected-track-color: var(--md-sys-color-primary);
-            --md-switch-selected-hover-track-color: var(--md-sys-color-primary);
-            --md-switch-selected-pressed-track-color: var(--md-sys-color-primary);
-            --md-switch-selected-focus-track-color: var(--md-sys-color-primary);
-            --md-switch-unselected-handle-color: var(--md-sys-color-outline);
-            --md-switch-unselected-hover-handle-color: var(--md-sys-color-outline);
-        }
-        md-filled-button {
-            --md-filled-button-container-color: var(--md-sys-color-primary);
-            --md-filled-button-label-text-color: var(--md-sys-color-on-primary);
-        }
-        md-outlined-button { /* アウトラインボタンのテーマ対応 */
-            --md-outlined-button-label-text-color: var(--md-sys-color-primary);
-            --md-outlined-button-outline-color: var(--md-sys-color-outline);
-            /* ホバーやフォーカス時の色も必要に応じて設定 */
-        }
+        @import url(style.css);
     </style>
 </head>
-<body data-theme="light"> 
 
+<body data-theme="light"> 
     <div class="app-bar">
         <h1>センサービューア</h1>
         <div class="theme-switch-container">
@@ -313,7 +44,7 @@
 
     <div class="app-container">
         <div id="permissionButtonContainer">
-             <!-- iOS Safariなどでセンサー許可を促すボタンがここに追加されます -->
+            <!-- iOS Safariなどでセンサー許可を促すボタンがここに追加されます -->
         </div>
 
         <!-- Recording Card -->
@@ -494,7 +225,7 @@
 
         prefersDarkScheme.addEventListener('change', (e) => {
             if (!localStorage.getItem('theme')) {
-                 applyTheme(e.matches ? 'dark' : 'light');
+                applyTheme(e.matches ? 'dark' : 'light');
             }
         });
         
@@ -522,7 +253,7 @@
                 } else if (recordedData.length > 0) {
                     recordingStatusEl.textContent = `記録停止中。${recordedData.length}件のデータを記録済み。CSVをダウンロードできます。`;
                 } else if (sensorsInitialized) {
-                     recordingStatusEl.textContent = "センサー監視中。記録を開始できます。";
+                    recordingStatusEl.textContent = "センサー監視中。記録を開始できます。";
                 }
             } else {
                 startRecordingButton.disabled = true;
@@ -581,7 +312,7 @@
 
             sensorsInitialized = true;
             if (permissionButtonContainer.firstChild) {
-                 permissionButtonContainer.firstChild.remove(); 
+                permissionButtonContainer.firstChild.remove(); 
             }
             updateRecordingButtonState(); // 初期状態のボタンを更新
         }
@@ -665,7 +396,7 @@
         // --- Sensor Event Handlers (Update currentSensorValues) ---
         function handleMotionEvent(event) {
             if (!motionPermissionGranted && !(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function')) {
-                 return;
+                return;
             }
 
             if (event.accelerationIncludingGravity) {
@@ -700,9 +431,9 @@
                 gyroGammaEl.textContent = gamma ? gamma.toFixed(2) : '-';
                 if (gyroStatusEl.textContent !== "監視中...") gyroStatusEl.textContent = "監視中...";
             } else {
-                 currentSensorValues.gyroAlpha = null; currentSensorValues.gyroBeta = null; currentSensorValues.gyroGamma = null;
-                 if (gyroStatusEl.classList.contains('not-supported') === false && gyroStatusEl.textContent.includes("ボタンを")) {
-                     gyroStatusEl.textContent = 'ジャイロスコープデータ利用不可';
+                currentSensorValues.gyroAlpha = null; currentSensorValues.gyroBeta = null; currentSensorValues.gyroGamma = null;
+                if (gyroStatusEl.classList.contains('not-supported') === false && gyroStatusEl.textContent.includes("ボタンを")) {
+                    gyroStatusEl.textContent = 'ジャイロスコープデータ利用不可';
                 }
             }
         }
@@ -788,14 +519,14 @@
                     currentSensorValues.illuminance = null;
                     lightValueEl.textContent = `-`;
                     if (error.name === 'SecurityError') {
-                         lightStatusEl.textContent = '光センサー: 安全でないコンテキスト(非HTTPS)では利用できません。';
+                        lightStatusEl.textContent = '光センサー: 安全でないコンテキスト(非HTTPS)では利用できません。';
                     } else if (error.name === 'ReferenceError') { 
-                         lightStatusEl.textContent = '光センサー: APIがブラウザでサポートされていません。';
+                        lightStatusEl.textContent = '光センサー: APIがブラウザでサポートされていません。';
                     } else {
                         lightStatusEl.textContent = `光センサー初期化失敗: ${error.name}`;
                     }
                     lightStatusEl.classList.add('error');
-                     updateRecordingButtonState();
+                    updateRecordingButtonState();
                 }
             };
             
@@ -818,12 +549,12 @@
                                 lightStatusEl.textContent = '光センサーへのアクセスが拒否されました。';
                                 lightStatusEl.classList.add('error');
                             }
-                             updateRecordingButtonState();
+                            updateRecordingButtonState();
                         };
                     })
                     .catch(e => { 
-                         console.warn("Permissions API for ambient-light-sensor not supported, trying to start sensor directly.", e);
-                         startSensor(); 
+                        console.warn("Permissions API for ambient-light-sensor not supported, trying to start sensor directly.", e);
+                        startSensor(); 
                     });
             } else {
                 console.warn("Permissions API not supported, trying to start ambient-light-sensor directly.");
@@ -842,7 +573,7 @@
             recordedData.push({ ...currentSensorValues });
             
             if (recordedData.length % 10 === 0) { // 1秒ごとくらいに表示更新 (10Hzの場合)
-                 recordingStatusEl.textContent = `記録中... (${recordedData.length}件)`;
+                recordingStatusEl.textContent = `記録中... (${recordedData.length}件)`;
             }
         }
 
