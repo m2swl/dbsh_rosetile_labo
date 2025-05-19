@@ -1,11 +1,11 @@
 {
-    "name": "スマホセンサービューア (M3 Green)",
-    "short_name": "センサービューア",
-    "description": "スマートフォンのセンサー情報を表示・記録するアプリです。",
+    "name": "Sensor Demo",
+    "short_name": "Sensor Demo",
+    "description": "Sensor Demo Web Application",
     "start_url": "./index.html",
     "display": "standalone",    
     "background_color": "#FCFDF7", 
-    "theme_color": "#006D3A",      
+    "theme_color": "#9EF2B3",      
     "orientation": "any",         
     "icons": [
         {
