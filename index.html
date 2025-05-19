@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-title" content="Sensor Demo"> 
 
     <!--  iOS Home Screen Icon -->
-    <link rel="apple-touch-icon" href="./icons/icon-192x192.png"> 
+    <link rel="apple-touch-icon" href="./icons/iosicon-512x512.png"> 
 
     <!-- Material Web Components (MWC) - CDNから読み込み -->
     <script type="module" src="https://unpkg.com/@material/web/all.js?module"></script>
@@ -268,9 +268,9 @@
             } else if (sensorsInitialized && !anySensorSupported && !motionPermissionGranted && !orientationPermissionGranted) {
                 recordingStatusEl.textContent = "利用可能なセンサーがありません。";
             } else if (needsExplicitPermission && !mainPermissionsGranted) {
-                recordingStatusEl.textContent = "左の🔒アイコンからセンサーアクセスを許可してください。";
+                recordingStatusEl.textContent = "左のアイコンからセンサーアクセスを許可してください。";
             } else {
-                 recordingStatusEl.textContent = "センサー準備中または利用不可。";
+                recordingStatusEl.textContent = "センサー準備中または利用不可。";
             }
         }
 
@@ -366,9 +366,9 @@
                 sensorPermissionIconButton.addEventListener('click', requestSensorPermissions, { once: true });
             }
             // 初期ステータスメッセージ
-            accelStatusEl.textContent = "🔒アイコンから許可";
-            gyroStatusEl.textContent = "🔒アイコンから許可";
-            orientStatusEl.textContent = "🔒アイコンから許可";
+            accelStatusEl.textContent = "アイコンから許可";
+            gyroStatusEl.textContent = "アイコンから許可";
+            orientStatusEl.textContent = "アイコンから許可";
         } else {
             if (sensorPermissionIconButton) sensorPermissionIconButton.style.display = 'none';
             requestSensorPermissions(); // 直接センサー初期化を試みる
@@ -465,7 +465,20 @@
         }
 
         // --- Recording Logic ---
-        function recordCurrentData() { /* ... (変更なし) ... */ }
+        function recordCurrentData() {
+            if (!isRecording) return;
+
+            const now = Date.now();
+            currentSensorValues.timestamp = now;
+
+            // currentSensorValues のコピーを記録 (参照ではなく値)
+            recordedData.push({ ...currentSensorValues });
+            
+            if (recordedData.length % 10 === 0) { // 1秒ごとくらいに表示更新 (10Hzの場合)
+                recordingStatusEl.textContent = `記録中... (${recordedData.length}件)`;
+            }
+        }
+
         function startRecording() {
             if (!sensorsInitialized || (!anySensorSupported && !motionPermissionGranted && !orientationPermissionGranted)) {
                 alert("利用可能なセンサーがないか、センサーへのアクセスが許可されていません。");
@@ -476,12 +489,58 @@
             recordingIntervalId = setInterval(recordCurrentData, RECORDING_INTERVAL_MS);
             updateRecordingButtonState();
         }
-        function stopRecording() { /* ... (変更なし、最後に updateRecordingButtonState() ) ... */
+        function stopRecording() {
             isRecording = false;
-            if (recordingIntervalId) { clearInterval(recordingIntervalId); recordingIntervalId = null; }
+            if (recordingIntervalId) {
+                clearInterval(recordingIntervalId);
+                recordingIntervalId = null;
+            }
+            recordingStatusEl.textContent = `記録を停止しました。${recordedData.length}件のデータを記録。`;
             updateRecordingButtonState();
         }
-        function downloadCSV() { /* ... (変更なし、最後に updateRecordingButtonState() の呼び出しは不要かも) ... */ }
+        function downloadCSV() {
+            if (recordedData.length === 0) {
+                alert("記録データがありません。");
+                return;
+            }
+
+            const header = "timestamp,accelX,accelY,accelZ,orientAlpha,orientBeta,orientGamma,gyroAlpha,gyroBeta,gyroGamma,illuminance";
+            const rows = recordedData.map(row => {
+                return [
+                    row.timestamp,
+                    row.accelX !== null ? row.accelX.toFixed(3) : '',
+                    row.accelY !== null ? row.accelY.toFixed(3) : '',
+                    row.accelZ !== null ? row.accelZ.toFixed(3) : '',
+                    row.orientAlpha !== null ? row.orientAlpha.toFixed(2) : '',
+                    row.orientBeta !== null ? row.orientBeta.toFixed(2) : '',
+                    row.orientGamma !== null ? row.orientGamma.toFixed(2) : '',
+                    row.gyroAlpha !== null ? row.gyroAlpha.toFixed(3) : '',
+                    row.gyroBeta !== null ? row.gyroBeta.toFixed(3) : '',
+                    row.gyroGamma !== null ? row.gyroGamma.toFixed(3) : '',
+                    row.illuminance !== null ? row.illuminance.toFixed(0) : ''
+                ].join(',');
+            });
+
+            const csvContent = header + "\n" + rows.join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            const link = document.createElement("a");
+            if (link.download !== undefined) { // feature detection
+                const url = URL.createObjectURL(blob);
+                const now = new Date();
+                const timestampStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
+                link.setAttribute("href", url);
+                link.setAttribute("download", `sensor_data_${timestampStr}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                recordingStatusEl.textContent = `CSVファイルをダウンロードしました。 (${recordedData.length}件)`;
+            } else {
+                alert("お使いのブラウザでは自動ダウンロードがサポートされていません。");
+            }
+        }
 
         // Event Listeners for Recording Controls
         if(startRecordingIconButton) startRecordingIconButton.addEventListener('click', startRecording);
