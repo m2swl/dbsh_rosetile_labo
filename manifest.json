@@ -4,7 +4,7 @@
     "description": "Sensor Demo Web Application",
     "start_url": "./index.html",
     "display": "standalone",    
-    "background_color": "#FCFDF7", 
+    "background_color": "#FFFFFF", 
     "theme_color": "#9EF2B3",      
     "orientation": "any",         
     "icons": [

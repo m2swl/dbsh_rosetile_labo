@@ -140,9 +140,9 @@ md-card {
     left: 0;
     right: 0;
     z-index: 1000;
-    background-color: var(--md-sys-color-surface-variant); /* AppBarと同じような背景 */
-    box-shadow: 0 -1px 3px rgba(0,0,0,0.05), 0 -2px 8px rgba(0,0,0,0.1); /* 上向きの影 */
-    padding: 4px 0 8px 0; /* 上下パディング調整 */
+    background-color: var(--md-sys-color-surface-variant);
+    box-shadow: 0 -1px 3px rgba(0,0,0,0.05), 0 -2px 8px rgba(0,0,0,0.1);
+    padding: 4px 0 8px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
