@@ -48,29 +48,31 @@
         </div>
 
         <!-- Recording Card -->
-        <md-card>
-            <div class="card-header">
-                <md-icon>fiber_manual_record</md-icon>
-                <h2>データ記録 (CSV)</h2>
-            </div>
-            <div class="card-content">
-                <div class="recording-controls">
-                    <md-filled-button id="startRecordingButton">
-                        <md-icon slot="icon">play_arrow</md-icon>
-                        記録開始
-                    </md-filled-button>
-                    <md-outlined-button id="stopRecordingButton" disabled>
-                        <md-icon slot="icon">stop</md-icon>
-                        記録停止
-                    </md-outlined-button>
-                    <md-filled-button id="downloadCSVButton" disabled>
-                        <md-icon slot="icon">download</md-icon>
-                        CSVダウンロード
-                    </md-filled-button>
+        <div class="recording-card-fixed">
+            <md-card>
+                <div class="card-header">
+                    <md-icon>fiber_manual_record</md-icon>
+                    <h2>データ記録 (CSV)</h2>
                 </div>
-                <p class="status-text" id="recordingStatus">待機中。センサーアクセスを許可してください。</p>
-            </div>
-        </md-card>
+                <div class="card-content">
+                    <div class="recording-controls">
+                        <md-filled-button id="startRecordingButton">
+                            <md-icon slot="icon">play_arrow</md-icon>
+                            記録開始
+                        </md-filled-button>
+                        <md-outlined-button id="stopRecordingButton" disabled>
+                            <md-icon slot="icon">stop</md-icon>
+                            記録停止
+                        </md-outlined-button>
+                        <md-filled-button id="downloadCSVButton" disabled>
+                            <md-icon slot="icon">download</md-icon>
+                            CSVダウンロード
+                        </md-filled-button>
+                    </div>
+                    <p class="status-text" id="recordingStatus">待機中。センサーアクセスを許可してください。</p>
+                </div>
+            </md-card>
+        </div>
 
 
         <!-- Device Orientation Card -->

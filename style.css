@@ -231,6 +231,27 @@
         }
         
         /* Recording Controls */
+
+        .recording-card-fixed {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000; /* 必要に応じて調整 */
+            padding: 1rem;
+            box-shadow: 0 -2px 10px color-mix(in srgb, var(--md-sys-color-shadow) 10%, transparent);
+            background: linear-gradient(
+                to bottom, 
+                transparent, /* 上部は完全に透明 */
+                color-mix(in srgb, var(--md-sys-color-shadow) 25%, transparent) /* 下部は影の色(黒)を25%の不透明度で */
+            );
+        }
+
+        .recording-card-fixed md-card {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
         .recording-controls {
             display: flex;
             gap: 10px;
