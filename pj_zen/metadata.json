@@ -1,0 +1,9 @@
+{
+  "name": "Copy of ZEN Diary: Motion & Emotion Logger",
+  "description": "An application to record daily movements, sounds, and emotions, transforming them into tangible experiences like origami, visualizations, and reflective insights for a new form of ZEN practice.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "prompt": ""
+}
