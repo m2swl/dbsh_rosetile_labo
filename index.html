@@ -575,7 +575,7 @@
                 micStatusEl.textContent = 'マイク API 非対応'; micStatusEl.classList.add('not-supported');
                 micPermissionGranted = false; updateRecordingButtonState(); return Promise.resolve();
             }
-            if (microphoneStream && !forcePermissionRequest) return Promise.resolve(); // Already initialized
+            if (microphoneStream && !forcePermissionRequest) return Promise.resolve();
 
             micStatusEl.textContent = "マイクアクセス許可待機中...";
             try {
@@ -583,58 +583,85 @@
                 micPermissionGranted = true; anySensorSupported = true;
                 micStatusEl.textContent = "監視中..."; micStatusEl.classList.remove('error', 'not-supported');
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                // ★ iOS Safari対策: AudioContextがsuspended状態で始まることがあるため、resumeを試みる
+                if (audioContext.state === 'suspended') {
+                    console.log("[Mic] AudioContext is initially suspended. Attempting to resume...");
+                    // ユーザーインタラクション（ボタンクリックなど）のハンドラ内で resume() するのが最も確実だが、
+                    // ここでは初期化時に一度試みる。
+                    await audioContext.resume().then(() => {
+                        console.log("[Mic] AudioContext resumed successfully on initialization attempt.");
+                    }).catch(e => console.error("[Mic] Error resuming AudioContext on init:", e));
+                }
+                
                 analyserNode = audioContext.createAnalyser();
                 const source = audioContext.createMediaStreamSource(microphoneStream);
                 source.connect(analyserNode);
-                analyserNode.fftSize = 256; // Smaller FFT for faster response, less detail
+                analyserNode.fftSize = 256;
                 const bufferLength = analyserNode.frequencyBinCount;
                 const dataArray = new Uint8Array(bufferLength);
 
-                // ★ ログ追加: 初期化成功時
-                console.log("[Mic] Initialized. Analyser and AudioContext created.");
+                console.log("[Mic] Initialized. Analyser and AudioContext created. State:", audioContext.state);
 
                 function getDecibels() {
                     if (!micPermissionGranted || !analyserNode) {
                         currentSensorValues.decibels = null;
                         micDbfsEl.textContent = "-";
                         micLevelBar.style.width = `0%`;
-                        // console.log("[Mic] getDecibels returning early (no permission or analyserNode)"); // デバッグ時に有効化も可
                         return;
                     }
-                    analyserNode.getByteFrequencyData(dataArray); // Can also use getByteTimeDomainData
-                    let sum = 0;
-                    for (let i = 0; i < bufferLength; i++) {
-                        sum += dataArray[i];
+
+                    // ★ getDecibels が呼ばれる直前にも AudioContext の状態を確認し、必要なら resume
+                    if (audioContext.state === 'suspended') {
+                        console.log("[Mic] AudioContext suspended in getDecibels. Attempting resume...");
+                        audioContext.resume().then(() => {
+                            console.log("[Mic] AudioContext resumed in getDecibels.");
+                            if (audioContext.state === 'running') {
+                                processAudioAndScheduleNextFrame(); // resume成功後に処理実行
+                            }
+                        }).catch(e => {
+                            console.error("[Mic] Error resuming AudioContext in getDecibels:", e);
+                            // resumeに失敗した場合、次のフレームのスケジュールはしない
+                        });
+                        return; // resume試行中は一旦処理を抜ける
                     }
-                    let average = sum / bufferLength;
-                    let pseudoDbFs = (average / 128.0) * 60.0 - 60.0; // crude mapping
-                    if (average < 1) pseudoDbFs = -Infinity; // Silence
-
-                    currentSensorValues.decibels = pseudoDbFs;
-
-                    // ★ ログ追加: デシベル値更新時 (ログが大量に出る可能性があるので注意)
-                    // console.log(`[Mic] getDecibels updated value: ${currentSensorValues.decibels}`); 
-
-                    micDbfsEl.textContent = isFinite(pseudoDbFs) ? pseudoDbFs.toFixed(1) : '-∞';
                     
-                    let levelPercent = Math.min(100, Math.max(0, (average / 100) * 100)); // Max average can be > 100
-                    micLevelBar.style.width = `${levelPercent}%`;
-                    if (isFinite(pseudoDbFs) && pseudoDbFs > -50) micLevelBar.style.backgroundColor = 'var(--md-sys-color-primary)';
-                    else micLevelBar.style.backgroundColor = 'var(--md-sys-color-secondary-container)';
+                    function processAudioAndScheduleNextFrame() {
+                        analyserNode.getByteFrequencyData(dataArray);
+                        let sum = 0;
+                        for (let i = 0; i < bufferLength; i++) {
+                            sum += dataArray[i];
+                        }
+                        let average = sum / bufferLength;
+                        let pseudoDbFs = (average / 128.0) * 60.0 - 60.0;
+                        if (average < 1) pseudoDbFs = -Infinity;
 
+                        currentSensorValues.decibels = pseudoDbFs;
+                        micDbfsEl.textContent = isFinite(pseudoDbFs) ? pseudoDbFs.toFixed(1) : '-∞';
+                        
+                        let levelPercent = Math.min(100, Math.max(0, (average / 100) * 100));
+                        micLevelBar.style.width = `${levelPercent}%`;
+                        if (isFinite(pseudoDbFs) && pseudoDbFs > -50) micLevelBar.style.backgroundColor = 'var(--md-sys-color-primary)';
+                        else micLevelBar.style.backgroundColor = 'var(--md-sys-color-secondary-container)';
 
-                    if (audioContext && audioContext.state === 'running') {
-                        requestAnimationFrame(getDecibels);
+                        if (audioContext && audioContext.state === 'running') {
+                            requestAnimationFrame(getDecibels); // 次のフレームをスケジュール
+                        } else {
+                            console.warn("[Mic] AudioContext not running or getDecibels loop stopped after processing. State:", audioContext ? audioContext.state : 'N/A');
+                        }
+                    }
+
+                    if (audioContext.state === 'running') {
+                        processAudioAndScheduleNextFrame();
                     } else {
-                        // ★ ログ追加: AudioContext が実行中でない、またはループが停止した場合
-                        console.warn("[Mic] AudioContext not running or getDecibels loop stopped. State:", audioContext ? audioContext.state : 'N/A');
+                        console.warn("[Mic] AudioContext not running before processing in getDecibels. State:", audioContext.state);
+                        // ここで requestAnimationFrame(getDecibels) を呼ばないようにする
                     }
                 }
-                getDecibels(); // ループを開始
+                getDecibels();
                 updateRecordingButtonState();
                 return Promise.resolve();
             } catch (err) {
-                // console.error を使用して、エラーをより目立たせる
                 console.error("[Mic] Microphone access error:", err);
                 micStatusEl.textContent = `マイクエラー: ${err.name}`; micStatusEl.classList.add('error');
                 micPermissionGranted = false;
