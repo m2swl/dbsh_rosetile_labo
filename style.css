@@ -237,6 +237,8 @@ md-navigation-tab {
     --md-navigation-tab-active-indicator-height: 32px; /* M3標準のインジケータ高さを明示 */
     --md-navigation-tab-active-indicator-shape: 16px;  /* 高さ32pxに対して半径16pxでピル形状 */
     
+    flex: 1; /* 各タブが利用可能なスペースを均等に占めるようにする */
+
     /* タブがコンテンツを中央に配置するように念のため設定 (通常はコンポーネント内部で処理) */
     display: flex;
     flex-direction: column;
@@ -247,11 +249,24 @@ md-navigation-tab {
     padding-bottom: 16px; /* M3の Navigation tab の下部パディングの目安 */
     min-height: var(--nav-bar-height); /* タブ自体もバーの高さを確保するようにする */
     box-sizing: border-box;
-
-    /* アイコンとラベルのサイズが小さすぎる場合、これらのトークンで調整可能 */
-    /* --md-navigation-tab-icon-size: 24px; (デフォルトのはず) */
-    /* --md-navigation-tab-label-text-size: 0.75rem; (12px, デフォルトのはず) */
 }
+
+/* タブがアクティブでない場合、activeIcon を非表示にし、inactiveIcon を表示 */
+md-navigation-tab:not([active]) md-icon[slot="activeIcon"] {
+    display: none !important;
+}
+md-navigation-tab:not([active]) md-icon[slot="inactiveIcon"] {
+    display: inline-flex !important; /* または block, inline-block などコンポーネントのデフォルトに合わせて */
+}
+
+/* タブがアクティブな場合、inactiveIcon を非表示にし、activeIcon を表示 */
+md-navigation-tab[active] md-icon[slot="inactiveIcon"] {
+    display: none !important;
+}
+md-navigation-tab[active] md-icon[slot="activeIcon"] {
+    display: inline-flex !important; /* または block, inline-block などコンポーネントのデフォルトに合わせて */
+}
+
 
 /* History Page Specifics */
 #historyListContainer md-elevated-card:hover {

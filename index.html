@@ -208,6 +208,8 @@
         </md-navigation-tab>
     </md-navigation-bar>
 
+    
+
     <script type="module">
         // MWC Components, DOM Elements, etc.
         const body = document.body;
@@ -554,7 +556,7 @@
                     currentSensorValues.illuminance = null; if (sensorsInitialized) updateRecordingButtonState();
                 }
             };
-             if (navigator.permissions && navigator.permissions.query) {
+            if (navigator.permissions && navigator.permissions.query) {
                 navigator.permissions.query({ name: 'ambient-light-sensor' })
                     .then(permissionStatus => {
                         if (permissionStatus.state === 'granted') startSensor();
@@ -670,7 +672,7 @@
             }
             const videoTracks = cameraStream.getVideoTracks();
             if (videoTracks.length === 0) {
-                 alert("有効なビデオトラックがありません。"); return;
+                alert("有効なビデオトラックがありません。"); return;
             }
             const trackSettings = videoTracks[0].getSettings();
             photoCanvas.width = trackSettings.width || cameraPreview.videoWidth;
@@ -794,7 +796,7 @@
             URL.revokeObjectURL(url);
             // Status update depends on context (current recording vs history)
             if (filenamePrefix === "sensor_data_current") {
-                 recordingStatusEl.textContent = `CSVファイルをダウンロードしました。 (${dataToExport.length}件)`;
+                recordingStatusEl.textContent = `CSVファイルをダウンロードしました。 (${dataToExport.length}件)`;
             }
         }
         // Event Listeners for Recording Controls
