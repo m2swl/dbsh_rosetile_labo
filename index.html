@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rosetile Demo</title>
+    <title>Sensor Demo Pro</title>
     <link rel="icon" href="favicon.ico">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#9EF2B3">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Rosetile Demo">
+    <meta name="apple-mobile-web-app-title" content="Sensor Demo Pro">
     <link rel="apple-touch-icon" href="./icons/iosicon-512x512.png">
 
     <script type="module" src="https://unpkg.com/@material/web/all.js?module"></script>
@@ -24,7 +24,7 @@
 
 <body data-theme="light">
     <div class="app-bar">
-        <h1>Rosetile Demo</h1>
+        <h1>Sensor Demo Pro</h1>
         <div class="theme-switch-container">
             <md-icon>light_mode</md-icon>
             <md-switch id="themeSwitch"></md-switch>
@@ -140,6 +140,8 @@
                         <p class="sensor-value"><strong>高度:</strong> <span id="geo-alt">-</span> m</p>
                         <p class="sensor-value"><strong>速度:</strong> <span id="geo-speed">-</span> m/s</p>
                         <p class="sensor-value"><strong>方角:</strong> <span id="geo-head">-</span> °</p>
+                        <p class="sensor-value"><strong>場所:</strong> <span id="geo-address">-</span></p>
+                        <p class="status-text" id="geo-address-status"></p>
                         <p class="status-text" id="geo-status">待機中...</p>
                         <hr style="margin: 12px 0 8px; border: 0; border-top: 1px solid var(--md-sys-color-outline-variant);">
                         <p class="sensor-value"><strong>現在地の気温:</strong> <span id="weather-temp">-</span> °C</p>
@@ -269,7 +271,7 @@
         const sensorPermissionIconButton = document.getElementById('sensorPermissionIconButton');
         const startRecordingIconButton = document.getElementById('startRecordingIconButton');
         const stopRecordingIconButton = document.getElementById('stopRecordingIconButton');
-        const downloadCSVIconButton = document.getElementById('downloadCSVIconButton'); // For current recording
+        const downloadCSVIconButton = document.getElementById('downloadCSVIconButton');
         const recordingStatusEl = document.getElementById('recordingStatus');
 
         // Sensor UI Elements (existing)
@@ -303,18 +305,20 @@
         const cameraStatusEl = document.getElementById('camera-status');
         const lastPhotoPreviewContainer = document.getElementById('lastPhotoPreviewContainer');
 
-        // New Sensor UI Elements: Geolocation & Weather
+        // Geolocation & Weather UI Elements
         const geoLatEl = document.getElementById('geo-lat');
         const geoLonEl = document.getElementById('geo-lon');
         const geoAccEl = document.getElementById('geo-acc');
         const geoAltEl = document.getElementById('geo-alt');
         const geoSpeedEl = document.getElementById('geo-speed');
         const geoHeadEl = document.getElementById('geo-head');
+        const geoAddressEl = document.getElementById('geo-address'); // New
+        const geoAddressStatusEl = document.getElementById('geo-address-status'); // New
         const geoStatusEl = document.getElementById('geo-status');
         const weatherTempEl = document.getElementById('weather-temp');
         const weatherStatusEl = document.getElementById('weather-status');
 
-        // New Sensor UI Elements: Pedometer
+        // Pedometer UI Elements
         const pedometerStepsEl = document.getElementById('pedometer-steps');
         const pedometerStatusEl = document.getElementById('pedometer-status');
 
@@ -339,9 +343,9 @@
         // --- Global State ---
         let isRecording = false;
         let currentRecordingData = [];
-        let currentRecordingPhotos = []; // { timestamp, dataUrl }
+        let currentRecordingPhotos = [];
         let recordingIntervalId = null;
-        const RECORDING_INTERVAL_MS = 100; // Sensor data polling rate
+        const RECORDING_INTERVAL_MS = 100;
 
         let currentSensorValues = {
             timestamp: null,
@@ -351,8 +355,9 @@
             illuminance: null,
             decibels: null,
             latitude: null, longitude: null, gpsAccuracy: null, altitude: null, speed: null, heading: null,
+            address: null, // For reverse geocoded address
             temperature_celsius: null,
-            steps_interval: 0, // Steps detected in this specific interval
+            steps_interval: 0,
             photoTakenId: null
         };
 
@@ -372,18 +377,22 @@
         let geolocationPermissionGranted = false;
         let geoWatchId = null;
         let lastWeatherFetchTime = 0;
-        const WEATHER_FETCH_INTERVAL_MS = 10 * 60 * 1000; // Fetch weather at most every 10 minutes
+        const WEATHER_FETCH_INTERVAL_MS = 10 * 60 * 1000;
+        let lastFetchedAddressCoords = { lat: null, lon: null }; // For reverse geocoding frequency
+        let lastReverseGeocodeFetchTime = 0;
+        const REVERSE_GEOCODE_INTERVAL_MS = 15000; // Min 15s between reverse geocode calls
+        const REVERSE_GEOCODE_MIN_COORD_CHANGE = 0.0005; // Approx 50m latitude/longitude change
 
         // Pedometer Variables
         let currentSessionTotalSteps = 0;
         let pedometer_last_accel_mag = 0;
         let pedometer_trending_up = false;
         let pedometer_last_step_time = 0;
-        const PEDOMETER_MAGNITUDE_HIGH_THRESHOLD = 11.5; // m/s^2 (gravity + impact)
-        const PEDOMETER_MIN_TIME_BETWEEN_STEPS_MS = 280; // ms
+        const PEDOMETER_MAGNITUDE_HIGH_THRESHOLD = 11.5; 
+        const PEDOMETER_MIN_TIME_BETWEEN_STEPS_MS = 280; 
 
 
-        // --- Theme Switch Logic ---
+        // --- Theme Switch Logic (same as before) ---
         function applyTheme(theme) {
             body.dataset.theme = theme;
             localStorage.setItem('theme', theme);
@@ -407,7 +416,7 @@
             });
         }
 
-        // --- Page Navigation Logic ---
+        // --- Page Navigation Logic (same as before) ---
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
             document.getElementById(pageId).classList.add('active-page');
@@ -420,7 +429,7 @@
         navRecordTab.active = true;
 
 
-        // --- Sensor Permission and Initialization ---
+        // --- Sensor Permission and Initialization (same as before, with updates) ---
         let motionPermissionGranted = false;
         let orientationPermissionGranted = false;
         let sensorsInitialized = false;
@@ -428,17 +437,14 @@
 
         const needsExplicitPermission = (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') ||
                                     (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') ||
-                                    (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || // For mic/camera
-                                    (navigator.geolocation); // For GPS
+                                    (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || 
+                                    (navigator.geolocation); 
 
-        function updateRecordingButtonState() {
+        function updateRecordingButtonState() { /* ... (same as before) ... */ 
             if (!startRecordingIconButton) return;
             const permissionIconEl = sensorPermissionIconButton ? sensorPermissionIconButton.querySelector('md-icon') : null;
             
-            // Check individual permissions. All being true is ideal, but some can be optional.
             const allCorePermissionsGranted = motionPermissionGranted && orientationPermissionGranted && micPermissionGranted && cameraPermissionGranted && geolocationPermissionGranted;
-            // If explicit permission API isn't there, we assume it's granted or not needed for motion/orientation.
-            // Mic, Camera, GPS always need some form of explicit grant via their APIs.
             const canRunWithoutExplicitRequestAPI = !needsExplicitPermission && anySensorSupported;
 
             if (needsExplicitPermission && !(motionPermissionGranted && orientationPermissionGranted && micPermissionGranted && cameraPermissionGranted && geolocationPermissionGranted) && sensorPermissionIconButton) {
@@ -451,15 +457,13 @@
                 if (permissionIconEl) permissionIconEl.textContent = (allCorePermissionsGranted || anySensorSupported || canRunWithoutExplicitRequestAPI) ? 'lock_open' : 'lock';
             }
             
-            // Sensors ready if initialized and at least one core sensor (motion, orient, mic, gps) is supported/granted.
-            // Camera is for photos, light for illuminance, not strictly essential for timeseries recording to start.
             const essentialSensorsReady = sensorsInitialized && 
                                           (anySensorSupported || motionPermissionGranted || orientationPermissionGranted || micPermissionGranted || geolocationPermissionGranted);
 
             startRecordingIconButton.disabled = !essentialSensorsReady || isRecording;
             stopRecordingIconButton.disabled = !essentialSensorsReady || !isRecording;
             downloadCSVIconButton.disabled = !essentialSensorsReady || isRecording || currentRecordingData.length === 0;
-            takePictureButton.disabled = !cameraPermissionGranted || !cameraStream; // Photo taking independent of sensor recording
+            takePictureButton.disabled = !cameraPermissionGranted || !cameraStream; 
 
             if (isRecording) {
                 recordingStatusEl.textContent = `記録中... (${currentRecordingData.length}件)`;
@@ -471,18 +475,22 @@
                 recordingStatusEl.textContent = "利用可能なセンサーがありません。";
             } else if (needsExplicitPermission && !allCorePermissionsGranted) {
                 let missingPerms = [];
-                if (!motionPermissionGranted) missingPerms.push("動作");
-                if (!orientationPermissionGranted) missingPerms.push("向き");
-                if (!micPermissionGranted) missingPerms.push("マイク");
-                if (!cameraPermissionGranted) missingPerms.push("カメラ");
-                if (!geolocationPermissionGranted) missingPerms.push("位置情報");
-                recordingStatusEl.textContent = `左のアイコンから${missingPerms.join('/')}アクセスを許可してください。`;
+                if (!motionPermissionGranted && (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') ) missingPerms.push("動作");
+                if (!orientationPermissionGranted && (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') ) missingPerms.push("向き");
+                if (!micPermissionGranted && (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ) missingPerms.push("マイク");
+                if (!cameraPermissionGranted && (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ) missingPerms.push("カメラ");
+                if (!geolocationPermissionGranted && navigator.geolocation) missingPerms.push("位置情報");
+                if (missingPerms.length > 0) {
+                    recordingStatusEl.textContent = `左のアイコンから${missingPerms.join('/')}アクセスを許可してください。`;
+                } else {
+                     recordingStatusEl.textContent = "センサー準備中または利用不可。"; // Fallback if no specific permission is obviously missing from the list
+                }
             } else {
                 recordingStatusEl.textContent = "センサー準備中または利用不可。";
             }
         }
 
-        async function initializeSensors() {
+        async function initializeSensors() { /* ... (same as before) ... */ 
             if (sensorsInitialized) return;
 
             if (motionPermissionGranted || (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function')) {
@@ -507,13 +515,13 @@
             initializeLightSensor();
             initializeMicrophone();
             initializeCamera();
-            initializeGeolocation(); // Handles its own permission if needed or starts monitoring.
+            initializeGeolocation(); 
 
             sensorsInitialized = true;
             updateRecordingButtonState();
         }
 
-        async function requestAllPermissions() {
+        async function requestAllPermissions() { /* ... (same as before) ... */ 
             const promises = [];
             if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function' && !motionPermissionGranted) {
                 promises.push(
@@ -538,7 +546,7 @@
             }
             
             if (navigator.geolocation && !geolocationPermissionGranted) {
-                promises.push(new Promise((resolve) => { // Don't reject promise chain for geo, allow others
+                promises.push(new Promise((resolve) => { 
                     initializeGeolocation(true).finally(resolve);
                 }));
             }
@@ -546,9 +554,6 @@
             if (promises.length > 0) {
                 await Promise.allSettled(promises);
             }
-            // Re-initialize sensors after permission attempts
-            // If permissions were already granted for some, their respective init functions might have run.
-            // This ensures everything is connected if permissions are now granted.
             initializeSensors();
         }
         
@@ -560,17 +565,17 @@
              orientStatusEl.textContent = "アイコンから許可"; micStatusEl.textContent = "アイコンから許可";
              cameraStatusEl.textContent = "アイコンから許可"; geoStatusEl.textContent = "アイコンから許可";
              pedometerStatusEl.textContent = "アイコンから許可";
+             geoAddressStatusEl.textContent = "GPS許可後";
         } else { 
             if(sensorPermissionIconButton) sensorPermissionIconButton.style.display = 'none';
             motionPermissionGranted = !!window.DeviceMotionEvent;
             orientationPermissionGranted = !!window.DeviceOrientationEvent;
-            // Mic, Camera, Geo will still do their own checks/prompts if needed in their init
-            initializeSensors(); // Try to initialize directly
+            initializeSensors();
         }
 
 
-        // --- Sensor Event Handlers ---
-        function handleMotionEvent(event) {
+        // --- Sensor Event Handlers (motion, orientation, light, mic, camera same as before) ---
+        function handleMotionEvent(event) { /* ... (same as before) ... */ 
             if (!motionPermissionGranted && !(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function')) return;
             anySensorSupported = true;
             let currentAccelX = null, currentAccelY = null, currentAccelZ = null;
@@ -578,7 +583,7 @@
             if (event.accelerationIncludingGravity) {
                 const { x, y, z } = event.accelerationIncludingGravity;
                 currentSensorValues.accelX = x; currentSensorValues.accelY = y; currentSensorValues.accelZ = z;
-                currentAccelX = x; currentAccelY = y; currentAccelZ = z; // For pedometer
+                currentAccelX = x; currentAccelY = y; currentAccelZ = z; 
                 accelXEl.textContent = x ? x.toFixed(2) : '-'; accelYEl.textContent = y ? y.toFixed(2) : '-'; accelZEl.textContent = z ? z.toFixed(2) : '-';
                 requestAnimationFrame(() => {
                     accelBarX.style.height = `${Math.min(100, (Math.abs(x || 0) / BAR_MAX_ACCEL) * 100)}%`;
@@ -594,19 +599,15 @@
                 if (gyroStatusEl.textContent !== "監視中...") gyroStatusEl.textContent = "監視中...";
             }
 
-            // Pedometer Logic (using accelerationIncludingGravity)
-            // Note: This is a very basic pedometer. For more accuracy, LinearAccelerationSensor (excluding gravity)
-            // and more sophisticated algorithms (filtering, dynamic thresholds) would be needed.
             if (currentAccelX !== null && currentAccelY !== null && currentAccelZ !== null) {
                 const mag = Math.sqrt(currentAccelX**2 + currentAccelY**2 + currentAccelZ**2);
-                currentSensorValues.steps_interval = 0; // Reset for this data point
+                currentSensorValues.steps_interval = 0; 
 
                 if (isRecording) {
                     const now = Date.now();
-                    // Simple peak detection: if magnitude was rising and now drops, and the peak was high enough.
-                    if (mag > pedometer_last_accel_mag) { // Trending up
+                    if (mag > pedometer_last_accel_mag) { 
                         pedometer_trending_up = true;
-                    } else if (mag < pedometer_last_accel_mag && pedometer_trending_up) { // Trending down after up - possible peak
+                    } else if (mag < pedometer_last_accel_mag && pedometer_trending_up) { 
                         if (pedometer_last_accel_mag > PEDOMETER_MAGNITUDE_HIGH_THRESHOLD &&
                             (now - pedometer_last_step_time) > PEDOMETER_MIN_TIME_BETWEEN_STEPS_MS) {
                             currentSessionTotalSteps++;
@@ -622,8 +623,6 @@
             } else if (motionPermissionGranted && pedometerStatusEl.textContent === "監視中..." && !event.accelerationIncludingGravity) {
                  pedometerStatusEl.textContent = "加速度データなし";
             }
-
-
             if (sensorsInitialized) updateRecordingButtonState();
         }
         function handleOrientationEvent(event) { /* ... (same as before) ... */ 
@@ -685,7 +684,7 @@
                     .catch(e => { console.warn("Ambient Light Sensor permission query failed, attempting to start directly.", e); startSensor(); });
             } else { startSensor(); }
         }
-        async function initializeMicrophone(forcePermissionRequest = false) { /* ... (same as before, ensure AudioContext resume logic is robust) ... */ 
+        async function initializeMicrophone(forcePermissionRequest = false) { /* ... (same as before) ... */ 
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 micStatusEl.textContent = 'マイク API 非対応'; micStatusEl.classList.add('not-supported');
                 micPermissionGranted = false; updateRecordingButtonState(); return Promise.resolve();
@@ -794,10 +793,11 @@
         });
 
 
-        // --- Geolocation & Weather Logic ---
+        // --- Geolocation, Reverse Geocoding & Weather Logic ---
         async function initializeGeolocation(forcePermissionRequest = false) {
             if (!('geolocation' in navigator)) {
                 geoStatusEl.textContent = '位置情報 API 非対応'; geoStatusEl.classList.add('not-supported');
+                geoAddressStatusEl.textContent = '位置情報 API 非対応';
                 return Promise.resolve();
             }
 
@@ -820,10 +820,21 @@
                 geoSpeedEl.textContent = speed !== null ? speed.toFixed(1) : '-';
                 geoHeadEl.textContent = heading !== null ? heading.toFixed(1) : '-';
                 
-                if (isRecording || sensorsInitialized) { // Fetch weather if recording or just initialized with GPS
-                    fetchWeatherData(latitude, longitude);
+                // Fetch reverse geocode and weather if new significant position
+                const now = Date.now();
+                const ScoordLatChanged = Math.abs(latitude - (lastFetchedAddressCoords.lat || 0)) > REVERSE_GEOCODE_MIN_COORD_CHANGE;
+                const ScoordLonChanged = Math.abs(longitude - (lastFetchedAddressCoords.lon || 0)) > REVERSE_GEOCODE_MIN_COORD_CHANGE;
+
+                if (latitude !== null && longitude !== null) {
+                    if ((ScoordLatChanged || ScoordLonChanged || !currentSensorValues.address) && 
+                        (now - lastReverseGeocodeFetchTime > REVERSE_GEOCODE_INTERVAL_MS)) {
+                        fetchReverseGeocode(latitude, longitude);
+                        lastFetchedAddressCoords = { lat: latitude, lon: longitude };
+                        lastReverseGeocodeFetchTime = now;
+                    }
+                    fetchWeatherData(latitude, longitude); // Weather can be fetched more often if needed (throttled internally)
                 }
-                updateRecordingButtonState(); // GPS status might affect button states
+                updateRecordingButtonState();
             };
 
             const handleError = (error) => {
@@ -833,89 +844,130 @@
                 else if (error.code === 2) message = 'GPS位置取得不能';
                 else if (error.code === 3) message = 'GPSタイムアウト';
                 geoStatusEl.textContent = message; geoStatusEl.classList.add('error');
-                geolocationPermissionGranted = false; // Explicitly set if denied
-                currentSensorValues.latitude = null; /* reset other geo values too */
+                geoAddressStatusEl.textContent = message;
+                geolocationPermissionGranted = false;
+                currentSensorValues.latitude = null; /* reset other geo values */
+                currentSensorValues.longitude = null;
+                currentSensorValues.address = null;
+                geoAddressEl.textContent = "-";
                 updateRecordingButtonState();
             };
 
-            if (forcePermissionRequest || !geolocationPermissionGranted) { // Prompt for permission
+            if (forcePermissionRequest || !geolocationPermissionGranted) {
                 geoStatusEl.textContent = "GPSアクセス許可待機中...";
+                geoAddressStatusEl.textContent = "GPSアクセス許可待機中...";
                 return new Promise((resolve, reject) => {
                     navigator.geolocation.getCurrentPosition(
-                        (position) => { // Permission granted (or already had it)
+                        (position) => { 
                             handlePosition(position);
                             if (geoWatchId) navigator.geolocation.clearWatch(geoWatchId);
                             geoWatchId = navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
                             resolve();
                         },
-                        (error) => { // Permission denied or other error
+                        (error) => { 
                             handleError(error);
-                            reject(error);
+                            reject(error); // Reject promise if initial permission fails
                         },
                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
                     );
                 });
-            } else if (geolocationPermissionGranted && !geoWatchId) { // Already granted, just start watching
+            } else if (geolocationPermissionGranted && !geoWatchId) {
                  if (geoWatchId) navigator.geolocation.clearWatch(geoWatchId);
                  geoWatchId = navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
             }
             return Promise.resolve();
         }
 
+        async function fetchReverseGeocode(latitude, longitude) {
+            if (latitude === null || longitude === null) return;
+            geoAddressStatusEl.textContent = "住所情報取得中...";
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=ja,en`;
+                console.log("Requesting RevGeo:", url);
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Nominatim API error: ${response.status} ${response.statusText}`);
+                }
+                const data = await response.json();
+                console.log("RevGeo Data:", data);
+                if (data && data.display_name) {
+                    currentSensorValues.address = data.display_name;
+                    geoAddressEl.textContent = data.display_name;
+                    geoAddressStatusEl.textContent = `最終更新: ${new Date().toLocaleTimeString()}`;
+                } else {
+                    geoAddressEl.textContent = "取得失敗";
+                    geoAddressStatusEl.textContent = "住所情報なし";
+                    currentSensorValues.address = null;
+                }
+            } catch (error) {
+                console.error("Failed to fetch reverse geocode data:", error);
+                geoAddressEl.textContent = "取得エラー";
+                geoAddressStatusEl.textContent = "住所情報取得エラー";
+                currentSensorValues.address = null;
+            }
+        }
+
         async function fetchWeatherData(latitude, longitude) {
             const now = Date.now();
-            if (now - lastWeatherFetchTime < WEATHER_FETCH_INTERVAL_MS) {
-                // weatherStatusEl.textContent = `前回取得から10分以内`;
-                return; // Throttled
+            if (now - lastWeatherFetchTime < WEATHER_FETCH_INTERVAL_MS && currentSensorValues.temperature_celsius !== null) {
+                // Already have recent data, no need to spam
+                return;
             }
-            if (latitude === null || longitude === null) {
+            if (latitude === null || longitude === null || typeof latitude !== 'number' || typeof longitude !== 'number') {
                 weatherStatusEl.textContent = "GPS座標不明";
+                console.warn("[Weather] Invalid coordinates for weather fetch:", latitude, longitude);
                 return;
             }
             
             weatherStatusEl.textContent = "天気情報取得中...";
+            const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}¤t_weather=true`;
+            console.log("[Weather] Fetching weather from:", apiUrl);
+
             try {
-                const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(2)}&longitude=${longitude.toFixed(2)}¤t_weather=true`);
+                const response = await fetch(apiUrl);
+                console.log("[Weather] Response status:", response.status, response.statusText);
                 if (!response.ok) {
-                    throw new Error(`API error: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error("[Weather] API error response text:", errorText);
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
                 }
                 const data = await response.json();
-                if (data.current_weather && typeof data.current_weather.temperature !== 'undefined') {
+                console.log("[Weather] Weather data received:", data);
+
+                if (data && data.current_weather && typeof data.current_weather.temperature !== 'undefined') {
                     currentSensorValues.temperature_celsius = data.current_weather.temperature;
                     weatherTempEl.textContent = data.current_weather.temperature.toFixed(1);
                     weatherStatusEl.textContent = `最終更新: ${new Date().toLocaleTimeString()}`;
                     lastWeatherFetchTime = now;
                 } else {
+                    console.warn("[Weather] Temperature data not found in response:", data);
                     throw new Error("Temperature data not found in response.");
                 }
             } catch (error) {
-                console.error("Failed to fetch weather data:", error);
+                console.error("[Weather] Failed to fetch weather data:", error);
                 weatherStatusEl.textContent = "天気情報取得失敗";
                 weatherTempEl.textContent = "-";
-                currentSensorValues.temperature_celsius = null;
+                // Do not clear currentSensorValues.temperature_celsius here, retain last known good value if any.
+                // It will be overwritten on next successful fetch.
             }
         }
 
 
-        // --- Recording Logic ---
-        function recordCurrentData() {
+        // --- Recording Logic (startRecording updates, others same) ---
+        function recordCurrentData() { /* ... (same as before) ... */ 
             if (!isRecording) return;
             const now = Date.now();
             let dataToRecord = { ...currentSensorValues, timestamp: now };
             currentRecordingData.push(dataToRecord);
             
-            // Reset transient values for next interval
             currentSensorValues.photoTakenId = null; 
-            currentSensorValues.steps_interval = 0; // Steps are cumulative in session, but interval logs 0 or 1
-            // Temperature is kept until next fetch, GPS values updated by watchPosition
-
+            currentSensorValues.steps_interval = 0; 
             if (currentRecordingData.length % 10 === 0) { 
                 recordingStatusEl.textContent = `記録中... (${currentRecordingData.length}件)`;
             }
         }
 
-        function startRecording() {
-            // Check more specific permissions if a feature depends on it critically
+        function startRecording() { /* ... (updated for address reset) ... */ 
             if (!sensorsInitialized || (!anySensorSupported && !motionPermissionGranted && !orientationPermissionGranted && !micPermissionGranted && !geolocationPermissionGranted)) {
                 alert("利用可能なセンサーがないか、センサーへのアクセスが許可されていません。");
                 return;
@@ -925,22 +977,23 @@
             currentRecordingPhotos = []; 
             lastPhotoPreviewContainer.innerHTML = ""; 
 
-            // Reset pedometer for the new session
             currentSessionTotalSteps = 0;
             pedometerStepsEl.textContent = '0';
             pedometer_last_accel_mag = 0;
             pedometer_trending_up = false;
             pedometer_last_step_time = 0;
 
-            // Reset current weather data for the new session (will be fetched if GPS is available)
-            currentSensorValues.temperature_celsius = null;
-            weatherTempEl.textContent = "-";
-            weatherStatusEl.textContent = geolocationPermissionGranted ? "GPS位置情報取得後に更新" : "GPSアクセスが必要です";
-            lastWeatherFetchTime = 0; // Allow immediate fetch if GPS is good
+            // Weather and address are fetched/updated by their respective mechanisms if GPS is available
+            // No need to explicitly reset currentSensorValues.address or temperature here, 
+            // as they reflect the latest fetched values.
+            lastWeatherFetchTime = 0; // Allow immediate weather fetch if GPS is good
             if (currentSensorValues.latitude !== null && currentSensorValues.longitude !== null) {
-                fetchWeatherData(currentSensorValues.latitude, currentSensorValues.longitude); // Attempt fetch at start
+                fetchWeatherData(currentSensorValues.latitude, currentSensorValues.longitude);
+                // Reverse geocode might also be triggered by handlePosition if conditions met
+            } else {
+                 weatherStatusEl.textContent = geolocationPermissionGranted ? "GPS位置情報取得後に更新" : "GPSアクセスが必要です";
+                 geoAddressStatusEl.textContent = geolocationPermissionGranted ? "GPS位置情報取得後に更新" : "GPSアクセスが必要です";
             }
-
 
             if (recordingIntervalId) clearInterval(recordingIntervalId);
             recordingIntervalId = setInterval(recordCurrentData, RECORDING_INTERVAL_MS);
@@ -948,7 +1001,7 @@
             downloadCSVIconButton.disabled = true; 
         }
 
-        function stopRecording() {
+        function stopRecording() { /* ... (same as before) ... */ 
             isRecording = false;
             if (recordingIntervalId) {
                 clearInterval(recordingIntervalId);
@@ -962,7 +1015,7 @@
                     endTime: currentRecordingData[currentRecordingData.length - 1].timestamp,
                     data: [...currentRecordingData],
                     photos: [...currentRecordingPhotos],
-                    totalSteps: currentSessionTotalSteps // Save total steps for the session
+                    totalSteps: currentSessionTotalSteps 
                 };
                 allRecordedSessions.push(session);
                 saveHistoryToLocalStorage();
@@ -973,12 +1026,12 @@
             updateRecordingButtonState();
         }
         
-        function downloadCSV(dataToExport, filenamePrefix = "sensor_data_current") {
+        function downloadCSV(dataToExport, filenamePrefix = "sensor_data_current") { /* ... (same as before) ... */ 
             if (!dataToExport || dataToExport.length === 0) {
                 alert("記録データがありません。");
                 return;
             }
-
+            // CSV Header now includes temperature and steps_in_interval. Address is not included in CSV.
             const header = "timestamp,accelX,accelY,accelZ,orientAlpha,orientBeta,orientGamma,gyroAlpha,gyroBeta,gyroGamma,illuminance,decibels,latitude,longitude,gpsAccuracy,altitude,speed,heading,temperature_celsius,steps_in_interval,photoTakenId";
             const rows = dataToExport.map(row => {
                 return [
@@ -1001,7 +1054,7 @@
                     row.speed !== null ? row.speed.toFixed(2) : '',
                     row.heading !== null ? row.heading.toFixed(1) : '',
                     row.temperature_celsius !== null ? row.temperature_celsius.toFixed(1) : '',
-                    row.steps_interval !== null ? row.steps_interval : '0', // 0 or 1
+                    row.steps_interval !== null ? row.steps_interval : '0',
                     row.photoTakenId || ''
                 ].join(',');
             });
@@ -1027,8 +1080,8 @@
         if(stopRecordingIconButton) stopRecordingIconButton.addEventListener('click', stopRecording);
         if(downloadCSVIconButton) downloadCSVIconButton.addEventListener('click', () => downloadCSV(currentRecordingData, "sensor_data_current"));
 
-        // --- History Logic ---
-        const HISTORY_STORAGE_KEY = 'sensorDemoProHistory_v2'; // v2 for new data structure
+        // --- History Logic (same as before for save/load/delete, display updated) ---
+        const HISTORY_STORAGE_KEY = 'sensorDemoProHistory_v2';
 
         function saveHistoryToLocalStorage() { /* ... (same as before) ... */ 
             try {
@@ -1038,12 +1091,11 @@
                 alert("履歴の保存に失敗しました。ストレージ容量が不足している可能性があります。");
             }
         }
-        function loadHistoryFromLocalStorage() { /* ... (same as before, ensure parsing handles new fields) ... */ 
+        function loadHistoryFromLocalStorage() { /* ... (same as before) ... */ 
             const storedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
             if (storedHistory) {
                 try {
                     allRecordedSessions = JSON.parse(storedHistory);
-                    // Ensure all sessions have new fields, provide defaults if not
                     allRecordedSessions.forEach(session => {
                         if (typeof session.totalSteps === 'undefined') session.totalSteps = 0;
                     });
@@ -1056,7 +1108,7 @@
             }
         }
 
-        function displayHistoryList() { /* ... (Updated to show totalSteps) ... */ 
+        function displayHistoryList() { /* ... (updated to show first recorded temperature if available) ... */ 
             historyListContainer.innerHTML = '';
             historyDetailView.style.display = 'none';
             historyListContainer.style.display = 'block';
@@ -1075,6 +1127,10 @@
                 const durationSec = Math.floor(durationMs / 1000);
                 const durationMin = Math.floor(durationSec / 60);
                 const formattedStartTime = startTime.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+                let firstTemp = session.data.find(d => d.temperature_celsius !== null && typeof d.temperature_celsius === 'number');
+                let tempString = firstTemp ? `${firstTemp.temperature_celsius.toFixed(1)}°C` : "記録なし";
+
 
                 let content = `
                     <div style="padding: 16px;">
@@ -1099,6 +1155,10 @@
                         <p style="font-size: 0.9em; margin: 4px 0;">
                             <md-icon style="font-size: 1.1em; vertical-align: bottom;">directions_walk</md-icon>
                             推定歩数: ${session.totalSteps || 0} 歩
+                        </p>
+                         <p style="font-size: 0.9em; margin: 4px 0;">
+                            <md-icon style="font-size: 1.1em; vertical-align: bottom;">thermostat</md-icon>
+                            開始時気温 (目安): ${tempString}
                         </p>
                     </div>
                 `;
@@ -1134,10 +1194,14 @@
             if (deleteConfirmDialog.close) deleteConfirmDialog.close('delete');
         });
         deleteConfirmDialog.addEventListener('closed', (event) => { /* ... (same as before) ... */ 
-            if(event.detail.action !== 'delete') sessionIdToDelete = null;
+            if(event.detail.action !== 'delete' && event.detail.action !== 'cancel') { // md-dialog might return other values
+                sessionIdToDelete = null;
+            } else if (event.detail.action === 'cancel'){
+                 sessionIdToDelete = null;
+            }
         });
 
-        function displayHistoryDetail(sessionId) { /* ... (Updated chart data) ... */ 
+        function displayHistoryDetail(sessionId) { /* ... (same chart logic as before) ... */ 
             const session = allRecordedSessions.find(s => s.id === sessionId);
             if (!session) { displayHistoryList(); return; }
 
@@ -1177,7 +1241,6 @@
             if (session.data.some(d => d.decibels !== null && isFinite(d.decibels))) datasets.push({ label: 'Decibels (dBFS)', data: session.data.map(d => isFinite(d.decibels) ? d.decibels : null), borderColor: 'magenta', fill: false, tension: 0.1, yAxisID: 'yDb', hidden: false });
             if (session.data.some(d => d.altitude !== null)) datasets.push({ label: 'Altitude (m)', data: session.data.map(d => d.altitude), borderColor: 'brown', fill: false, tension: 0.1, yAxisID: 'yAlt', hidden: false });
             if (session.data.some(d => d.temperature_celsius !== null)) datasets.push({ label: 'Temperature (°C)', data: session.data.map(d => d.temperature_celsius), borderColor: 'coral', fill: false, tension: 0.1, yAxisID: 'yTemp', hidden: false });
-
 
             historyChartInstance = new Chart(ctx, {
                 type: 'line',
