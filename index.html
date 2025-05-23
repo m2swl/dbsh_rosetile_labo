@@ -590,11 +590,15 @@
                 const bufferLength = analyserNode.frequencyBinCount;
                 const dataArray = new Uint8Array(bufferLength);
 
+                // ★ ログ追加: 初期化成功時
+                console.log("[Mic] Initialized. Analyser and AudioContext created.");
+
                 function getDecibels() {
                     if (!micPermissionGranted || !analyserNode) {
                         currentSensorValues.decibels = null;
                         micDbfsEl.textContent = "-";
                         micLevelBar.style.width = `0%`;
+                        // console.log("[Mic] getDecibels returning early (no permission or analyserNode)"); // デバッグ時に有効化も可
                         return;
                     }
                     analyserNode.getByteFrequencyData(dataArray); // Can also use getByteTimeDomainData
@@ -603,18 +607,16 @@
                         sum += dataArray[i];
                     }
                     let average = sum / bufferLength;
-                    // This is a simplified "volume" level, not true dBFS.
-                    // For more accurate dBFS, you'd typically use a different approach (e.g. RMS).
-                    // This gives a value roughly between 0 and 128 (half of 256).
-                    // Let's map it to a pseudo dBFS range, e.g. -60dB to 0dB.
-                    // Max average is around 128. Min is 0.
                     let pseudoDbFs = (average / 128.0) * 60.0 - 60.0; // crude mapping
                     if (average < 1) pseudoDbFs = -Infinity; // Silence
 
                     currentSensorValues.decibels = pseudoDbFs;
+
+                    // ★ ログ追加: デシベル値更新時 (ログが大量に出る可能性があるので注意)
+                    // console.log(`[Mic] getDecibels updated value: ${currentSensorValues.decibels}`); 
+
                     micDbfsEl.textContent = isFinite(pseudoDbFs) ? pseudoDbFs.toFixed(1) : '-∞';
                     
-                    // Visual bar (0 to 100%)
                     let levelPercent = Math.min(100, Math.max(0, (average / 100) * 100)); // Max average can be > 100
                     micLevelBar.style.width = `${levelPercent}%`;
                     if (isFinite(pseudoDbFs) && pseudoDbFs > -50) micLevelBar.style.backgroundColor = 'var(--md-sys-color-primary)';
@@ -623,13 +625,17 @@
 
                     if (audioContext && audioContext.state === 'running') {
                         requestAnimationFrame(getDecibels);
+                    } else {
+                        // ★ ログ追加: AudioContext が実行中でない、またはループが停止した場合
+                        console.warn("[Mic] AudioContext not running or getDecibels loop stopped. State:", audioContext ? audioContext.state : 'N/A');
                     }
                 }
-                getDecibels();
+                getDecibels(); // ループを開始
                 updateRecordingButtonState();
                 return Promise.resolve();
             } catch (err) {
-                console.error("Microphone access error:", err);
+                // console.error を使用して、エラーをより目立たせる
+                console.error("[Mic] Microphone access error:", err);
                 micStatusEl.textContent = `マイクエラー: ${err.name}`; micStatusEl.classList.add('error');
                 micPermissionGranted = false;
                 updateRecordingButtonState();
