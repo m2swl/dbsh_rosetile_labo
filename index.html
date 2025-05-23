@@ -163,18 +163,9 @@
                     </div>
                 </md-card>
 
-                <!-- Delete Dialog -->
-                <md-dialog id="deleteConfirmDialog">
-                    <div slot="headline">記録の削除</div>
-                    <form slot="content" id="deleteConfirmForm" method="dialog">
-                        <p>この記録セッションを本当に削除しますか？この操作は元に戻せません。</p>
-                        <p id="deleteDialogSessionInfo" style="font-size: 0.9em; color: var(--md-sys-color-on-surface-variant);"></p>
-                    </form>
-                    <div slot="actions">
-                        <md-text-button form="deleteConfirmForm" value="cancel">キャンセル</md-text-button>
-                        <md-filled-tonal-button id="confirmDeleteButton" value="delete">削除</md-filled-tonal-button>
-                    </div>
-                </md-dialog>
+                <!-- ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ -->
+                <!-- ★ Delete Dialog はここから削除しました ★ -->
+                <!-- ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ -->
 
                 <p style="font-size: 0.8em; text-align: center; margin-top: 20px; color: var(--md-sys-color-on-surface-variant);">
                     注意: センサーの利用にはブラウザからの許可が必要な場合があります。
@@ -221,6 +212,20 @@
         </md-navigation-tab>
     </md-navigation-bar>
 
+    <!-- ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ -->
+    <!-- ★ Delete Dialog をここに移動しました (body の直接の子要素) ★ -->
+    <!-- ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ -->
+    <md-dialog id="deleteConfirmDialog">
+        <div slot="headline">記録の削除</div>
+        <form slot="content" id="deleteConfirmForm" method="dialog">
+            <p>この記録セッションを本当に削除しますか？この操作は元に戻せません。</p>
+            <p id="deleteDialogSessionInfo" style="font-size: 0.9em; color: var(--md-sys-color-on-surface-variant);"></p>
+        </form>
+        <div slot="actions">
+            <md-text-button form="deleteConfirmForm" value="cancel">キャンセル</md-text-button>
+            <md-filled-tonal-button id="confirmDeleteButton" value="delete">削除</md-filled-tonal-button>
+        </div>
+    </md-dialog>
     
 
     <script type="module">
@@ -964,12 +969,18 @@
             saveHistoryToLocalStorage();
             displayHistoryList(); // リストを再描画
             // もし詳細ビューが表示されていて、それが削除されたセッションのものだったらリストに戻る
-            if (historyDetailView.style.display === 'block' && historyDetailTitle.textContent.includes(new Date(allRecordedSessions.find(s => s.id === sessionId)?.startTime || 0).toLocaleString())) {
-                 // この部分はより堅牢なチェックが必要かもしれないが、ここでは簡易的に
-                displayHistoryList();
+            if (historyDetailView.style.display === 'block') {
+                // 現在詳細表示されているセッションが削除されたものか確認
+                const currentDetailSessionStillExists = allRecordedSessions.some(s => s.id === sessionIdToDelete); // sessionIdToDelete は直前に削除されたID
+                if (!currentDetailSessionStillExists) { // 削除されたものが表示されていた場合
+                     // または、historyDetailTitle が削除されたセッションの情報を含んでいるかで判断も可能
+                     // 例: if (historyDetailTitle.textContent.includes(new Date(sessionToDelete.startTime).toLocaleString(...)))
+                    displayHistoryList();
+                }
             }
             sessionIdToDelete = null; // リセット
         }
+
 
         // ダイアログの削除ボタンのイベントリスナー
         confirmDeleteButton.addEventListener('click', () => {
@@ -983,17 +994,16 @@
         // ダイアログが何らかの理由で閉じたとき（キャンセル含む）
         deleteConfirmDialog.addEventListener('closed', (event) => {
             // valueが'delete'でなければ（つまりキャンセルやESCキーなどで閉じられた場合）sessionIdToDeleteをリセット
-            if(event.detail.action !== 'delete') {
+            if(event.detail.action !== 'delete') { // `event.returnValue` を使うのがより確実な場合もある
                 sessionIdToDelete = null;
             }
         });
 
 
         function displayHistoryDetail(sessionId) {
-            // ... (既存の displayHistoryDetail 関数の内容は変更なし) ...
             const session = allRecordedSessions.find(s => s.id === sessionId);
-            if (!session) { // セッションが見つからない場合（削除された直後など）
-                displayHistoryList(); // 履歴リスト表示に戻る
+            if (!session) { 
+                displayHistoryList(); 
                 return;
             }
 

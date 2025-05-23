@@ -1,4 +1,3 @@
-/* style.css */
 :root {
     /* --- Green Light Theme --- */
     --md-sys-color-primary: #006D3A; /* Primary Green */
@@ -32,7 +31,7 @@
     /* Custom properties */
     --app-font-family: 'Noto Sans JP', sans-serif;
     --app-bar-height: 56px;
-    --nav-bar-height: 80px; /* md-navigation-bar の目標の高さ */
+    --nav-bar-height: 80px; /* For md-navigation-bar */
     --cube-size: 100px;
     --bar-max-height: 50px;
 }
@@ -238,17 +237,6 @@ md-navigation-tab {
     --md-navigation-tab-active-indicator-shape: 16px;  /* 高さ32pxに対して半径16pxでピル形状 */
     
     flex: 1; /* 各タブが利用可能なスペースを均等に占めるようにする */
-
-    /* タブがコンテンツを中央に配置するように念のため設定 (通常はコンポーネント内部で処理) */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex: 1; /* 各タブが利用可能なスペースを均等に占めるようにする */
-    padding-top: 12px; /* M3の Navigation tab の上部パディングの目安 */
-    padding-bottom: 16px; /* M3の Navigation tab の下部パディングの目安 */
-    min-height: var(--nav-bar-height); /* タブ自体もバーの高さを確保するようにする */
-    box-sizing: border-box;
 }
 
 /* タブがアクティブでない場合、activeIcon を非表示にし、inactiveIcon を表示 */
@@ -270,23 +258,25 @@ md-navigation-tab[active] md-icon[slot="activeIcon"] {
 
 /* History Page Specifics */
 #historyListContainer md-elevated-card:hover {
-    --md-elevated-card-container-color: var(--md-sys-color-surface-container-low, var(--md-sys-color-surface-variant));
+    --md-elevated-card-container-color: var(--md-sys-color-surface-container-low, var(--md-sys-color-surface-variant)); /* M3 hover */
 }
 #historyChart {
-    max-height: 300px;
+    max-height: 300px; /* constrain chart height */
     width: 100%;
 }
-
+/* 履歴カード内の削除ボタンのスタイル（任意） */
 .delete-session-button {
+    /* アイコンの色などを調整する場合 */
     --md-icon-button-icon-color: var(--md-sys-color-error);
-    margin-left: auto;
+    margin-left: auto; /* 右端に配置 */
 }
 
+/* ダイアログ内の情報表示用Pタグのスタイル（任意） */
 #deleteDialogSessionInfo {
     margin-top: 8px;
     margin-bottom: 0;
 }
-Use code wit
+
 
 /* MWC component theming (Switch, Buttons - mostly unchanged) */
 md-switch {
