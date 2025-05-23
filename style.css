@@ -237,6 +237,17 @@ md-navigation-tab {
     --md-navigation-tab-active-indicator-shape: 16px;  /* 高さ32pxに対して半径16pxでピル形状 */
     
     flex: 1; /* 各タブが利用可能なスペースを均等に占めるようにする */
+
+    /* タブがコンテンツを中央に配置するように念のため設定 (通常はコンポーネント内部で処理) */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1; /* 各タブが利用可能なスペースを均等に占めるようにする */
+    padding-top: 12px; /* M3の Navigation tab の上部パディングの目安 */
+    padding-bottom: 16px; /* M3の Navigation tab の下部パディングの目安 */
+    min-height: var(--nav-bar-height); /* タブ自体もバーの高さを確保するようにする */
+    box-sizing: border-box;
 }
 
 /* タブがアクティブでない場合、activeIcon を非表示にし、inactiveIcon を表示 */
