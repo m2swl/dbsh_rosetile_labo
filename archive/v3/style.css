@@ -23,7 +23,6 @@
     --md-sys-color-surface-variant: #DDE5DA; /* Light Grayish Green */
     --md-sys-color-on-surface-variant: #414941;
     --md-sys-color-outline: #717971;
-    --md-sys-color-outline-variant: #C1C9BF; /* Added for things like <hr> */
     --md-sys-color-shadow: #000000;
     --md-sys-color-inverse-surface: #2F312E;
     --md-sys-color-inverse-on-surface: #F0F1EC;
@@ -62,7 +61,6 @@
     --md-sys-color-surface-variant: #414941;
     --md-sys-color-on-surface-variant: #C1C9BF;
     --md-sys-color-outline: #8B938A;
-    --md-sys-color-outline-variant: #414941; /* Added for things like <hr> */
 }
 
 body {
@@ -72,8 +70,8 @@ body {
     color: var(--md-sys-color-on-background);
     transition: background-color 0.3s ease, color 0.3s ease;
     overscroll-behavior-y: contain;
-    padding-top: var(--app-bar-height); 
-    padding-bottom: var(--nav-bar-height); 
+    padding-top: var(--app-bar-height); /* Space for fixed app-bar */
+    padding-bottom: var(--nav-bar-height); /* Space for fixed navigation-bar */
     box-sizing: border-box;
 }
 
@@ -83,17 +81,29 @@ body {
     overflow-y: auto;
 }
 
-.page { display: none; }
-.page.active-page { display: block; }
+.page {
+    display: none;
+}
+.page.active-page {
+    display: block;
+}
 
-.app-container { padding: 16px; }
+.app-container {
+    padding: 16px;
+    /* No fixed top/bottom padding here as it's handled by body for main scrollable area */
+}
 
 .app-bar {
-    position: fixed; top: 0; left: 0; right: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
     height: var(--app-bar-height);
     background-color: var(--md-sys-color-surface-variant);
     color: var(--md-sys-color-on-surface-variant);
-    display: flex; align-items: center; padding: 0 16px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     z-index: 1000;
 }
@@ -104,13 +114,14 @@ body {
 md-card {
     margin-bottom: 16px;
     background-color: var(--md-sys-color-surface);
-    --md-card-container-color: var(--md-sys-color-surface);
+    --md-card-container-color: var(--md-sys-color-surface); /* M3 style */
     border-radius: 12px;
-    overflow: hidden;
+    overflow: hidden; /* Important for card content */
 }
-md-elevated-card {
+md-elevated-card { /* For history items */
     --md-elevated-card-container-color: var(--md-sys-color-surface-container-low, var(--md-sys-color-surface));
 }
+
 
 .card-header { display: flex; align-items: center; padding: 16px; }
 .card-header md-icon { margin-right: 12px; color: var(--md-sys-color-primary); }
@@ -119,15 +130,11 @@ md-elevated-card {
 .card-content { padding: 16px; padding-top: 0; }
 .sensor-value { font-size: 0.9rem; margin-bottom: 8px; color: var(--md-sys-color-on-surface-variant); }
 .sensor-value strong { color: var(--md-sys-color-on-surface); min-width: 80px; display: inline-block; font-weight: 500; }
-/* For Geolocation card, ensure strong tags align better */
-#recordPage md-card:nth-of-type(5) .sensor-value strong { /* Assuming GPS card is 5th */
-    min-width: 90px; /* Adjust as needed */
-}
 .status-text { font-size: 0.8rem; color: var(--md-sys-color-secondary); margin-top: 8px; }
 .error { color: var(--md-sys-color-error) !important; font-weight: 500; }
 .not-supported { color: var(--md-sys-color-outline) !important; }
 
-/* Sensor Visualizations */
+/* Sensor Visualizations (Cube, Bars, Light - mostly unchanged) */
 .cube-container { width: var(--cube-size); height: var(--cube-size); margin: 20px auto; perspective: 600px; }
 .cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.1s linear; }
 .cube__face { position: absolute; width: var(--cube-size); height: var(--cube-size); border: 1px solid var(--md-sys-color-outline); background-color: color-mix(in srgb, var(--md-sys-color-primary-container) 70%, transparent); color: var(--md-sys-color-on-primary-container); font-size: calc(var(--cube-size) / 3); font-weight: bold; display: flex; justify-content: center; align-items: center; opacity: 0.9; }
@@ -146,19 +153,49 @@ md-elevated-card {
 #light-icon-moon { color: #90A4AE; }
 
 /* Microphone Level Bar */
-.mic-level-bar-container { width: 100%; height: 10px; background-color: var(--md-sys-color-surface-variant); border-radius: 5px; overflow: hidden; margin-top: 8px; }
-.mic-level-bar { height: 100%; width: 0%; background-color: var(--md-sys-color-primary); border-radius: 5px; transition: width 0.1s linear, background-color 0.2s linear; }
-
-/* Recording Controls Bar */
-.recording-controls-bar {
-    background-color: var(--md-sys-color-surface-container-lowest, var(--md-sys-color-surface-variant));
-    padding: 8px 16px; margin: -16px -16px 16px -16px; 
-    border-bottom: 1px solid var(--md-sys-color-outline-variant, var(--md-sys-color-outline));
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
+.mic-level-bar-container {
+    width: 100%;
+    height: 10px;
+    background-color: var(--md-sys-color-surface-variant);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-top: 8px;
 }
-.recording-status-area { width: 100%; text-align: center; }
-.recording-controls-bar #recordingStatus { font-size: 0.8em; color: var(--md-sys-color-on-surface-variant); margin: 0; }
-.recording-buttons-area { display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 300px; }
+.mic-level-bar {
+    height: 100%;
+    width: 0%; /* Controlled by JS */
+    background-color: var(--md-sys-color-primary);
+    border-radius: 5px;
+    transition: width 0.1s linear, background-color 0.2s linear;
+}
+
+/* Recording Controls Bar (relocated from bottom) */
+.recording-controls-bar {
+    background-color: var(--md-sys-color-surface-container-lowest, var(--md-sys-color-surface-variant)); /* slightly different from app-bar */
+    padding: 8px 16px;
+    margin: -16px -16px 16px -16px; /* Extend to edges of app-container if it has padding */
+    border-bottom: 1px solid var(--md-sys-color-outline-variant, var(--md-sys-color-outline));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+.recording-status-area {
+    width: 100%;
+    text-align: center;
+}
+.recording-controls-bar #recordingStatus {
+    font-size: 0.8em; 
+    color: var(--md-sys-color-on-surface-variant);
+    margin: 0;
+}
+.recording-buttons-area {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    width: 100%;
+    max-width: 300px; /* Limit width of buttons */
+}
 .recording-buttons-area md-icon-button {
     --md-icon-button-icon-color: var(--md-sys-color-primary); 
     --md-icon-button-disabled-icon-color: var(--md-sys-color-outline); 
@@ -166,41 +203,93 @@ md-elevated-card {
     --md-icon-button-focus-state-layer-color: var(--md-sys-color-primary);
     --md-icon-button-pressed-state-layer-color: var(--md-sys-color-primary);
 }
-#sensorPermissionIconButton { --md-icon-button-icon-color: var(--md-sys-color-tertiary); }
+#sensorPermissionIconButton { /* Special color for permission button */
+    --md-icon-button-icon-color: var(--md-sys-color-tertiary);
+}
+
 
 /* Bottom Navigation Bar */
 md-navigation-bar {
-    position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
-    height: var(--nav-bar-height);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    height: var(--nav-bar-height); /* これが80pxになることを期待 */
     --md-navigation-bar-container-color: var(--md-sys-color-surface-container, var(--md-sys-color-surface));
-    display: flex; justify-content: space-around; align-items: center;
-    padding: 0 8px; box-sizing: border-box;
+    
+    /* Flexbox設定を追加して、タブの配置を制御 */
+    display: flex;
+    justify-content: space-around; /* タブを均等に配置 */
+    align-items: center;       /* タブを垂直方向に中央揃え */
+    padding: 0 8px; /* 必要に応じて左右のパディングを追加 */
+    box-sizing: border-box;
 }
+
 md-navigation-tab {
     --md-navigation-tab-active-icon-color: var(--md-sys-color-on-secondary-container);
-    --md-navigation-tab-active-label-text-color: var(--md-sys-color-on-secondary-container);
+    --md-navigation-tab-active-label-text-color: var(--md-sys-color-on-secondary-container); /* 前回修正済み */
     --md-navigation-tab-inactive-icon-color: var(--md-sys-color-on-surface-variant);
     --md-navigation-tab-inactive-label-text-color: var(--md-sys-color-on-surface-variant);
+
     --md-navigation-tab-active-indicator-color: var(--md-sys-color-secondary-container);
-    --md-navigation-tab-active-indicator-height: 32px;
-    --md-navigation-tab-active-indicator-shape: 16px;  
-    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding-top: 12px; padding-bottom: 16px; min-height: var(--nav-bar-height); box-sizing: border-box;
+    --md-navigation-tab-active-indicator-height: 32px; /* M3標準のインジケータ高さを明示 */
+    --md-navigation-tab-active-indicator-shape: 16px;  /* 高さ32pxに対して半径16pxでピル形状 */
+    
+    flex: 1; /* 各タブが利用可能なスペースを均等に占めるようにする */
+
+    /* タブがコンテンツを中央に配置するように念のため設定 (通常はコンポーネント内部で処理) */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1; /* 各タブが利用可能なスペースを均等に占めるようにする */
+    padding-top: 12px; /* M3の Navigation tab の上部パディングの目安 */
+    padding-bottom: 16px; /* M3の Navigation tab の下部パディングの目安 */
+    min-height: var(--nav-bar-height); /* タブ自体もバーの高さを確保するようにする */
+    box-sizing: border-box;
 }
-md-navigation-tab:not([active]) md-icon[slot="activeIcon"] { display: none !important; }
-md-navigation-tab:not([active]) md-icon[slot="inactiveIcon"] { display: inline-flex !important; }
-md-navigation-tab[active] md-icon[slot="inactiveIcon"] { display: none !important; }
-md-navigation-tab[active] md-icon[slot="activeIcon"] { display: inline-flex !important; }
+
+/* タブがアクティブでない場合、activeIcon を非表示にし、inactiveIcon を表示 */
+md-navigation-tab:not([active]) md-icon[slot="activeIcon"] {
+    display: none !important;
+}
+md-navigation-tab:not([active]) md-icon[slot="inactiveIcon"] {
+    display: inline-flex !important; /* または block, inline-block などコンポーネントのデフォルトに合わせて */
+}
+
+/* タブがアクティブな場合、inactiveIcon を非表示にし、activeIcon を表示 */
+md-navigation-tab[active] md-icon[slot="inactiveIcon"] {
+    display: none !important;
+}
+md-navigation-tab[active] md-icon[slot="activeIcon"] {
+    display: inline-flex !important; /* または block, inline-block などコンポーネントのデフォルトに合わせて */
+}
+
 
 /* History Page Specifics */
 #historyListContainer md-elevated-card:hover {
-    --md-elevated-card-container-color: var(--md-sys-color-surface-container-low, var(--md-sys-color-surface-variant));
+    --md-elevated-card-container-color: var(--md-sys-color-surface-container-low, var(--md-sys-color-surface-variant)); /* M3 hover */
 }
-#historyChart { max-height: 300px; width: 100%; }
-.delete-session-button { --md-icon-button-icon-color: var(--md-sys-color-error); margin-left: auto; }
-#deleteDialogSessionInfo { margin-top: 8px; margin-bottom: 0; }
+#historyChart {
+    max-height: 300px; /* constrain chart height */
+    width: 100%;
+}
+/* 履歴カード内の削除ボタンのスタイル（任意） */
+.delete-session-button {
+    /* アイコンの色などを調整する場合 */
+    --md-icon-button-icon-color: var(--md-sys-color-error);
+    margin-left: auto; /* 右端に配置 */
+}
 
-/* MWC component theming */
+/* ダイアログ内の情報表示用Pタグのスタイル（任意） */
+#deleteDialogSessionInfo {
+    margin-top: 8px;
+    margin-bottom: 0;
+}
+
+
+/* MWC component theming (Switch, Buttons - mostly unchanged) */
 md-switch {
     --md-switch-selected-handle-color: var(--md-sys-color-on-primary);
     --md-switch-selected-hover-handle-color: var(--md-sys-color-on-primary);
@@ -219,11 +308,4 @@ md-filled-button {
 md-outlined-button {
     --md-outlined-button-label-text-color: var(--md-sys-color-primary);
     --md-outlined-button-outline-color: var(--md-sys-color-outline);
-}
-
-/* Ensure icons in history list items are vertically centered with text */
-#historyListContainer md-icon { 
-    vertical-align: middle; 
-    margin-right: 4px; /* Add a little space after icon */
-    font-size: 1.1em; /* Match font-size of surrounding text or adjust */
 }

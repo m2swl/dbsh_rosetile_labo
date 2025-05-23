@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rosetile Demo</title>
+    <title>Sensor Demo Pro</title>
     <link rel="icon" href="favicon.ico">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#9EF2B3">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Rosetile Demo">
+    <meta name="apple-mobile-web-app-title" content="Sensor Demo Pro">
     <link rel="apple-touch-icon" href="./icons/iosicon-512x512.png">
 
     <script type="module" src="https://unpkg.com/@material/web/all.js?module"></script>
@@ -24,7 +24,7 @@
 
 <body data-theme="light">
     <div class="app-bar">
-        <h1>Rosetile Demo</h1>
+        <h1>Sensor Demo Pro</h1>
         <div class="theme-switch-container">
             <md-icon>light_mode</md-icon>
             <md-switch id="themeSwitch"></md-switch>
@@ -111,39 +111,6 @@
                         <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta">-</span> °/s</p>
                         <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="gyro-gamma">-</span> °/s</p>
                         <p class="status-text" id="gyro-status">待機中...</p>
-                    </div>
-                </md-card>
-
-                <!-- Pedometer Card -->
-                <md-card>
-                    <div class="card-header">
-                        <md-icon>directions_walk</md-icon>
-                        <h2>歩数計 (試作版)</h2>
-                    </div>
-                    <div class="card-content">
-                        <p class="sensor-value" style="font-size: 1.1em;"><strong>記録中の歩数:</strong> <span id="pedometer-steps">0</span> 歩</p>
-                        <p class="status-text" id="pedometer-status">待機中...</p>
-                        <p style="font-size: 0.7em; color: var(--md-sys-color-on-surface-variant);">※ 加速度センサーに基づく簡易的な推定です。</p>
-                    </div>
-                </md-card>
-
-                <!-- Geolocation & Weather Card -->
-                <md-card>
-                    <div class="card-header">
-                        <md-icon>location_on</md-icon>
-                        <h2>位置情報 & 天気</h2>
-                    </div>
-                    <div class="card-content">
-                        <p class="sensor-value"><strong>緯度:</strong> <span id="geo-lat">-</span></p>
-                        <p class="sensor-value"><strong>経度:</strong> <span id="geo-lon">-</span></p>
-                        <p class="sensor-value"><strong>精度:</strong> <span id="geo-acc">-</span> m</p>
-                        <p class="sensor-value"><strong>高度:</strong> <span id="geo-alt">-</span> m</p>
-                        <p class="sensor-value"><strong>速度:</strong> <span id="geo-speed">-</span> m/s</p>
-                        <p class="sensor-value"><strong>方角:</strong> <span id="geo-head">-</span> °</p>
-                        <p class="status-text" id="geo-status">待機中...</p>
-                        <hr style="margin: 12px 0 8px; border: 0; border-top: 1px solid var(--md-sys-color-outline-variant);">
-                        <p class="sensor-value"><strong>現在地の気温:</strong> <span id="weather-temp">-</span> °C</p>
-                        <p class="status-text" id="weather-status">GPS位置情報取得後に更新</p>
                     </div>
                 </md-card>
 
@@ -241,6 +208,9 @@
         </md-navigation-tab>
     </md-navigation-bar>
 
+    <!-- ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ -->
+    <!-- ★ Delete Dialog をここに移動しました (body の直接の子要素) ★ -->
+    <!-- ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ -->
     <md-dialog id="deleteConfirmDialog">
         <div slot="headline">記録の削除</div>
         <form slot="content" id="deleteConfirmForm" method="dialog">
@@ -294,30 +264,18 @@
         const lightStatusEl = document.getElementById('light-status');
         const lightIconSun = document.getElementById('light-icon-sun');
         const lightIconMoon = document.getElementById('light-icon-moon');
+
+        // New Sensor UI Elements: Microphone
         const micDbfsEl = document.getElementById('mic-dbfs');
         const micStatusEl = document.getElementById('mic-status');
         const micLevelBar = document.getElementById('micLevelBar');
+
+        // New Sensor UI Elements: Camera
         const cameraPreview = document.getElementById('cameraPreview');
         const photoCanvas = document.getElementById('photoCanvas');
         const takePictureButton = document.getElementById('takePictureButton');
         const cameraStatusEl = document.getElementById('camera-status');
         const lastPhotoPreviewContainer = document.getElementById('lastPhotoPreviewContainer');
-
-        // New Sensor UI Elements: Geolocation & Weather
-        const geoLatEl = document.getElementById('geo-lat');
-        const geoLonEl = document.getElementById('geo-lon');
-        const geoAccEl = document.getElementById('geo-acc');
-        const geoAltEl = document.getElementById('geo-alt');
-        const geoSpeedEl = document.getElementById('geo-speed');
-        const geoHeadEl = document.getElementById('geo-head');
-        const geoStatusEl = document.getElementById('geo-status');
-        const weatherTempEl = document.getElementById('weather-temp');
-        const weatherStatusEl = document.getElementById('weather-status');
-
-        // New Sensor UI Elements: Pedometer
-        const pedometerStepsEl = document.getElementById('pedometer-steps');
-        const pedometerStatusEl = document.getElementById('pedometer-status');
-
 
         // History Page Elements
         const noHistoryText = document.getElementById('noHistoryText');
@@ -350,40 +308,23 @@
             gyroAlpha: null, gyroBeta: null, gyroGamma: null,
             illuminance: null,
             decibels: null,
-            latitude: null, longitude: null, gpsAccuracy: null, altitude: null, speed: null, heading: null,
-            temperature_celsius: null,
-            steps_interval: 0, // Steps detected in this specific interval
-            photoTakenId: null
+            photoTakenId: null // ID or timestamp of photo taken during this interval
         };
 
-        let allRecordedSessions = []; 
+        let allRecordedSessions = []; // Array to store multiple recording sessions
 
-        // Audio Variables
+        // --- Audio Variables ---
         let audioContext = null;
         let analyserNode = null;
         let microphoneStream = null;
         let micPermissionGranted = false;
 
-        // Camera Variables
+        // --- Camera Variables ---
         let cameraStream = null;
         let cameraPermissionGranted = false;
 
-        // Geolocation Variables
-        let geolocationPermissionGranted = false;
-        let geoWatchId = null;
-        let lastWeatherFetchTime = 0;
-        const WEATHER_FETCH_INTERVAL_MS = 10 * 60 * 1000; // Fetch weather at most every 10 minutes
 
-        // Pedometer Variables
-        let currentSessionTotalSteps = 0;
-        let pedometer_last_accel_mag = 0;
-        let pedometer_trending_up = false;
-        let pedometer_last_step_time = 0;
-        const PEDOMETER_MAGNITUDE_HIGH_THRESHOLD = 11.5; // m/s^2 (gravity + impact)
-        const PEDOMETER_MIN_TIME_BETWEEN_STEPS_MS = 280; // ms
-
-
-        // --- Theme Switch Logic ---
+        // --- Theme Switch Logic (same as before) ---
         function applyTheme(theme) {
             body.dataset.theme = theme;
             localStorage.setItem('theme', theme);
@@ -417,66 +358,56 @@
         }
         navRecordTab.addEventListener('click', () => showPage('recordPage'));
         navHistoryTab.addEventListener('click', () => showPage('historyPage'));
+        // Default to record page
         navRecordTab.active = true;
 
 
         // --- Sensor Permission and Initialization ---
         let motionPermissionGranted = false;
         let orientationPermissionGranted = false;
+        // let lightSensorPermissionGranted = false; // Handled internally by AmbientLightSensor
         let sensorsInitialized = false;
         let anySensorSupported = false;
 
         const needsExplicitPermission = (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') ||
                                     (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') ||
-                                    (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || // For mic/camera
-                                    (navigator.geolocation); // For GPS
+                                    (navigator.mediaDevices && navigator.mediaDevices.getUserMedia); // For mic/camera
 
         function updateRecordingButtonState() {
             if (!startRecordingIconButton) return;
-            const permissionIconEl = sensorPermissionIconButton ? sensorPermissionIconButton.querySelector('md-icon') : null;
-            
-            // Check individual permissions. All being true is ideal, but some can be optional.
-            const allCorePermissionsGranted = motionPermissionGranted && orientationPermissionGranted && micPermissionGranted && cameraPermissionGranted && geolocationPermissionGranted;
-            // If explicit permission API isn't there, we assume it's granted or not needed for motion/orientation.
-            // Mic, Camera, GPS always need some form of explicit grant via their APIs.
-            const canRunWithoutExplicitRequestAPI = !needsExplicitPermission && anySensorSupported;
 
-            if (needsExplicitPermission && !(motionPermissionGranted && orientationPermissionGranted && micPermissionGranted && cameraPermissionGranted && geolocationPermissionGranted) && sensorPermissionIconButton) {
+            const permissionIconEl = sensorPermissionIconButton ? sensorPermissionIconButton.querySelector('md-icon') : null;
+            // For main sensors, mic, and camera:
+            const mainPermissionsGranted = (motionPermissionGranted && orientationPermissionGranted && micPermissionGranted && cameraPermissionGranted) || 
+                                           (!needsExplicitPermission && anySensorSupported); // if no explicit perm needed, and a sensor works
+
+            if (needsExplicitPermission && !(motionPermissionGranted && orientationPermissionGranted && micPermissionGranted && cameraPermissionGranted) && sensorPermissionIconButton) {
                 sensorPermissionIconButton.style.display = 'inline-flex';
                 sensorPermissionIconButton.disabled = false;
                 if (permissionIconEl) permissionIconEl.textContent = 'lock';
             } else if (sensorPermissionIconButton) {
                 sensorPermissionIconButton.style.display = 'inline-flex';
                 sensorPermissionIconButton.disabled = true;
-                if (permissionIconEl) permissionIconEl.textContent = (allCorePermissionsGranted || anySensorSupported || canRunWithoutExplicitRequestAPI) ? 'lock_open' : 'lock';
+                if (permissionIconEl) permissionIconEl.textContent = (mainPermissionsGranted || anySensorSupported) ? 'lock_open' : 'lock';
             }
-            
-            // Sensors ready if initialized and at least one core sensor (motion, orient, mic, gps) is supported/granted.
-            // Camera is for photos, light for illuminance, not strictly essential for timeseries recording to start.
-            const essentialSensorsReady = sensorsInitialized && 
-                                          (anySensorSupported || motionPermissionGranted || orientationPermissionGranted || micPermissionGranted || geolocationPermissionGranted);
 
-            startRecordingIconButton.disabled = !essentialSensorsReady || isRecording;
-            stopRecordingIconButton.disabled = !essentialSensorsReady || !isRecording;
-            downloadCSVIconButton.disabled = !essentialSensorsReady || isRecording || currentRecordingData.length === 0;
-            takePictureButton.disabled = !cameraPermissionGranted || !cameraStream; // Photo taking independent of sensor recording
+            const sensorsReadyForRecording = sensorsInitialized && (anySensorSupported || mainPermissionsGranted);
+
+            startRecordingIconButton.disabled = !sensorsReadyForRecording || isRecording;
+            stopRecordingIconButton.disabled = !sensorsReadyForRecording || !isRecording;
+            downloadCSVIconButton.disabled = !sensorsReadyForRecording || isRecording || currentRecordingData.length === 0;
+            takePictureButton.disabled = !cameraPermissionGranted || !cameraStream || isRecording; // Can take picture even if not recording sensors
 
             if (isRecording) {
                 recordingStatusEl.textContent = `記録中... (${currentRecordingData.length}件)`;
-            } else if (currentRecordingData.length > 0) {
+            } else if (currentRecordingData.length > 0) { // After stopping a recording, before clearing
                 recordingStatusEl.textContent = `記録停止。${currentRecordingData.length}件。CSVダウンロード可。`;
-            } else if (essentialSensorsReady) {
+            } else if (sensorsReadyForRecording) {
                 recordingStatusEl.textContent = "センサー監視中。記録を開始できます。";
-            } else if (sensorsInitialized && !anySensorSupported && !allCorePermissionsGranted) {
+            } else if (sensorsInitialized && !anySensorSupported && !mainPermissionsGranted) {
                 recordingStatusEl.textContent = "利用可能なセンサーがありません。";
-            } else if (needsExplicitPermission && !allCorePermissionsGranted) {
-                let missingPerms = [];
-                if (!motionPermissionGranted) missingPerms.push("動作");
-                if (!orientationPermissionGranted) missingPerms.push("向き");
-                if (!micPermissionGranted) missingPerms.push("マイク");
-                if (!cameraPermissionGranted) missingPerms.push("カメラ");
-                if (!geolocationPermissionGranted) missingPerms.push("位置情報");
-                recordingStatusEl.textContent = `左のアイコンから${missingPerms.join('/')}アクセスを許可してください。`;
+            } else if (needsExplicitPermission && !mainPermissionsGranted) {
+                recordingStatusEl.textContent = "左のアイコンからセンサーアクセスを許可してください。";
             } else {
                 recordingStatusEl.textContent = "センサー準備中または利用不可。";
             }
@@ -485,29 +416,34 @@
         async function initializeSensors() {
             if (sensorsInitialized) return;
 
-            if (motionPermissionGranted || (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function')) {
+            // Motion & Orientation
+            if (motionPermissionGranted) {
+                window.addEventListener('devicemotion', handleMotionEvent, { passive: true });
+                accelStatusEl.textContent = "監視中...";
+                gyroStatusEl.textContent = "監視中...";
+            } else if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function') {
                 window.addEventListener('devicemotion', handleMotionEvent, { passive: true });
                 accelStatusEl.textContent = "監視中..."; gyroStatusEl.textContent = "監視中...";
-                pedometerStatusEl.textContent = "監視中...";
-                if(!motionPermissionGranted) motionPermissionGranted = true;
+                motionPermissionGranted = true;
             } else if (!window.DeviceMotionEvent) {
                 accelStatusEl.textContent = '加速度センサー非対応'; accelStatusEl.classList.add('not-supported');
                 gyroStatusEl.textContent = 'ジャイロスコープ非対応'; gyroStatusEl.classList.add('not-supported');
-                pedometerStatusEl.textContent = '加速度センサー非対応'; pedometerStatusEl.classList.add('not-supported');
             }
 
-            if (orientationPermissionGranted || (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function')) {
+            if (orientationPermissionGranted) {
                 window.addEventListener('deviceorientation', handleOrientationEvent, { passive: true });
                 orientStatusEl.textContent = "監視中...";
-                if(!orientationPermissionGranted) orientationPermissionGranted = true;
+            } else if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function') {
+                window.addEventListener('deviceorientation', handleOrientationEvent, { passive: true });
+                orientStatusEl.textContent = "監視中...";
+                orientationPermissionGranted = true;
             } else if(!window.DeviceOrientationEvent) {
                 orientStatusEl.textContent = '向きセンサー非対応'; orientStatusEl.classList.add('not-supported');
             }
 
             initializeLightSensor();
             initializeMicrophone();
-            initializeCamera();
-            initializeGeolocation(); // Handles its own permission if needed or starts monitoring.
+            initializeCamera(); // Attempt to initialize camera for preview
 
             sensorsInitialized = true;
             updateRecordingButtonState();
@@ -515,14 +451,16 @@
 
         async function requestAllPermissions() {
             const promises = [];
+            // Device Motion
             if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function' && !motionPermissionGranted) {
                 promises.push(
                     DeviceMotionEvent.requestPermission().then(state => {
                         if (state === 'granted') motionPermissionGranted = true;
-                        else { accelStatusEl.textContent = '加速度アクセス拒否'; gyroStatusEl.textContent = 'ジャイロアクセス拒否'; pedometerStatusEl.textContent = '加速度アクセス拒否';}
-                    }).catch(err => { console.error("Motion Err:", err); accelStatusEl.textContent = '加速度エラー'; gyroStatusEl.textContent = 'ジャイロエラー'; pedometerStatusEl.textContent = '加速度エラー';})
+                        else { accelStatusEl.textContent = '加速度アクセス拒否'; gyroStatusEl.textContent = 'ジャイロアクセス拒否'; }
+                    }).catch(err => { console.error("Motion Err:", err); accelStatusEl.textContent = '加速度エラー'; gyroStatusEl.textContent = 'ジャイロエラー';})
                 );
             }
+            // Device Orientation
             if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function' && !orientationPermissionGranted) {
                 promises.push(
                     DeviceOrientationEvent.requestPermission().then(state => {
@@ -532,53 +470,48 @@
                 );
             }
 
+            // Microphone & Camera (handled in their init functions, but triggered here)
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                if (!micPermissionGranted) promises.push(initializeMicrophone(true));
-                if (!cameraPermissionGranted) promises.push(initializeCamera(true));
+                if (!micPermissionGranted) {
+                     promises.push(initializeMicrophone(true)); // Pass true to force permission prompt
+                }
+                if (!cameraPermissionGranted) {
+                    promises.push(initializeCamera(true)); // Pass true to force permission prompt
+                }
             }
-            
-            if (navigator.geolocation && !geolocationPermissionGranted) {
-                promises.push(new Promise((resolve) => { // Don't reject promise chain for geo, allow others
-                    initializeGeolocation(true).finally(resolve);
-                }));
-            }
+
 
             if (promises.length > 0) {
                 await Promise.allSettled(promises);
+                initializeSensors(); // Re-initialize after all permissions attempted
+            } else {
+                initializeSensors();
             }
-            // Re-initialize sensors after permission attempts
-            // If permissions were already granted for some, their respective init functions might have run.
-            // This ensures everything is connected if permissions are now granted.
-            initializeSensors();
         }
         
         if (needsExplicitPermission) {
             if (sensorPermissionIconButton) {
-                sensorPermissionIconButton.addEventListener('click', requestAllPermissions);
+                sensorPermissionIconButton.addEventListener('click', requestAllPermissions, { once: false }); // Allow multiple attempts if denied initially
             }
-             accelStatusEl.textContent = "アイコンから許可"; gyroStatusEl.textContent = "アイコンから許可";
-             orientStatusEl.textContent = "アイコンから許可"; micStatusEl.textContent = "アイコンから許可";
-             cameraStatusEl.textContent = "アイコンから許可"; geoStatusEl.textContent = "アイコンから許可";
-             pedometerStatusEl.textContent = "アイコンから許可";
-        } else { 
+            accelStatusEl.textContent = "アイコンから許可"; gyroStatusEl.textContent = "アイコンから許可";
+            orientStatusEl.textContent = "アイコンから許可"; micStatusEl.textContent = "アイコンから許可";
+            cameraStatusEl.textContent = "アイコンから許可";
+        } else { // No explicit permission API, try to initialize directly
             if(sensorPermissionIconButton) sensorPermissionIconButton.style.display = 'none';
-            motionPermissionGranted = !!window.DeviceMotionEvent;
-            orientationPermissionGranted = !!window.DeviceOrientationEvent;
-            // Mic, Camera, Geo will still do their own checks/prompts if needed in their init
-            initializeSensors(); // Try to initialize directly
+            // Assume permissions are implicitly granted or not needed for basic sensors
+            motionPermissionGranted = true; // Or check for existence of DeviceMotionEvent
+            orientationPermissionGranted = true; // Or check for existence of DeviceOrientationEvent
+            // Mic/Camera will still need navigator.mediaDevices.getUserMedia
+            requestAllPermissions();
         }
 
-
-        // --- Sensor Event Handlers ---
+        // --- Sensor Event Handlers (Existing sensors - condensed) ---
         function handleMotionEvent(event) {
             if (!motionPermissionGranted && !(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function')) return;
             anySensorSupported = true;
-            let currentAccelX = null, currentAccelY = null, currentAccelZ = null;
-
             if (event.accelerationIncludingGravity) {
                 const { x, y, z } = event.accelerationIncludingGravity;
                 currentSensorValues.accelX = x; currentSensorValues.accelY = y; currentSensorValues.accelZ = z;
-                currentAccelX = x; currentAccelY = y; currentAccelZ = z; // For pedometer
                 accelXEl.textContent = x ? x.toFixed(2) : '-'; accelYEl.textContent = y ? y.toFixed(2) : '-'; accelZEl.textContent = z ? z.toFixed(2) : '-';
                 requestAnimationFrame(() => {
                     accelBarX.style.height = `${Math.min(100, (Math.abs(x || 0) / BAR_MAX_ACCEL) * 100)}%`;
@@ -593,40 +526,9 @@
                 gyroAlphaEl.textContent = alpha ? alpha.toFixed(2) : '-'; gyroBetaEl.textContent = beta ? beta.toFixed(2) : '-'; gyroGammaEl.textContent = gamma ? gamma.toFixed(2) : '-';
                 if (gyroStatusEl.textContent !== "監視中...") gyroStatusEl.textContent = "監視中...";
             }
-
-            // Pedometer Logic (using accelerationIncludingGravity)
-            // Note: This is a very basic pedometer. For more accuracy, LinearAccelerationSensor (excluding gravity)
-            // and more sophisticated algorithms (filtering, dynamic thresholds) would be needed.
-            if (currentAccelX !== null && currentAccelY !== null && currentAccelZ !== null) {
-                const mag = Math.sqrt(currentAccelX**2 + currentAccelY**2 + currentAccelZ**2);
-                currentSensorValues.steps_interval = 0; // Reset for this data point
-
-                if (isRecording) {
-                    const now = Date.now();
-                    // Simple peak detection: if magnitude was rising and now drops, and the peak was high enough.
-                    if (mag > pedometer_last_accel_mag) { // Trending up
-                        pedometer_trending_up = true;
-                    } else if (mag < pedometer_last_accel_mag && pedometer_trending_up) { // Trending down after up - possible peak
-                        if (pedometer_last_accel_mag > PEDOMETER_MAGNITUDE_HIGH_THRESHOLD &&
-                            (now - pedometer_last_step_time) > PEDOMETER_MIN_TIME_BETWEEN_STEPS_MS) {
-                            currentSessionTotalSteps++;
-                            currentSensorValues.steps_interval = 1;
-                            pedometer_last_step_time = now;
-                            if (pedometerStepsEl) pedometerStepsEl.textContent = currentSessionTotalSteps;
-                        }
-                        pedometer_trending_up = false;
-                    }
-                    pedometer_last_accel_mag = mag;
-                }
-                if (pedometerStatusEl.textContent !== "監視中...") pedometerStatusEl.textContent = "監視中...";
-            } else if (motionPermissionGranted && pedometerStatusEl.textContent === "監視中..." && !event.accelerationIncludingGravity) {
-                 pedometerStatusEl.textContent = "加速度データなし";
-            }
-
-
             if (sensorsInitialized) updateRecordingButtonState();
         }
-        function handleOrientationEvent(event) { /* ... (same as before) ... */ 
+        function handleOrientationEvent(event) {
             if (!orientationPermissionGranted && !(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function')) return;
             anySensorSupported = true;
             const { alpha, beta, gamma } = event;
@@ -640,7 +542,7 @@
             if (orientStatusEl.textContent !== "監視中...") orientStatusEl.textContent = "監視中...";
             if (sensorsInitialized) updateRecordingButtonState();
         }
-        function initializeLightSensor() { /* ... (same as before) ... */ 
+        function initializeLightSensor() { /* ... (same as before, check for AmbientLightSensor, update anySensorSupported, currentSensorValues.illuminance) ... */ 
             if (!('AmbientLightSensor' in window)) {
                 lightStatusEl.textContent = '光センサー API 非対応'; lightStatusEl.classList.add('not-supported');
                 currentSensorValues.illuminance = null; if (sensorsInitialized) updateRecordingButtonState(); return;
@@ -682,10 +584,12 @@
                         permissionStatus.onchange = () => { if (permissionStatus.state === 'granted') startSensor(); else if (permissionStatus.state !== 'prompt') { lightStatusEl.textContent = '光センサーアクセス拒否'; lightStatusEl.classList.add('error');} if (sensorsInitialized) updateRecordingButtonState(); };
                         if (sensorsInitialized && permissionStatus.state !== 'granted') updateRecordingButtonState();
                     })
-                    .catch(e => { console.warn("Ambient Light Sensor permission query failed, attempting to start directly.", e); startSensor(); });
-            } else { startSensor(); }
+                    .catch(e => { console.warn("Ambient Light Sensor permission query failed, attempting to start directly.", e); startSensor(); }); // Fallback if query fails
+            } else { startSensor(); } // Fallback for browsers not supporting permission query
         }
-        async function initializeMicrophone(forcePermissionRequest = false) { /* ... (same as before, ensure AudioContext resume logic is robust) ... */ 
+
+        // --- Microphone Logic ---
+        async function initializeMicrophone(forcePermissionRequest = false) {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 micStatusEl.textContent = 'マイク API 非対応'; micStatusEl.classList.add('not-supported');
                 micPermissionGranted = false; updateRecordingButtonState(); return Promise.resolve();
@@ -698,9 +602,15 @@
                 micPermissionGranted = true; anySensorSupported = true;
                 micStatusEl.textContent = "監視中..."; micStatusEl.classList.remove('error', 'not-supported');
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                
+
+                // ★ iOS Safari対策: AudioContextがsuspended状態で始まることがあるため、resumeを試みる
                 if (audioContext.state === 'suspended') {
-                    await audioContext.resume().catch(e => console.error("[Mic] Error resuming AudioContext on init:", e));
+                    console.log("[Mic] AudioContext is initially suspended. Attempting to resume...");
+                    // ユーザーインタラクション（ボタンクリックなど）のハンドラ内で resume() するのが最も確実だが、
+                    // ここでは初期化時に一度試みる。
+                    await audioContext.resume().then(() => {
+                        console.log("[Mic] AudioContext resumed successfully on initialization attempt.");
+                    }).catch(e => console.error("[Mic] Error resuming AudioContext on init:", e));
                 }
                 
                 analyserNode = audioContext.createAnalyser();
@@ -710,42 +620,78 @@
                 const bufferLength = analyserNode.frequencyBinCount;
                 const dataArray = new Uint8Array(bufferLength);
 
+                console.log("[Mic] Initialized. Analyser and AudioContext created. State:", audioContext.state);
+
                 function getDecibels() {
-                    if (!micPermissionGranted || !analyserNode || !audioContext) {
-                        currentSensorValues.decibels = null; micDbfsEl.textContent = "-"; micLevelBar.style.width = `0%`; return;
+                    if (!micPermissionGranted || !analyserNode) {
+                        currentSensorValues.decibels = null;
+                        micDbfsEl.textContent = "-";
+                        micLevelBar.style.width = `0%`;
+                        return;
                     }
+
+                    // ★ getDecibels が呼ばれる直前にも AudioContext の状態を確認し、必要なら resume
                     if (audioContext.state === 'suspended') {
-                        audioContext.resume().then(() => { if (audioContext.state === 'running') requestAnimationFrame(getDecibels); })
-                                       .catch(e => console.error("[Mic] Error resuming AudioContext in getDecibels:", e));
-                        return; 
+                        console.log("[Mic] AudioContext suspended in getDecibels. Attempting resume...");
+                        audioContext.resume().then(() => {
+                            console.log("[Mic] AudioContext resumed in getDecibels.");
+                            if (audioContext.state === 'running') {
+                                processAudioAndScheduleNextFrame(); // resume成功後に処理実行
+                            }
+                        }).catch(e => {
+                            console.error("[Mic] Error resuming AudioContext in getDecibels:", e);
+                            // resumeに失敗した場合、次のフレームのスケジュールはしない
+                        });
+                        return; // resume試行中は一旦処理を抜ける
                     }
                     
-                    analyserNode.getByteFrequencyData(dataArray);
-                    let sum = 0;
-                    for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
-                    let average = sum / bufferLength;
-                    let pseudoDbFs = (average / 128.0) * 60.0 - 60.0;
-                    if (average < 1) pseudoDbFs = -Infinity;
+                    function processAudioAndScheduleNextFrame() {
+                        analyserNode.getByteFrequencyData(dataArray);
+                        let sum = 0;
+                        for (let i = 0; i < bufferLength; i++) {
+                            sum += dataArray[i];
+                        }
+                        let average = sum / bufferLength;
+                        let pseudoDbFs = (average / 128.0) * 60.0 - 60.0;
+                        if (average < 1) pseudoDbFs = -Infinity;
 
-                    currentSensorValues.decibels = pseudoDbFs;
-                    micDbfsEl.textContent = isFinite(pseudoDbFs) ? pseudoDbFs.toFixed(1) : '-∞';
-                    
-                    let levelPercent = Math.min(100, Math.max(0, (average / 100) * 100));
-                    micLevelBar.style.width = `${levelPercent}%`;
-                    micLevelBar.style.backgroundColor = (isFinite(pseudoDbFs) && pseudoDbFs > -50) ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-secondary-container)';
+                        currentSensorValues.decibels = pseudoDbFs;
+                        micDbfsEl.textContent = isFinite(pseudoDbFs) ? pseudoDbFs.toFixed(1) : '-∞';
+                        
+                        let levelPercent = Math.min(100, Math.max(0, (average / 100) * 100));
+                        micLevelBar.style.width = `${levelPercent}%`;
+                        if (isFinite(pseudoDbFs) && pseudoDbFs > -50) micLevelBar.style.backgroundColor = 'var(--md-sys-color-primary)';
+                        else micLevelBar.style.backgroundColor = 'var(--md-sys-color-secondary-container)';
 
-                    if (audioContext.state === 'running') requestAnimationFrame(getDecibels);
+                        if (audioContext && audioContext.state === 'running') {
+                            requestAnimationFrame(getDecibels); // 次のフレームをスケジュール
+                        } else {
+                            console.warn("[Mic] AudioContext not running or getDecibels loop stopped after processing. State:", audioContext ? audioContext.state : 'N/A');
+                        }
+                    }
+
+                    if (audioContext.state === 'running') {
+                        processAudioAndScheduleNextFrame();
+                    } else {
+                        console.warn("[Mic] AudioContext not running before processing in getDecibels. State:", audioContext.state);
+                        // ここで requestAnimationFrame(getDecibels) を呼ばないようにする
+                    }
                 }
-                if (audioContext.state === 'running') requestAnimationFrame(getDecibels);
+                getDecibels();
                 updateRecordingButtonState();
                 return Promise.resolve();
             } catch (err) {
                 console.error("[Mic] Microphone access error:", err);
                 micStatusEl.textContent = `マイクエラー: ${err.name}`; micStatusEl.classList.add('error');
-                micPermissionGranted = false; updateRecordingButtonState(); return Promise.reject(err);
+                micPermissionGranted = false;
+                updateRecordingButtonState();
+                return Promise.reject(err);
             }
         }
-        async function initializeCamera(forcePermissionRequest = false) { /* ... (same as before) ... */ 
+
+
+        // --- Camera Logic ---
+        async function initializeCamera(forcePermissionRequest = false) {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 cameraStatusEl.textContent = 'カメラ API 非対応'; cameraStatusEl.classList.add('not-supported');
                 cameraPermissionGranted = false; updateRecordingButtonState(); return Promise.resolve();
@@ -755,7 +701,7 @@
             cameraStatusEl.textContent = "カメラアクセス許可待機中...";
             try {
                 cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-                cameraPermissionGranted = true; anySensorSupported = true; 
+                cameraPermissionGranted = true; anySensorSupported = true; // If camera works, count as sensor support
                 cameraStatusEl.textContent = "カメラ準備完了。撮影できます。"; cameraStatusEl.classList.remove('error', 'not-supported');
                 cameraPreview.srcObject = cameraStream;
                 cameraPreview.style.display = 'block';
@@ -770,182 +716,71 @@
                 return Promise.reject(err);
             }
         }
-        takePictureButton.addEventListener('click', () => { /* ... (same as before) ... */ 
+
+        takePictureButton.addEventListener('click', () => {
             if (!cameraStream || !cameraPermissionGranted) {
-                alert("カメラが利用できません。"); return;
+                alert("カメラが利用できません。");
+                return;
             }
             const videoTracks = cameraStream.getVideoTracks();
-            if (videoTracks.length === 0) { alert("有効なビデオトラックがありません。"); return; }
+            if (videoTracks.length === 0) {
+                alert("有効なビデオトラックがありません。"); return;
+            }
             const trackSettings = videoTracks[0].getSettings();
             photoCanvas.width = trackSettings.width || cameraPreview.videoWidth;
             photoCanvas.height = trackSettings.height || cameraPreview.videoHeight;
 
             const context = photoCanvas.getContext('2d');
             context.drawImage(cameraPreview, 0, 0, photoCanvas.width, photoCanvas.height);
-            const dataUrl = photoCanvas.toDataURL('image/jpeg', 0.8);
+            const dataUrl = photoCanvas.toDataURL('image/jpeg', 0.8); // Use JPEG for smaller size
             
             const photoTimestamp = Date.now();
             currentRecordingPhotos.push({ timestamp: photoTimestamp, dataUrl: dataUrl });
             
+            // Display last taken photo as a small preview
             lastPhotoPreviewContainer.innerHTML = `<img src="${dataUrl}" alt="撮影した写真" style="max-width:100px; max-height:100px; border:1px solid var(--md-sys-color-outline); border-radius:4px;"> <p style="font-size:0.7em; color: var(--md-sys-color-secondary);">${new Date(photoTimestamp).toLocaleTimeString()}に撮影</p>`;
 
-            if (isRecording) currentSensorValues.photoTakenId = photoTimestamp;
+            if (isRecording) { // If currently recording sensor data, mark that a photo was taken
+                currentSensorValues.photoTakenId = photoTimestamp; // Store the timestamp as ID
+                // This ID will be recorded in the current data row. The photo itself is in currentRecordingPhotos.
+            }
             cameraStatusEl.textContent = `${new Date(photoTimestamp).toLocaleTimeString()} に写真を撮影しました。`;
+            // No need to call updateRecordingButtonState unless recording state changes related to photos
         });
-
-
-        // --- Geolocation & Weather Logic ---
-        async function initializeGeolocation(forcePermissionRequest = false) {
-            if (!('geolocation' in navigator)) {
-                geoStatusEl.textContent = '位置情報 API 非対応'; geoStatusEl.classList.add('not-supported');
-                return Promise.resolve();
-            }
-
-            const handlePosition = (position) => {
-                geolocationPermissionGranted = true; anySensorSupported = true;
-                geoStatusEl.textContent = "監視中..."; geoStatusEl.classList.remove('error', 'not-supported');
-                
-                const { latitude, longitude, accuracy, altitude, speed, heading } = position.coords;
-                currentSensorValues.latitude = latitude;
-                currentSensorValues.longitude = longitude;
-                currentSensorValues.gpsAccuracy = accuracy;
-                currentSensorValues.altitude = altitude;
-                currentSensorValues.speed = speed;
-                currentSensorValues.heading = heading;
-
-                geoLatEl.textContent = latitude !== null ? latitude.toFixed(5) : '-';
-                geoLonEl.textContent = longitude !== null ? longitude.toFixed(5) : '-';
-                geoAccEl.textContent = accuracy !== null ? accuracy.toFixed(1) : '-';
-                geoAltEl.textContent = altitude !== null ? altitude.toFixed(1) : '-';
-                geoSpeedEl.textContent = speed !== null ? speed.toFixed(1) : '-';
-                geoHeadEl.textContent = heading !== null ? heading.toFixed(1) : '-';
-                
-                if (isRecording || sensorsInitialized) { // Fetch weather if recording or just initialized with GPS
-                    fetchWeatherData(latitude, longitude);
-                }
-                updateRecordingButtonState(); // GPS status might affect button states
-            };
-
-            const handleError = (error) => {
-                console.error('Geolocation error:', error);
-                let message = 'GPSエラー';
-                if (error.code === 1) message = 'GPSアクセス拒否';
-                else if (error.code === 2) message = 'GPS位置取得不能';
-                else if (error.code === 3) message = 'GPSタイムアウト';
-                geoStatusEl.textContent = message; geoStatusEl.classList.add('error');
-                geolocationPermissionGranted = false; // Explicitly set if denied
-                currentSensorValues.latitude = null; /* reset other geo values too */
-                updateRecordingButtonState();
-            };
-
-            if (forcePermissionRequest || !geolocationPermissionGranted) { // Prompt for permission
-                geoStatusEl.textContent = "GPSアクセス許可待機中...";
-                return new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => { // Permission granted (or already had it)
-                            handlePosition(position);
-                            if (geoWatchId) navigator.geolocation.clearWatch(geoWatchId);
-                            geoWatchId = navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-                            resolve();
-                        },
-                        (error) => { // Permission denied or other error
-                            handleError(error);
-                            reject(error);
-                        },
-                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-                    );
-                });
-            } else if (geolocationPermissionGranted && !geoWatchId) { // Already granted, just start watching
-                 if (geoWatchId) navigator.geolocation.clearWatch(geoWatchId);
-                 geoWatchId = navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-            }
-            return Promise.resolve();
-        }
-
-        async function fetchWeatherData(latitude, longitude) {
-            const now = Date.now();
-            if (now - lastWeatherFetchTime < WEATHER_FETCH_INTERVAL_MS) {
-                // weatherStatusEl.textContent = `前回取得から10分以内`;
-                return; // Throttled
-            }
-            if (latitude === null || longitude === null) {
-                weatherStatusEl.textContent = "GPS座標不明";
-                return;
-            }
-            
-            weatherStatusEl.textContent = "天気情報取得中...";
-            try {
-                const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(2)}&longitude=${longitude.toFixed(2)}¤t_weather=true`);
-                if (!response.ok) {
-                    throw new Error(`API error: ${response.status}`);
-                }
-                const data = await response.json();
-                if (data.current_weather && typeof data.current_weather.temperature !== 'undefined') {
-                    currentSensorValues.temperature_celsius = data.current_weather.temperature;
-                    weatherTempEl.textContent = data.current_weather.temperature.toFixed(1);
-                    weatherStatusEl.textContent = `最終更新: ${new Date().toLocaleTimeString()}`;
-                    lastWeatherFetchTime = now;
-                } else {
-                    throw new Error("Temperature data not found in response.");
-                }
-            } catch (error) {
-                console.error("Failed to fetch weather data:", error);
-                weatherStatusEl.textContent = "天気情報取得失敗";
-                weatherTempEl.textContent = "-";
-                currentSensorValues.temperature_celsius = null;
-            }
-        }
 
 
         // --- Recording Logic ---
         function recordCurrentData() {
             if (!isRecording) return;
+
             const now = Date.now();
+            // Ensure all current sensor values are up-to-date (some update via RAF, others via events)
             let dataToRecord = { ...currentSensorValues, timestamp: now };
+            
             currentRecordingData.push(dataToRecord);
             
-            // Reset transient values for next interval
+            // Reset photoTakenId for the next interval
             currentSensorValues.photoTakenId = null; 
-            currentSensorValues.steps_interval = 0; // Steps are cumulative in session, but interval logs 0 or 1
-            // Temperature is kept until next fetch, GPS values updated by watchPosition
 
-            if (currentRecordingData.length % 10 === 0) { 
+            if (currentRecordingData.length % 10 === 0) { // Update status roughly every second
                 recordingStatusEl.textContent = `記録中... (${currentRecordingData.length}件)`;
             }
         }
 
         function startRecording() {
-            // Check more specific permissions if a feature depends on it critically
-            if (!sensorsInitialized || (!anySensorSupported && !motionPermissionGranted && !orientationPermissionGranted && !micPermissionGranted && !geolocationPermissionGranted)) {
+            if (!sensorsInitialized || (!anySensorSupported && !motionPermissionGranted && !orientationPermissionGranted && !micPermissionGranted /* camera not essential for timeseries */)) {
                 alert("利用可能なセンサーがないか、センサーへのアクセスが許可されていません。");
                 return;
             }
             isRecording = true;
-            currentRecordingData = []; 
-            currentRecordingPhotos = []; 
-            lastPhotoPreviewContainer.innerHTML = ""; 
-
-            // Reset pedometer for the new session
-            currentSessionTotalSteps = 0;
-            pedometerStepsEl.textContent = '0';
-            pedometer_last_accel_mag = 0;
-            pedometer_trending_up = false;
-            pedometer_last_step_time = 0;
-
-            // Reset current weather data for the new session (will be fetched if GPS is available)
-            currentSensorValues.temperature_celsius = null;
-            weatherTempEl.textContent = "-";
-            weatherStatusEl.textContent = geolocationPermissionGranted ? "GPS位置情報取得後に更新" : "GPSアクセスが必要です";
-            lastWeatherFetchTime = 0; // Allow immediate fetch if GPS is good
-            if (currentSensorValues.latitude !== null && currentSensorValues.longitude !== null) {
-                fetchWeatherData(currentSensorValues.latitude, currentSensorValues.longitude); // Attempt fetch at start
-            }
-
+            currentRecordingData = []; // Reset for new recording
+            currentRecordingPhotos = []; // Reset photos for new recording
+            lastPhotoPreviewContainer.innerHTML = ""; // Clear last photo preview
 
             if (recordingIntervalId) clearInterval(recordingIntervalId);
             recordingIntervalId = setInterval(recordCurrentData, RECORDING_INTERVAL_MS);
             updateRecordingButtonState();
-            downloadCSVIconButton.disabled = true; 
+            downloadCSVIconButton.disabled = true; // Disable download while recording
         }
 
         function stopRecording() {
@@ -957,12 +792,11 @@
             
             if (currentRecordingData.length > 0) {
                 const session = {
-                    id: Date.now(),
+                    id: Date.now(), // Unique ID for the session
                     startTime: currentRecordingData[0].timestamp,
                     endTime: currentRecordingData[currentRecordingData.length - 1].timestamp,
                     data: [...currentRecordingData],
-                    photos: [...currentRecordingPhotos],
-                    totalSteps: currentSessionTotalSteps // Save total steps for the session
+                    photos: [...currentRecordingPhotos] // Store copies
                 };
                 allRecordedSessions.push(session);
                 saveHistoryToLocalStorage();
@@ -979,7 +813,7 @@
                 return;
             }
 
-            const header = "timestamp,accelX,accelY,accelZ,orientAlpha,orientBeta,orientGamma,gyroAlpha,gyroBeta,gyroGamma,illuminance,decibels,latitude,longitude,gpsAccuracy,altitude,speed,heading,temperature_celsius,steps_in_interval,photoTakenId";
+            const header = "timestamp,accelX,accelY,accelZ,orientAlpha,orientBeta,orientGamma,gyroAlpha,gyroBeta,gyroGamma,illuminance,decibels,photoTakenId";
             const rows = dataToExport.map(row => {
                 return [
                     row.timestamp,
@@ -994,23 +828,16 @@
                     row.gyroGamma !== null ? row.gyroGamma.toFixed(3) : '',
                     row.illuminance !== null ? row.illuminance.toFixed(0) : '',
                     row.decibels !== null && isFinite(row.decibels) ? row.decibels.toFixed(1) : '',
-                    row.latitude !== null ? row.latitude.toFixed(6) : '',
-                    row.longitude !== null ? row.longitude.toFixed(6) : '',
-                    row.gpsAccuracy !== null ? row.gpsAccuracy.toFixed(1) : '',
-                    row.altitude !== null ? row.altitude.toFixed(1) : '',
-                    row.speed !== null ? row.speed.toFixed(2) : '',
-                    row.heading !== null ? row.heading.toFixed(1) : '',
-                    row.temperature_celsius !== null ? row.temperature_celsius.toFixed(1) : '',
-                    row.steps_interval !== null ? row.steps_interval : '0', // 0 or 1
-                    row.photoTakenId || ''
+                    row.photoTakenId || '' // Add photo timestamp if taken
                 ].join(',');
             });
 
             const csvContent = header + "\n" + rows.join("\n");
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
-            const now = new Date(dataToExport[0].timestamp);
+            const now = new Date(dataToExport[0].timestamp); // Use start time of data for filename
             const timestampStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
             link.setAttribute("href", url);
             link.setAttribute("download", `${filenamePrefix}_${timestampStr}.csv`);
@@ -1019,18 +846,20 @@
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
+            // Status update depends on context (current recording vs history)
             if (filenamePrefix === "sensor_data_current") {
                 recordingStatusEl.textContent = `CSVファイルをダウンロードしました。 (${dataToExport.length}件)`;
             }
         }
+        // Event Listeners for Recording Controls
         if(startRecordingIconButton) startRecordingIconButton.addEventListener('click', startRecording);
         if(stopRecordingIconButton) stopRecordingIconButton.addEventListener('click', stopRecording);
         if(downloadCSVIconButton) downloadCSVIconButton.addEventListener('click', () => downloadCSV(currentRecordingData, "sensor_data_current"));
 
         // --- History Logic ---
-        const HISTORY_STORAGE_KEY = 'sensorDemoProHistory_v2'; // v2 for new data structure
+        const HISTORY_STORAGE_KEY = 'sensorDemoProHistory';
 
-        function saveHistoryToLocalStorage() { /* ... (same as before) ... */ 
+        function saveHistoryToLocalStorage() {
             try {
                 localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(allRecordedSessions));
             } catch (e) {
@@ -1038,15 +867,12 @@
                 alert("履歴の保存に失敗しました。ストレージ容量が不足している可能性があります。");
             }
         }
-        function loadHistoryFromLocalStorage() { /* ... (same as before, ensure parsing handles new fields) ... */ 
+
+        function loadHistoryFromLocalStorage() {
             const storedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
             if (storedHistory) {
                 try {
                     allRecordedSessions = JSON.parse(storedHistory);
-                    // Ensure all sessions have new fields, provide defaults if not
-                    allRecordedSessions.forEach(session => {
-                        if (typeof session.totalSteps === 'undefined') session.totalSteps = 0;
-                    });
                 } catch (e) {
                     console.error("Error parsing history from localStorage:", e);
                     allRecordedSessions = [];
@@ -1056,25 +882,34 @@
             }
         }
 
-        function displayHistoryList() { /* ... (Updated to show totalSteps) ... */ 
+        function displayHistoryList() {
             historyListContainer.innerHTML = '';
             historyDetailView.style.display = 'none';
             historyListContainer.style.display = 'block';
 
             if (allRecordedSessions.length === 0) {
-                noHistoryText.style.display = 'block'; return;
+                noHistoryText.style.display = 'block';
+                return;
             }
             noHistoryText.style.display = 'none';
+
             allRecordedSessions.sort((a, b) => b.id - a.id);
 
             allRecordedSessions.forEach(session => {
                 const sessionCard = document.createElement('md-elevated-card');
-                sessionCard.style.marginBottom = '12px';
+                sessionCard.style.marginBottom = '12px'; // 少し間隔を調整
+                // sessionCard.style.cursor = 'pointer'; // 詳細表示への導線として残す
+
                 const startTime = new Date(session.startTime);
                 const durationMs = session.endTime - session.startTime;
                 const durationSec = Math.floor(durationMs / 1000);
                 const durationMin = Math.floor(durationSec / 60);
-                const formattedStartTime = startTime.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+                // 日時フォーマットを改善
+                const formattedStartTime = startTime.toLocaleString('ja-JP', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
+                });
 
                 let content = `
                     <div style="padding: 16px;">
@@ -1094,58 +929,89 @@
                         </p>
                         <p style="font-size: 0.9em; margin: 4px 0;">
                             <md-icon style="font-size: 1.1em; vertical-align: bottom;">photo_library</md-icon>
-                            写真枚数: ${session.photos ? session.photos.length : 0}枚
-                        </p>
-                        <p style="font-size: 0.9em; margin: 4px 0;">
-                            <md-icon style="font-size: 1.1em; vertical-align: bottom;">directions_walk</md-icon>
-                            推定歩数: ${session.totalSteps || 0} 歩
+                            写真枚数: ${session.photos.length}枚
                         </p>
                     </div>
                 `;
                 sessionCard.innerHTML = content;
+
+                // カード全体（削除ボタン以外）のクリックで詳細表示
                 sessionCard.addEventListener('click', (event) => {
-                    if (!event.target.closest('.delete-session-button')) displayHistoryDetail(session.id);
+                    // クリックされた要素が削除ボタン自身またはその子要素でない場合のみ詳細表示
+                    if (!event.target.closest('.delete-session-button')) {
+                        displayHistoryDetail(session.id);
+                    }
                 });
+                
+                // 削除ボタンのイベントリスナー
                 const deleteButton = sessionCard.querySelector('.delete-session-button');
                 deleteButton.addEventListener('click', (event) => {
-                    event.stopPropagation();
+                    event.stopPropagation(); // カード全体のクリックイベントを発火させない
                     promptDeleteSession(session.id, formattedStartTime);
                 });
+
                 historyListContainer.appendChild(sessionCard);
             });
         }
 
-        function promptDeleteSession(sessionId, sessionStartTimeFormatted) { /* ... (same as before) ... */ 
+        function promptDeleteSession(sessionId, sessionStartTimeFormatted) {
             sessionIdToDelete = sessionId;
             deleteDialogSessionInfo.textContent = `記録日時: ${sessionStartTimeFormatted}`;
             deleteConfirmDialog.show();
         }
-        async function deleteSession(sessionId) { /* ... (same as before) ... */ 
+
+        async function deleteSession(sessionId) {
             allRecordedSessions = allRecordedSessions.filter(session => session.id !== sessionId);
             saveHistoryToLocalStorage();
-            displayHistoryList();
-            if (historyDetailView.style.display === 'block' && !allRecordedSessions.some(s => s.id === sessionIdToDelete) ) {
-                displayHistoryList();
+            displayHistoryList(); // リストを再描画
+            // もし詳細ビューが表示されていて、それが削除されたセッションのものだったらリストに戻る
+            if (historyDetailView.style.display === 'block') {
+                // 現在詳細表示されているセッションが削除されたものか確認
+                const currentDetailSessionStillExists = allRecordedSessions.some(s => s.id === sessionIdToDelete); // sessionIdToDelete は直前に削除されたID
+                if (!currentDetailSessionStillExists) { // 削除されたものが表示されていた場合
+                     // または、historyDetailTitle が削除されたセッションの情報を含んでいるかで判断も可能
+                     // 例: if (historyDetailTitle.textContent.includes(new Date(sessionToDelete.startTime).toLocaleString(...)))
+                    displayHistoryList();
+                }
             }
-            sessionIdToDelete = null;
+            sessionIdToDelete = null; // リセット
         }
-        confirmDeleteButton.addEventListener('click', () => { /* ... (same as before) ... */ 
-            if (sessionIdToDelete !== null) deleteSession(sessionIdToDelete);
+
+
+        // ダイアログの削除ボタンのイベントリスナー
+        confirmDeleteButton.addEventListener('click', () => {
+            if (sessionIdToDelete !== null) {
+                deleteSession(sessionIdToDelete);
+            }
+            // ダイアログを閉じる (md-dialogはvalueで閉じるが、明示的に呼ぶことも可能)
             if (deleteConfirmDialog.close) deleteConfirmDialog.close('delete');
+
         });
-        deleteConfirmDialog.addEventListener('closed', (event) => { /* ... (same as before) ... */ 
-            if(event.detail.action !== 'delete') sessionIdToDelete = null;
+        // ダイアログが何らかの理由で閉じたとき（キャンセル含む）
+        deleteConfirmDialog.addEventListener('closed', (event) => {
+            // valueが'delete'でなければ（つまりキャンセルやESCキーなどで閉じられた場合）sessionIdToDeleteをリセット
+            if(event.detail.action !== 'delete') { // `event.returnValue` を使うのがより確実な場合もある
+                sessionIdToDelete = null;
+            }
         });
 
-        function displayHistoryDetail(sessionId) { /* ... (Updated chart data) ... */ 
+
+        function displayHistoryDetail(sessionId) {
             const session = allRecordedSessions.find(s => s.id === sessionId);
-            if (!session) { displayHistoryList(); return; }
+            if (!session) { 
+                displayHistoryList(); 
+                return;
+            }
 
             historyListContainer.style.display = 'none';
             historyDetailView.style.display = 'block';
+
             const startTime = new Date(session.startTime);
-            const formattedStartTime = startTime.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-            historyDetailTitle.textContent = `記録詳細: ${formattedStartTime} (歩数: ${session.totalSteps || 0}歩)`;
+            const formattedStartTime = startTime.toLocaleString('ja-JP', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            });
+            historyDetailTitle.textContent = `記録詳細: ${formattedStartTime}`;
             
             historyPhotosContainer.innerHTML = '';
             if (session.photos && session.photos.length > 0) {
@@ -1153,8 +1019,10 @@
                     const img = document.createElement('img');
                     img.src = photo.dataUrl;
                     img.alt = `Photo from ${new Date(photo.timestamp).toLocaleTimeString()}`;
-                    img.style.maxWidth = '100px'; img.style.maxHeight = '100px';
-                    img.style.borderRadius = '4px'; img.style.border = '1px solid var(--md-sys-color-outline)';
+                    img.style.maxWidth = '100px';
+                    img.style.maxHeight = '100px';
+                    img.style.borderRadius = '4px';
+                    img.style.border = '1px solid var(--md-sys-color-outline)';
                     historyPhotosContainer.appendChild(img);
                 });
             } else {
@@ -1163,7 +1031,9 @@
 
             exportHistoryCSVButton.onclick = () => downloadCSV(session.data, `sensor_data_history_${session.id}`);
             
-            if (historyChartInstance) historyChartInstance.destroy();
+            if (historyChartInstance) {
+                historyChartInstance.destroy();
+            }
             const ctx = historyChartCanvas.getContext('2d');
             const labels = session.data.map(d => new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 1 }));
             
@@ -1175,9 +1045,6 @@
             if (session.data.some(d => d.orientBeta !== null)) datasets.push({ label: 'Orient Beta (X)', data: session.data.map(d => d.orientBeta), borderColor: 'orange', fill: false, tension: 0.1, hidden: true });
             if (session.data.some(d => d.illuminance !== null)) datasets.push({ label: 'Illuminance (lux)', data: session.data.map(d => d.illuminance), borderColor: 'teal', fill: false, tension: 0.1, yAxisID: 'yLux', hidden: true });
             if (session.data.some(d => d.decibels !== null && isFinite(d.decibels))) datasets.push({ label: 'Decibels (dBFS)', data: session.data.map(d => isFinite(d.decibels) ? d.decibels : null), borderColor: 'magenta', fill: false, tension: 0.1, yAxisID: 'yDb', hidden: false });
-            if (session.data.some(d => d.altitude !== null)) datasets.push({ label: 'Altitude (m)', data: session.data.map(d => d.altitude), borderColor: 'brown', fill: false, tension: 0.1, yAxisID: 'yAlt', hidden: false });
-            if (session.data.some(d => d.temperature_celsius !== null)) datasets.push({ label: 'Temperature (°C)', data: session.data.map(d => d.temperature_celsius), borderColor: 'coral', fill: false, tension: 0.1, yAxisID: 'yTemp', hidden: false });
-
 
             historyChartInstance = new Chart(ctx, {
                 type: 'line',
@@ -1188,9 +1055,7 @@
                         x: { title: { display: true, text: 'Time' } },
                         y: { title: { display: true, text: 'Sensor Values (m/s², °/s, °)' } },
                         yLux: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Lux'}, grid: { drawOnChartArea: false, } },
-                        yDb: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'dBFS'}, grid: { drawOnChartArea: false, } },
-                        yAlt: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Altitude (m)'}, grid: { drawOnChartArea: false, } },
-                        yTemp: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Temp (°C)'}, grid: { drawOnChartArea: false, } }
+                        yDb: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'dBFS'}, grid: { drawOnChartArea: false, } }
                     },
                     plugins: { legend: { position: 'top' } }
                 }
@@ -1198,15 +1063,16 @@
         }
         
         backToHistoryListButton.addEventListener('click', displayHistoryList);
+
         function loadAndDisplayHistory() {
             loadHistoryFromLocalStorage();
             displayHistoryList();
         }
 
         // --- Initial Setup ---
-        loadHistoryFromLocalStorage(); 
-        updateRecordingButtonState(); 
-        showPage('recordPage');
+        loadHistoryFromLocalStorage(); // Load history on app start
+        updateRecordingButtonState(); // Initial button state
+        showPage('recordPage'); // Show record page by default
 
     </script>
 </body>

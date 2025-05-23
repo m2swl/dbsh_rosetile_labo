@@ -1,7 +1,7 @@
 {
-    "name": "Rosetile Demo",
-    "short_name": "Rosetile Demo",
-    "description": "Rosetile Demo Web Application",
+    "name": "Sensor Demo",
+    "short_name": "Sensor Demo",
+    "description": "Sensor Demo Web Application",
     "start_url": "./index.html",
     "display": "standalone",    
     "background_color": "#FFFFFF", 
