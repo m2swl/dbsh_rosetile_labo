@@ -32,7 +32,7 @@
     /* Custom properties */
     --app-font-family: 'Noto Sans JP', sans-serif;
     --app-bar-height: 56px;
-    --nav-bar-height: 80px; /* For md-navigation-bar */
+    --nav-bar-height: 80px; /* md-navigation-bar の目標の高さ */
     --cube-size: 100px;
     --bar-max-height: 50px;
 }
@@ -216,18 +216,41 @@ md-navigation-bar {
     left: 0;
     right: 0;
     z-index: 1000;
-    height: var(--nav-bar-height);
-    /* Background color is handled by the component using Material tokens */
-     --md-navigation-bar-container-color: var(--md-sys-color-surface-container, var(--md-sys-color-surface));
+    height: var(--nav-bar-height); /* これが80pxになることを期待 */
+    --md-navigation-bar-container-color: var(--md-sys-color-surface-container, var(--md-sys-color-surface));
+    
+    /* Flexbox設定を追加して、タブの配置を制御 */
+    display: flex;
+    justify-content: space-around; /* タブを均等に配置 */
+    align-items: center;       /* タブを垂直方向に中央揃え */
+    padding: 0 8px; /* 必要に応じて左右のパディングを追加 */
+    box-sizing: border-box;
 }
+
 md-navigation-tab {
-    /* Customize if needed, e.g., icon/label colors via tokens */
     --md-navigation-tab-active-icon-color: var(--md-sys-color-on-secondary-container);
-    --md-navigation-tab-active-label-text-color: var(--md-sys-color-on-surface);
+    --md-navigation-tab-active-label-text-color: var(--md-sys-color-on-secondary-container); /* 前回修正済み */
     --md-navigation-tab-inactive-icon-color: var(--md-sys-color-on-surface-variant);
     --md-navigation-tab-inactive-label-text-color: var(--md-sys-color-on-surface-variant);
+
     --md-navigation-tab-active-indicator-color: var(--md-sys-color-secondary-container);
-    --md-navigation-tab-active-indicator-shape: 16px; /* pill shape height */
+    --md-navigation-tab-active-indicator-height: 32px; /* M3標準のインジケータ高さを明示 */
+    --md-navigation-tab-active-indicator-shape: 16px;  /* 高さ32pxに対して半径16pxでピル形状 */
+    
+    /* タブがコンテンツを中央に配置するように念のため設定 (通常はコンポーネント内部で処理) */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1; /* 各タブが利用可能なスペースを均等に占めるようにする */
+    padding-top: 12px; /* M3の Navigation tab の上部パディングの目安 */
+    padding-bottom: 16px; /* M3の Navigation tab の下部パディングの目安 */
+    min-height: var(--nav-bar-height); /* タブ自体もバーの高さを確保するようにする */
+    box-sizing: border-box;
+
+    /* アイコンとラベルのサイズが小さすぎる場合、これらのトークンで調整可能 */
+    /* --md-navigation-tab-icon-size: 24px; (デフォルトのはず) */
+    /* --md-navigation-tab-label-text-size: 0.75rem; (12px, デフォルトのはず) */
 }
 
 /* History Page Specifics */
