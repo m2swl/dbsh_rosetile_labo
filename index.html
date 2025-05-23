@@ -3,41 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sensor Demo</title>
-
-    <!-- Favicon -->
+    <title>Sensor Demo Pro</title>
     <link rel="icon" href="favicon.ico">
-
-    <!-- Web App Manifest -->
     <link rel="manifest" href="manifest.json">
-
-    <!-- Theme Color (iOS Safari and other browsers) -->
-    <meta name="theme-color" content="#9EF2B3">  <!-- manifest.jsonのtheme_colorと合わせる -->
-
-    <!-- iOS specific meta tags for PWA (optional but good to have) -->
+    <meta name="theme-color" content="#9EF2B3">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Sensor Demo"> 
+    <meta name="apple-mobile-web-app-title" content="Sensor Demo Pro">
+    <link rel="apple-touch-icon" href="./icons/iosicon-512x512.png">
 
-    <!--  iOS Home Screen Icon -->
-    <link rel="apple-touch-icon" href="./icons/iosicon-512x512.png"> 
-
-    <!-- Material Web Components (MWC) - CDNから読み込み -->
     <script type="module" src="https://unpkg.com/@material/web/all.js?module"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-
-    <!-- Noto Sans JP from Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- Style -->
     <link href="style.css" rel="stylesheet">
 </head>
 
 <body data-theme="light">
     <div class="app-bar">
-        <h1>Sensor Demo</h1>
+        <h1>Sensor Demo Pro</h1>
         <div class="theme-switch-container">
             <md-icon>light_mode</md-icon>
             <md-switch id="themeSwitch"></md-switch>
@@ -45,129 +32,206 @@
         </div>
     </div>
 
-    <div class="app-container">
-        
-        <!-- Device Orientation Card -->
-        <md-card>
-            <div class="card-header">
-                <md-icon>screen_rotation</md-icon>
-                <h2>デバイスの向き</h2>
-            </div>
-            <div class="card-content">
-                <div class="cube-container">
-                    <div class="cube" id="orientationCube">
-                        <div class="cube__face cube__face--front">前</div>
-                        <div class="cube__face cube__face--back">後</div>
-                        <div class="cube__face cube__face--right">右</div>
-                        <div class="cube__face cube__face--left">左</div>
-                        <div class="cube__face cube__face--top">上</div>
-                        <div class="cube__face cube__face--bottom">下</div>
+    <div class="main-content">
+        <!-- Page for Recording -->
+        <div id="recordPage" class="page active-page">
+            <div class="app-container">
+                <!-- Recording Controls -->
+                <div class="recording-controls-bar">
+                    <div class="recording-status-area">
+                        <p class="status-text" id="recordingStatus">待機中...</p>
+                    </div>
+                    <div class="recording-buttons-area">
+                        <md-icon-button id="sensorPermissionIconButton" aria-label="センサーアクセス許可">
+                            <md-icon>lock</md-icon>
+                        </md-icon-button>
+                        <md-icon-button id="startRecordingIconButton" aria-label="記録開始" disabled>
+                            <md-icon>play_arrow</md-icon>
+                        </md-icon-button>
+                        <md-icon-button id="stopRecordingIconButton" aria-label="記録停止" disabled>
+                            <md-icon>stop</md-icon>
+                        </md-icon-button>
+                        <md-icon-button id="downloadCSVIconButton" aria-label="CSVダウンロード" disabled>
+                            <md-icon>download</md-icon>
+                        </md-icon-button>
                     </div>
                 </div>
-                <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="orient-alpha">-</span> °</p>
-                <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="orient-beta">-</span> °</p>
-                <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="orient-gamma">-</span> °</p>
-                <p class="status-text" id="orient-status">待機中...</p>
-            </div>
-        </md-card>
 
-        <!-- Accelerometer Card -->
-        <md-card>
-            <div class="card-header">
-                <md-icon>vibration</md-icon>
-                <h2>加速度 (重力含む)</h2>
+                <!-- Device Orientation Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>screen_rotation</md-icon>
+                        <h2>デバイスの向き</h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="cube-container">
+                            <div class="cube" id="orientationCube">
+                                <div class="cube__face cube__face--front">前</div>
+                                <div class="cube__face cube__face--back">後</div>
+                                <div class="cube__face cube__face--right">右</div>
+                                <div class="cube__face cube__face--left">左</div>
+                                <div class="cube__face cube__face--top">上</div>
+                                <div class="cube__face cube__face--bottom">下</div>
+                            </div>
+                        </div>
+                        <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="orient-alpha">-</span> °</p>
+                        <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="orient-beta">-</span> °</p>
+                        <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="orient-gamma">-</span> °</p>
+                        <p class="status-text" id="orient-status">待機中...</p>
+                    </div>
+                </md-card>
+
+                <!-- Accelerometer Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>vibration</md-icon>
+                        <h2>加速度 (重力含む)</h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="bars-container">
+                            <div class="bar" id="accel-bar-x"><span class="bar-label">X</span></div>
+                            <div class="bar" id="accel-bar-y"><span class="bar-label">Y</span></div>
+                            <div class="bar" id="accel-bar-z"><span class="bar-label">Z</span></div>
+                        </div>
+                        <p class="sensor-value"><strong>X:</strong> <span id="accel-x">-</span> m/s²</p>
+                        <p class="sensor-value"><strong>Y:</strong> <span id="accel-y">-</span> m/s²</p>
+                        <p class="sensor-value"><strong>Z:</strong> <span id="accel-z">-</span> m/s²</p>
+                        <p class="status-text" id="accel-status">待機中...</p>
+                    </div>
+                </md-card>
+
+                <!-- Gyroscope Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>explore</md-icon>
+                        <h2>ジャイロスコープ (回転速度)</h2>
+                    </div>
+                    <div class="card-content">
+                        <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="gyro-alpha">-</span> °/s</p>
+                        <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta">-</span> °/s</p>
+                        <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="gyro-gamma">-</span> °/s</p>
+                        <p class="status-text" id="gyro-status">待機中...</p>
+                    </div>
+                </md-card>
+
+                <!-- Light Sensor Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>lightbulb</md-icon>
+                        <h2>光センサー</h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="light-viz">
+                            <md-icon id="light-icon-sun" style="display:none;">wb_sunny</md-icon>
+                            <md-icon id="light-icon-moon" style="display:none;">nightlight_round</md-icon>
+                        </div>
+                        <p class="sensor-value"><strong>明るさ:</strong> <span id="light-value">-</span> lux</p>
+                        <p class="status-text" id="light-status">待機中...</p>
+                    </div>
+                </md-card>
+
+                <!-- Microphone Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>mic</md-icon>
+                        <h2>マイク (音量)</h2>
+                    </div>
+                    <div class="card-content">
+                        <p class="sensor-value"><strong>音量 (dBFS):</strong> <span id="mic-dbfs">-</span> dBFS</p>
+                        <div class="mic-level-bar-container">
+                            <div class="mic-level-bar" id="micLevelBar"></div>
+                        </div>
+                        <p class="status-text" id="mic-status">待機中...</p>
+                    </div>
+                </md-card>
+
+                <!-- Camera Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>photo_camera</md-icon>
+                        <h2>写真撮影</h2>
+                    </div>
+                    <div class="card-content">
+                        <video id="cameraPreview" playsinline autoplay muted style="display:none; width: 100%; max-width:300px; border-radius: 8px; margin-bottom:10px;"></video>
+                        <canvas id="photoCanvas" style="display:none;"></canvas>
+                        <md-filled-button id="takePictureButton" disabled>
+                            <md-icon slot="icon">camera_alt</md-icon>
+                            写真を撮る
+                        </md-filled-button>
+                        <p class="status-text" id="camera-status">カメラ準備中...</p>
+                        <div id="lastPhotoPreviewContainer" style="margin-top: 10px;"></div>
+                    </div>
+                </md-card>
+
+                <p style="font-size: 0.8em; text-align: center; margin-top: 20px; color: var(--md-sys-color-on-surface-variant);">
+                    注意: センサーの利用にはブラウザからの許可が必要な場合があります。
+                </p>
             </div>
-            <div class="card-content">
-                <div class="bars-container">
-                    <div class="bar" id="accel-bar-x"><span class="bar-label">X</span></div>
-                    <div class="bar" id="accel-bar-y"><span class="bar-label">Y</span></div>
-                    <div class="bar" id="accel-bar-z"><span class="bar-label">Z</span></div>
+        </div>
+
+        <!-- Page for Recording History -->
+        <div id="historyPage" class="page">
+            <div class="app-container">
+                <h2>記録履歴</h2>
+                <p id="noHistoryText" style="text-align:center; color: var(--md-sys-color-on-surface-variant);">記録されたセッションはありません。</p>
+                <div id="historyListContainer">
+                    <!-- History items will be injected here -->
                 </div>
-                <p class="sensor-value"><strong>X:</strong> <span id="accel-x">-</span> m/s²</p>
-                <p class="sensor-value"><strong>Y:</strong> <span id="accel-y">-</span> m/s²</p>
-                <p class="sensor-value"><strong>Z:</strong> <span id="accel-z">-</span> m/s²</p>
-                <p class="status-text" id="accel-status">待機中...</p>
-            </div>
-        </md-card>
-
-        <!-- Gyroscope Card -->
-        <md-card>
-            <div class="card-header">
-                <md-icon>explore</md-icon>
-                <h2>ジャイロスコープ (回転速度)</h2>
-            </div>
-            <div class="card-content">
-                <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="gyro-alpha">-</span> °/s</p>
-                <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta">-</span> °/s</p>
-                <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="gyro-gamma">-</span> °/s</p>
-                <p class="status-text" id="gyro-status">待機中...</p>
-            </div>
-        </md-card>
-
-        <!-- Light Sensor Card -->
-        <md-card>
-            <div class="card-header">
-                <md-icon>lightbulb</md-icon>
-                <h2>光センサー</h2>
-            </div>
-            <div class="card-content">
-                <div class="light-viz">
-                    <md-icon id="light-icon-sun" style="display:none;">wb_sunny</md-icon>
-                    <md-icon id="light-icon-moon" style="display:none;">nightlight_round</md-icon>
+                <div id="historyDetailView" style="display:none; margin-top:20px;">
+                    <h3 id="historyDetailTitle"></h3>
+                    <md-outlined-button id="backToHistoryListButton" style="margin-bottom:10px;">
+                        <md-icon slot="icon">arrow_back</md-icon>
+                        一覧へ戻る
+                    </md-outlined-button>
+                    <h4>センサーデータグラフ</h4>
+                    <canvas id="historyChart" width="400" height="300"></canvas>
+                    <h4>撮影された写真</h4>
+                    <div id="historyPhotosContainer" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;"></div>
+                    <md-filled-button id="exportHistoryCSVButton" style="margin-top:20px;">
+                        <md-icon slot="icon">download</md-icon>
+                        この記録をCSVでエクスポート
+                    </md-filled-button>
                 </div>
-                <p class="sensor-value"><strong>明るさ:</strong> <span id="light-value">-</span> lux</p>
-                <p class="status-text" id="light-status">待機中...</p>
             </div>
-        </md-card>
-
-        <p style="font-size: 0.8em; text-align: center; margin-top: 20px; margin-bottom: 80px; /* 下部ボタンバーとのスペース確保 */ color: var(--md-sys-color-on-surface-variant);">
-            注意: センサーの利用にはブラウザからの許可が必要な場合があります。また、お使いのデバイスやブラウザによっては一部センサーが利用できないことがあります。記録されたデータはCSV形式でダウンロードできます。
-        </p>
+        </div>
     </div>
 
-    <!-- New Icon Button Bar for Recording -->
-    <div class="icon-button-bar">
-        <div class="recording-status-bar">
-            <p class="status-text" id="recordingStatus">待機中...</p>
-        </div>
-        <div class="icon-button-controls">
-            <md-icon-button id="sensorPermissionIconButton" aria-label="センサーアクセス許可">
-                <md-icon>lock</md-icon>
-            </md-icon-button>
-            <md-icon-button id="startRecordingIconButton" aria-label="記録開始" disabled>
-                <md-icon>play_arrow</md-icon>
-            </md-icon-button>
-            <md-icon-button id="stopRecordingIconButton" aria-label="記録停止" disabled>
-                <md-icon>stop</md-icon>
-            </md-icon-button>
-            <md-icon-button id="downloadCSVIconButton" aria-label="CSVダウンロード" disabled>
-                <md-icon>download</md-icon>
-            </md-icon-button>
-        </div>
-    </div>
+    <!-- Bottom Navigation Bar -->
+    <md-navigation-bar>
+        <md-navigation-tab id="navRecordTab" label="記録">
+            <md-icon slot="activeIcon">sensors</md-icon>
+            <md-icon slot="inactiveIcon">sensors</md-icon>
+        </md-navigation-tab>
+        <md-navigation-tab id="navHistoryTab" label="記録履歴">
+            <md-icon slot="activeIcon">history</md-icon>
+            <md-icon slot="inactiveIcon">history</md-icon>
+        </md-navigation-tab>
+    </md-navigation-bar>
 
     <script type="module">
-        // MWCコンポーネントの参照
-
-        // DOM Elements
+        // MWC Components, DOM Elements, etc.
         const body = document.body;
         const themeSwitch = document.getElementById('themeSwitch');
 
-        // Recording Elements - Updated to icon buttons
+        // Page containers
+        const recordPage = document.getElementById('recordPage');
+        const historyPage = document.getElementById('historyPage');
+        const navRecordTab = document.getElementById('navRecordTab');
+        const navHistoryTab = document.getElementById('navHistoryTab');
+
+        // Recording Elements
         const sensorPermissionIconButton = document.getElementById('sensorPermissionIconButton');
         const startRecordingIconButton = document.getElementById('startRecordingIconButton');
         const stopRecordingIconButton = document.getElementById('stopRecordingIconButton');
-        const downloadCSVIconButton = document.getElementById('downloadCSVIconButton');
+        const downloadCSVIconButton = document.getElementById('downloadCSVIconButton'); // For current recording
         const recordingStatusEl = document.getElementById('recordingStatus');
 
-        // Orientation
+        // Sensor UI Elements (existing)
         const orientationCube = document.getElementById('orientationCube');
         const orientAlphaEl = document.getElementById('orient-alpha');
         const orientBetaEl = document.getElementById('orient-beta');
         const orientGammaEl = document.getElementById('orient-gamma');
         const orientStatusEl = document.getElementById('orient-status');
-
-        // Accelerometer
         const accelXEl = document.getElementById('accel-x');
         const accelYEl = document.getElementById('accel-y');
         const accelZEl = document.getElementById('accel-z');
@@ -176,33 +240,70 @@
         const accelBarY = document.getElementById('accel-bar-y');
         const accelBarZ = document.getElementById('accel-bar-z');
         const BAR_MAX_ACCEL = 20;
-
-        // Gyroscope
         const gyroAlphaEl = document.getElementById('gyro-alpha');
         const gyroBetaEl = document.getElementById('gyro-beta');
         const gyroGammaEl = document.getElementById('gyro-gamma');
         const gyroStatusEl = document.getElementById('gyro-status');
-
-        // Light Sensor
         const lightValueEl = document.getElementById('light-value');
         const lightStatusEl = document.getElementById('light-status');
         const lightIconSun = document.getElementById('light-icon-sun');
         const lightIconMoon = document.getElementById('light-icon-moon');
 
-        // --- Recording Variables ---
+        // New Sensor UI Elements: Microphone
+        const micDbfsEl = document.getElementById('mic-dbfs');
+        const micStatusEl = document.getElementById('mic-status');
+        const micLevelBar = document.getElementById('micLevelBar');
+
+        // New Sensor UI Elements: Camera
+        const cameraPreview = document.getElementById('cameraPreview');
+        const photoCanvas = document.getElementById('photoCanvas');
+        const takePictureButton = document.getElementById('takePictureButton');
+        const cameraStatusEl = document.getElementById('camera-status');
+        const lastPhotoPreviewContainer = document.getElementById('lastPhotoPreviewContainer');
+
+        // History Page Elements
+        const noHistoryText = document.getElementById('noHistoryText');
+        const historyListContainer = document.getElementById('historyListContainer');
+        const historyDetailView = document.getElementById('historyDetailView');
+        const historyDetailTitle = document.getElementById('historyDetailTitle');
+        const backToHistoryListButton = document.getElementById('backToHistoryListButton');
+        const historyChartCanvas = document.getElementById('historyChart');
+        const historyPhotosContainer = document.getElementById('historyPhotosContainer');
+        const exportHistoryCSVButton = document.getElementById('exportHistoryCSVButton');
+        let historyChartInstance = null;
+
+
+        // --- Global State ---
         let isRecording = false;
-        let recordedData = [];
+        let currentRecordingData = [];
+        let currentRecordingPhotos = []; // { timestamp, dataUrl }
         let recordingIntervalId = null;
-        const RECORDING_INTERVAL_MS = 100;
+        const RECORDING_INTERVAL_MS = 100; // Sensor data polling rate
+
         let currentSensorValues = {
             timestamp: null,
             accelX: null, accelY: null, accelZ: null,
             orientAlpha: null, orientBeta: null, orientGamma: null,
             gyroAlpha: null, gyroBeta: null, gyroGamma: null,
-            illuminance: null
+            illuminance: null,
+            decibels: null,
+            photoTakenId: null // ID or timestamp of photo taken during this interval
         };
 
-        // --- Theme Switch Logic ---
+        let allRecordedSessions = []; // Array to store multiple recording sessions
+
+        // --- Audio Variables ---
+        let audioContext = null;
+        let analyserNode = null;
+        let microphoneStream = null;
+        let micPermissionGranted = false;
+
+        // --- Camera Variables ---
+        let cameraStream = null;
+        let cameraPermissionGranted = false;
+
+
+        // --- Theme Switch Logic (same as before) ---
         function applyTheme(theme) {
             body.dataset.theme = theme;
             localStorage.setItem('theme', theme);
@@ -226,46 +327,63 @@
             });
         }
 
+        // --- Page Navigation Logic ---
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
+            document.getElementById(pageId).classList.add('active-page');
+            if (pageId === 'historyPage') {
+                loadAndDisplayHistory();
+            }
+        }
+        navRecordTab.addEventListener('click', () => showPage('recordPage'));
+        navHistoryTab.addEventListener('click', () => showPage('historyPage'));
+        // Default to record page
+        navRecordTab.active = true;
+
+
         // --- Sensor Permission and Initialization ---
         let motionPermissionGranted = false;
         let orientationPermissionGranted = false;
+        // let lightSensorPermissionGranted = false; // Handled internally by AmbientLightSensor
         let sensorsInitialized = false;
-        let anySensorSupported = false; // いずれかのセンサーが実際に利用可能か
+        let anySensorSupported = false;
 
         const needsExplicitPermission = (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') ||
-                                    (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function');
+                                    (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') ||
+                                    (navigator.mediaDevices && navigator.mediaDevices.getUserMedia); // For mic/camera
 
         function updateRecordingButtonState() {
-            if (!startRecordingIconButton) return; // DOM読み込み前は実行しない
+            if (!startRecordingIconButton) return;
 
             const permissionIconEl = sensorPermissionIconButton ? sensorPermissionIconButton.querySelector('md-icon') : null;
-            const mainPermissionsGranted = motionPermissionGranted && orientationPermissionGranted;
+            // For main sensors, mic, and camera:
+            const mainPermissionsGranted = (motionPermissionGranted && orientationPermissionGranted && micPermissionGranted && cameraPermissionGranted) || 
+                                           (!needsExplicitPermission && anySensorSupported); // if no explicit perm needed, and a sensor works
 
-            if (needsExplicitPermission && !mainPermissionsGranted && sensorPermissionIconButton) {
-                sensorPermissionIconButton.style.display = 'inline-flex';
-                sensorPermissionIconButton.disabled = false;
-                if (permissionIconEl) permissionIconEl.textContent = 'lock';
+            if (needsExplicitPermission && !(motionPermissionGranted && orientationPermissionGranted && micPermissionGranted && cameraPermissionGranted) && sensorPermissionIconButton) {
+                 sensorPermissionIconButton.style.display = 'inline-flex';
+                 sensorPermissionIconButton.disabled = false;
+                 if (permissionIconEl) permissionIconEl.textContent = 'lock';
             } else if (sensorPermissionIconButton) {
-                sensorPermissionIconButton.style.display = 'inline-flex'; // 表示は維持し、状態を示す
-                sensorPermissionIconButton.disabled = true; // 役割を終えたら無効化
+                sensorPermissionIconButton.style.display = 'inline-flex';
+                sensorPermissionIconButton.disabled = true;
                 if (permissionIconEl) permissionIconEl.textContent = (mainPermissionsGranted || anySensorSupported) ? 'lock_open' : 'lock';
-                 // もし完全に不要なら style.display = 'none' も検討
             }
 
-
-            const sensorsReadyForRecording = sensorsInitialized && (anySensorSupported || motionPermissionGranted || orientationPermissionGranted);
+            const sensorsReadyForRecording = sensorsInitialized && (anySensorSupported || mainPermissionsGranted);
 
             startRecordingIconButton.disabled = !sensorsReadyForRecording || isRecording;
             stopRecordingIconButton.disabled = !sensorsReadyForRecording || !isRecording;
-            downloadCSVIconButton.disabled = !sensorsReadyForRecording || isRecording || recordedData.length === 0;
+            downloadCSVIconButton.disabled = !sensorsReadyForRecording || isRecording || currentRecordingData.length === 0;
+            takePictureButton.disabled = !cameraPermissionGranted || !cameraStream || isRecording; // Can take picture even if not recording sensors
 
             if (isRecording) {
-                recordingStatusEl.textContent = `記録中... (${recordedData.length}件)`;
-            } else if (recordedData.length > 0) {
-                recordingStatusEl.textContent = `記録停止。${recordedData.length}件。CSVダウンロード可。`;
+                recordingStatusEl.textContent = `記録中... (${currentRecordingData.length}件)`;
+            } else if (currentRecordingData.length > 0) { // After stopping a recording, before clearing
+                recordingStatusEl.textContent = `記録停止。${currentRecordingData.length}件。CSVダウンロード可。`;
             } else if (sensorsReadyForRecording) {
                 recordingStatusEl.textContent = "センサー監視中。記録を開始できます。";
-            } else if (sensorsInitialized && !anySensorSupported && !motionPermissionGranted && !orientationPermissionGranted) {
+            } else if (sensorsInitialized && !anySensorSupported && !mainPermissionsGranted) {
                 recordingStatusEl.textContent = "利用可能なセンサーがありません。";
             } else if (needsExplicitPermission && !mainPermissionsGranted) {
                 recordingStatusEl.textContent = "左のアイコンからセンサーアクセスを許可してください。";
@@ -274,238 +392,375 @@
             }
         }
 
-
-        function initializeSensors() {
+        async function initializeSensors() {
             if (sensorsInitialized) return;
-            // anySensorSupported は各センサーのイベントハンドラ内で true に設定される
 
+            // Motion & Orientation
             if (motionPermissionGranted) {
                 window.addEventListener('devicemotion', handleMotionEvent, { passive: true });
                 accelStatusEl.textContent = "監視中...";
                 gyroStatusEl.textContent = "監視中...";
-                // anySensorSupported はイベント受信時に設定
-            } else if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function') { // パーミッションAPIなし環境
+            } else if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function') {
                 window.addEventListener('devicemotion', handleMotionEvent, { passive: true });
-                accelStatusEl.textContent = "監視中...";
-                gyroStatusEl.textContent = "監視中...";
-                motionPermissionGranted = true; // 暗黙的に許可されているとみなす
+                accelStatusEl.textContent = "監視中..."; gyroStatusEl.textContent = "監視中...";
+                motionPermissionGranted = true;
             } else if (!window.DeviceMotionEvent) {
-                accelStatusEl.textContent = '加速度センサーはサポートされていません。';
-                accelStatusEl.classList.add('not-supported');
-                gyroStatusEl.textContent = 'ジャイロスコープはサポートされていません。';
-                gyroStatusEl.classList.add('not-supported');
+                accelStatusEl.textContent = '加速度センサー非対応'; accelStatusEl.classList.add('not-supported');
+                gyroStatusEl.textContent = 'ジャイロスコープ非対応'; gyroStatusEl.classList.add('not-supported');
             }
 
             if (orientationPermissionGranted) {
                 window.addEventListener('deviceorientation', handleOrientationEvent, { passive: true });
                 orientStatusEl.textContent = "監視中...";
-            } else if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function') { // パーミッションAPIなし環境
+            } else if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function') {
                 window.addEventListener('deviceorientation', handleOrientationEvent, { passive: true });
                 orientStatusEl.textContent = "監視中...";
-                orientationPermissionGranted = true; // 暗黙的に許可
+                orientationPermissionGranted = true;
             } else if(!window.DeviceOrientationEvent) {
-                orientStatusEl.textContent = '向きセンサーはサポートされていません。';
-                orientStatusEl.classList.add('not-supported');
+                orientStatusEl.textContent = '向きセンサー非対応'; orientStatusEl.classList.add('not-supported');
             }
 
-            initializeLightSensor(); // 光センサーの初期化も行う
+            initializeLightSensor();
+            initializeMicrophone();
+            initializeCamera(); // Attempt to initialize camera for preview
 
             sensorsInitialized = true;
             updateRecordingButtonState();
         }
 
-        function requestSensorPermissions() {
+        async function requestAllPermissions() {
             const promises = [];
+            // Device Motion
             if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function' && !motionPermissionGranted) {
                 promises.push(
                     DeviceMotionEvent.requestPermission().then(state => {
-                        if (state === 'granted') {
-                            motionPermissionGranted = true;
-                        } else {
-                            accelStatusEl.textContent = '加速度センサーへのアクセスが拒否されました。';
-                            accelStatusEl.classList.add('error');
-                            gyroStatusEl.textContent = 'ジャイロスコープへのアクセスが拒否されました。';
-                            gyroStatusEl.classList.add('error');
-                        }
-                    }).catch(err => {
-                        console.error("DeviceMotionEvent permission error:", err);
-                        accelStatusEl.textContent = `加速度センサーエラー`; accelStatusEl.classList.add('error');
-                        gyroStatusEl.textContent = `ジャイロスコープエラー`; gyroStatusEl.classList.add('error');
-                    })
+                        if (state === 'granted') motionPermissionGranted = true;
+                        else { accelStatusEl.textContent = '加速度アクセス拒否'; gyroStatusEl.textContent = 'ジャイロアクセス拒否'; }
+                    }).catch(err => { console.error("Motion Err:", err); accelStatusEl.textContent = '加速度エラー'; gyroStatusEl.textContent = 'ジャイロエラー';})
                 );
             }
-
+            // Device Orientation
             if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function' && !orientationPermissionGranted) {
                 promises.push(
                     DeviceOrientationEvent.requestPermission().then(state => {
-                        if (state === 'granted') {
-                            orientationPermissionGranted = true;
-                        } else {
-                            orientStatusEl.textContent = '向きセンサーへのアクセスが拒否されました。';
-                            orientStatusEl.classList.add('error');
-                        }
-                    }).catch(err => {
-                        console.error("DeviceOrientationEvent permission error:", err);
-                        orientStatusEl.textContent = `向きセンサーエラー`; orientStatusEl.classList.add('error');
-                    })
+                        if (state === 'granted') orientationPermissionGranted = true;
+                        else { orientStatusEl.textContent = '向きアクセス拒否'; }
+                    }).catch(err => { console.error("Orientation Err:", err); orientStatusEl.textContent = '向きエラー';})
                 );
             }
 
+            // Microphone & Camera (handled in their init functions, but triggered here)
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                if (!micPermissionGranted) {
+                     promises.push(initializeMicrophone(true)); // Pass true to force permission prompt
+                }
+                if (!cameraPermissionGranted) {
+                    promises.push(initializeCamera(true)); // Pass true to force permission prompt
+                }
+            }
+
+
             if (promises.length > 0) {
-                Promise.allSettled(promises).then(() => {
-                    initializeSensors();
-                });
+                await Promise.allSettled(promises);
+                initializeSensors(); // Re-initialize after all permissions attempted
             } else {
-                // パーミッション要求が不要だったか、既に許可済みの場合
                 initializeSensors();
             }
         }
-
+        
         if (needsExplicitPermission) {
             if (sensorPermissionIconButton) {
-                sensorPermissionIconButton.addEventListener('click', requestSensorPermissions, { once: true });
+                sensorPermissionIconButton.addEventListener('click', requestAllPermissions, { once: false }); // Allow multiple attempts if denied initially
             }
-            // 初期ステータスメッセージ
-            accelStatusEl.textContent = "アイコンから許可";
-            gyroStatusEl.textContent = "アイコンから許可";
-            orientStatusEl.textContent = "アイコンから許可";
-        } else {
-            if (sensorPermissionIconButton) sensorPermissionIconButton.style.display = 'none';
-            requestSensorPermissions(); // 直接センサー初期化を試みる
+            accelStatusEl.textContent = "アイコンから許可"; gyroStatusEl.textContent = "アイコンから許可";
+            orientStatusEl.textContent = "アイコンから許可"; micStatusEl.textContent = "アイコンから許可";
+            cameraStatusEl.textContent = "アイコンから許可";
+        } else { // No explicit permission API, try to initialize directly
+            if(sensorPermissionIconButton) sensorPermissionIconButton.style.display = 'none';
+            // Assume permissions are implicitly granted or not needed for basic sensors
+            motionPermissionGranted = true; // Or check for existence of DeviceMotionEvent
+            orientationPermissionGranted = true; // Or check for existence of DeviceOrientationEvent
+            // Mic/Camera will still need navigator.mediaDevices.getUserMedia
+            requestAllPermissions();
         }
 
-        // --- Sensor Event Handlers ---
+        // --- Sensor Event Handlers (Existing sensors - condensed) ---
         function handleMotionEvent(event) {
             if (!motionPermissionGranted && !(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function')) return;
-            anySensorSupported = true; // DeviceMotion からデータが来始めた
-
+            anySensorSupported = true;
             if (event.accelerationIncludingGravity) {
                 const { x, y, z } = event.accelerationIncludingGravity;
                 currentSensorValues.accelX = x; currentSensorValues.accelY = y; currentSensorValues.accelZ = z;
-                accelXEl.textContent = x ? x.toFixed(2) : '-';
-                accelYEl.textContent = y ? y.toFixed(2) : '-';
-                accelZEl.textContent = z ? z.toFixed(2) : '-';
+                accelXEl.textContent = x ? x.toFixed(2) : '-'; accelYEl.textContent = y ? y.toFixed(2) : '-'; accelZEl.textContent = z ? z.toFixed(2) : '-';
                 requestAnimationFrame(() => {
                     accelBarX.style.height = `${Math.min(100, (Math.abs(x || 0) / BAR_MAX_ACCEL) * 100)}%`;
                     accelBarY.style.height = `${Math.min(100, (Math.abs(y || 0) / BAR_MAX_ACCEL) * 100)}%`;
                     accelBarZ.style.height = `${Math.min(100, (Math.abs(z || 0) / BAR_MAX_ACCEL) * 100)}%`;
                 });
                 if (accelStatusEl.textContent !== "監視中...") accelStatusEl.textContent = "監視中...";
-            } else { /* ... */ }
-
+            }
             if (event.rotationRate) {
                 const { alpha, beta, gamma } = event.rotationRate;
                 currentSensorValues.gyroAlpha = alpha; currentSensorValues.gyroBeta = beta; currentSensorValues.gyroGamma = gamma;
-                gyroAlphaEl.textContent = alpha ? alpha.toFixed(2) : '-';
-                gyroBetaEl.textContent = beta ? beta.toFixed(2) : '-';
-                gyroGammaEl.textContent = gamma ? gamma.toFixed(2) : '-';
+                gyroAlphaEl.textContent = alpha ? alpha.toFixed(2) : '-'; gyroBetaEl.textContent = beta ? beta.toFixed(2) : '-'; gyroGammaEl.textContent = gamma ? gamma.toFixed(2) : '-';
                 if (gyroStatusEl.textContent !== "監視中...") gyroStatusEl.textContent = "監視中...";
-            } else { /* ... */ }
-            if (sensorsInitialized) updateRecordingButtonState(); // 状態変化の可能性
+            }
+            if (sensorsInitialized) updateRecordingButtonState();
         }
-
         function handleOrientationEvent(event) {
             if (!orientationPermissionGranted && !(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function')) return;
-            anySensorSupported = true; // DeviceOrientation からデータが来始めた
-
+            anySensorSupported = true;
             const { alpha, beta, gamma } = event;
             currentSensorValues.orientAlpha = alpha; currentSensorValues.orientBeta = beta; currentSensorValues.orientGamma = gamma;
-            orientAlphaEl.textContent = alpha ? alpha.toFixed(1) : '-';
-            orientBetaEl.textContent = beta ? beta.toFixed(1) : '-';
-            orientGammaEl.textContent = gamma ? gamma.toFixed(1) : '-';
+            orientAlphaEl.textContent = alpha ? alpha.toFixed(1) : '-'; orientBetaEl.textContent = beta ? beta.toFixed(1) : '-'; orientGammaEl.textContent = gamma ? gamma.toFixed(1) : '-';
             if (beta !== null && gamma !== null && alpha !== null) {
                 requestAnimationFrame(() => {
                     orientationCube.style.transform = `rotateX(${beta.toFixed(1)}deg) rotateY(${gamma.toFixed(1)}deg) rotateZ(${alpha.toFixed(1)}deg)`;
                 });
             }
             if (orientStatusEl.textContent !== "監視中...") orientStatusEl.textContent = "監視中...";
-            if (sensorsInitialized) updateRecordingButtonState(); // 状態変化の可能性
+            if (sensorsInitialized) updateRecordingButtonState();
         }
-
-        function initializeLightSensor() {
+        function initializeLightSensor() { /* ... (same as before, check for AmbientLightSensor, update anySensorSupported, currentSensorValues.illuminance) ... */ 
             if (!('AmbientLightSensor' in window)) {
-                lightStatusEl.textContent = '光センサー API はサポートされていません。';
-                lightStatusEl.classList.add('not-supported');
-                currentSensorValues.illuminance = null;
-                if (sensorsInitialized) updateRecordingButtonState();
-                return;
+                lightStatusEl.textContent = '光センサー API 非対応'; lightStatusEl.classList.add('not-supported');
+                currentSensorValues.illuminance = null; if (sensorsInitialized) updateRecordingButtonState(); return;
             }
-            lightStatusEl.textContent = "アクセス許可を待っています...";
+            lightStatusEl.textContent = "アクセス許可待機中...";
             const startSensor = () => {
                 try {
                     const sensor = new AmbientLightSensor({ frequency: 1 });
                     sensor.addEventListener('reading', () => {
-                        anySensorSupported = true; // 光センサーからデータが来始めた
+                        anySensorSupported = true; 
                         const illuminance = sensor.illuminance;
                         currentSensorValues.illuminance = illuminance;
                         lightValueEl.textContent = illuminance ? illuminance.toFixed(0) : '-';
-                        lightStatusEl.textContent = "監視中...";
-                        lightStatusEl.classList.remove('error', 'not-supported');
-                        if (illuminance === null || typeof illuminance === 'undefined') { /* ... */ }
+                        lightStatusEl.textContent = "監視中..."; lightStatusEl.classList.remove('error', 'not-supported');
+                        if (illuminance === null || typeof illuminance === 'undefined') {}
                         else if (illuminance > 100) { lightIconSun.style.display = 'inline-block'; lightIconMoon.style.display = 'none'; }
                         else if (illuminance < 10) { lightIconSun.style.display = 'none'; lightIconMoon.style.display = 'inline-block'; }
                         else { lightIconSun.style.display = 'none'; lightIconMoon.style.display = 'none'; }
                         if (sensorsInitialized) updateRecordingButtonState();
                     });
-                    sensor.addEventListener('error', event => { /* ... */ if (sensorsInitialized) updateRecordingButtonState(); });
+                    sensor.addEventListener('error', event => { 
+                        console.error('Light sensor error:', event.error.name, event.error.message);
+                        lightStatusEl.textContent = `光センサーエラー: ${event.error.name}`; lightStatusEl.classList.add('error');
+                        currentSensorValues.illuminance = null; if (sensorsInitialized) updateRecordingButtonState();
+                    });
                     sensor.start();
-                } catch (error) { /* ... */ if (sensorsInitialized) updateRecordingButtonState(); }
+                } catch (error) {
+                    console.error('Failed to start light sensor:', error);
+                    lightStatusEl.textContent = `光センサー開始失敗: ${error.name}`; lightStatusEl.classList.add('error');
+                    currentSensorValues.illuminance = null; if (sensorsInitialized) updateRecordingButtonState();
+                }
             };
-            if (navigator.permissions && navigator.permissions.query) {
+             if (navigator.permissions && navigator.permissions.query) {
                 navigator.permissions.query({ name: 'ambient-light-sensor' })
                     .then(permissionStatus => {
                         if (permissionStatus.state === 'granted') startSensor();
-                        else if (permissionStatus.state === 'prompt') lightStatusEl.textContent = '光センサー: ブラウザがアクセス許可を求めています。';
-                        else { lightStatusEl.textContent = '光センサーへのアクセスが拒否されました。'; lightStatusEl.classList.add('error'); }
-                        permissionStatus.onchange = () => { /* ... */ if (sensorsInitialized) updateRecordingButtonState(); };
+                        else if (permissionStatus.state === 'prompt') lightStatusEl.textContent = '光センサー: ブラウザが許可を求めています。';
+                        else { lightStatusEl.textContent = '光センサーアクセス拒否'; lightStatusEl.classList.add('error'); }
+                        permissionStatus.onchange = () => { if (permissionStatus.state === 'granted') startSensor(); else if (permissionStatus.state !== 'prompt') { lightStatusEl.textContent = '光センサーアクセス拒否'; lightStatusEl.classList.add('error');} if (sensorsInitialized) updateRecordingButtonState(); };
                         if (sensorsInitialized && permissionStatus.state !== 'granted') updateRecordingButtonState();
                     })
-                    .catch(e => { startSensor(); });
-            } else { startSensor(); }
+                    .catch(e => { console.warn("Ambient Light Sensor permission query failed, attempting to start directly.", e); startSensor(); }); // Fallback if query fails
+            } else { startSensor(); } // Fallback for browsers not supporting permission query
         }
+
+        // --- Microphone Logic ---
+        async function initializeMicrophone(forcePermissionRequest = false) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                micStatusEl.textContent = 'マイク API 非対応'; micStatusEl.classList.add('not-supported');
+                micPermissionGranted = false; updateRecordingButtonState(); return Promise.resolve();
+            }
+            if (microphoneStream && !forcePermissionRequest) return Promise.resolve(); // Already initialized
+
+            micStatusEl.textContent = "マイクアクセス許可待機中...";
+            try {
+                microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                micPermissionGranted = true; anySensorSupported = true;
+                micStatusEl.textContent = "監視中..."; micStatusEl.classList.remove('error', 'not-supported');
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyserNode = audioContext.createAnalyser();
+                const source = audioContext.createMediaStreamSource(microphoneStream);
+                source.connect(analyserNode);
+                analyserNode.fftSize = 256; // Smaller FFT for faster response, less detail
+                const bufferLength = analyserNode.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+
+                function getDecibels() {
+                    if (!micPermissionGranted || !analyserNode) {
+                        currentSensorValues.decibels = null;
+                        micDbfsEl.textContent = "-";
+                        micLevelBar.style.width = `0%`;
+                        return;
+                    }
+                    analyserNode.getByteFrequencyData(dataArray); // Can also use getByteTimeDomainData
+                    let sum = 0;
+                    for (let i = 0; i < bufferLength; i++) {
+                        sum += dataArray[i];
+                    }
+                    let average = sum / bufferLength;
+                    // This is a simplified "volume" level, not true dBFS.
+                    // For more accurate dBFS, you'd typically use a different approach (e.g. RMS).
+                    // This gives a value roughly between 0 and 128 (half of 256).
+                    // Let's map it to a pseudo dBFS range, e.g. -60dB to 0dB.
+                    // Max average is around 128. Min is 0.
+                    let pseudoDbFs = (average / 128.0) * 60.0 - 60.0; // crude mapping
+                    if (average < 1) pseudoDbFs = -Infinity; // Silence
+
+                    currentSensorValues.decibels = pseudoDbFs;
+                    micDbfsEl.textContent = isFinite(pseudoDbFs) ? pseudoDbFs.toFixed(1) : '-∞';
+                    
+                    // Visual bar (0 to 100%)
+                    let levelPercent = Math.min(100, Math.max(0, (average / 100) * 100)); // Max average can be > 100
+                    micLevelBar.style.width = `${levelPercent}%`;
+                    if (isFinite(pseudoDbFs) && pseudoDbFs > -50) micLevelBar.style.backgroundColor = 'var(--md-sys-color-primary)';
+                    else micLevelBar.style.backgroundColor = 'var(--md-sys-color-secondary-container)';
+
+
+                    if (audioContext && audioContext.state === 'running') {
+                        requestAnimationFrame(getDecibels);
+                    }
+                }
+                getDecibels();
+                updateRecordingButtonState();
+                return Promise.resolve();
+            } catch (err) {
+                console.error("Microphone access error:", err);
+                micStatusEl.textContent = `マイクエラー: ${err.name}`; micStatusEl.classList.add('error');
+                micPermissionGranted = false;
+                updateRecordingButtonState();
+                return Promise.reject(err);
+            }
+        }
+
+
+        // --- Camera Logic ---
+        async function initializeCamera(forcePermissionRequest = false) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                cameraStatusEl.textContent = 'カメラ API 非対応'; cameraStatusEl.classList.add('not-supported');
+                cameraPermissionGranted = false; updateRecordingButtonState(); return Promise.resolve();
+            }
+            if (cameraStream && !forcePermissionRequest) return Promise.resolve();
+
+            cameraStatusEl.textContent = "カメラアクセス許可待機中...";
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+                cameraPermissionGranted = true; anySensorSupported = true; // If camera works, count as sensor support
+                cameraStatusEl.textContent = "カメラ準備完了。撮影できます。"; cameraStatusEl.classList.remove('error', 'not-supported');
+                cameraPreview.srcObject = cameraStream;
+                cameraPreview.style.display = 'block';
+                updateRecordingButtonState();
+                return Promise.resolve();
+            } catch (err) {
+                console.error("Camera access error:", err);
+                cameraStatusEl.textContent = `カメラエラー: ${err.name}`; cameraStatusEl.classList.add('error');
+                cameraPreview.style.display = 'none';
+                cameraPermissionGranted = false;
+                updateRecordingButtonState();
+                return Promise.reject(err);
+            }
+        }
+
+        takePictureButton.addEventListener('click', () => {
+            if (!cameraStream || !cameraPermissionGranted) {
+                alert("カメラが利用できません。");
+                return;
+            }
+            const videoTracks = cameraStream.getVideoTracks();
+            if (videoTracks.length === 0) {
+                 alert("有効なビデオトラックがありません。"); return;
+            }
+            const trackSettings = videoTracks[0].getSettings();
+            photoCanvas.width = trackSettings.width || cameraPreview.videoWidth;
+            photoCanvas.height = trackSettings.height || cameraPreview.videoHeight;
+
+            const context = photoCanvas.getContext('2d');
+            context.drawImage(cameraPreview, 0, 0, photoCanvas.width, photoCanvas.height);
+            const dataUrl = photoCanvas.toDataURL('image/jpeg', 0.8); // Use JPEG for smaller size
+            
+            const photoTimestamp = Date.now();
+            currentRecordingPhotos.push({ timestamp: photoTimestamp, dataUrl: dataUrl });
+            
+            // Display last taken photo as a small preview
+            lastPhotoPreviewContainer.innerHTML = `<img src="${dataUrl}" alt="撮影した写真" style="max-width:100px; max-height:100px; border:1px solid var(--md-sys-color-outline); border-radius:4px;"> <p style="font-size:0.7em; color: var(--md-sys-color-secondary);">${new Date(photoTimestamp).toLocaleTimeString()}に撮影</p>`;
+
+            if (isRecording) { // If currently recording sensor data, mark that a photo was taken
+                currentSensorValues.photoTakenId = photoTimestamp; // Store the timestamp as ID
+                // This ID will be recorded in the current data row. The photo itself is in currentRecordingPhotos.
+            }
+            cameraStatusEl.textContent = `${new Date(photoTimestamp).toLocaleTimeString()} に写真を撮影しました。`;
+            // No need to call updateRecordingButtonState unless recording state changes related to photos
+        });
+
 
         // --- Recording Logic ---
         function recordCurrentData() {
             if (!isRecording) return;
 
             const now = Date.now();
-            currentSensorValues.timestamp = now;
-
-            // currentSensorValues のコピーを記録 (参照ではなく値)
-            recordedData.push({ ...currentSensorValues });
+            // Ensure all current sensor values are up-to-date (some update via RAF, others via events)
+            let dataToRecord = { ...currentSensorValues, timestamp: now };
             
-            if (recordedData.length % 10 === 0) { // 1秒ごとくらいに表示更新 (10Hzの場合)
-                recordingStatusEl.textContent = `記録中... (${recordedData.length}件)`;
+            currentRecordingData.push(dataToRecord);
+            
+            // Reset photoTakenId for the next interval
+            currentSensorValues.photoTakenId = null; 
+
+            if (currentRecordingData.length % 10 === 0) { // Update status roughly every second
+                recordingStatusEl.textContent = `記録中... (${currentRecordingData.length}件)`;
             }
         }
 
         function startRecording() {
-            if (!sensorsInitialized || (!anySensorSupported && !motionPermissionGranted && !orientationPermissionGranted)) {
+            if (!sensorsInitialized || (!anySensorSupported && !motionPermissionGranted && !orientationPermissionGranted && !micPermissionGranted /* camera not essential for timeseries */)) {
                 alert("利用可能なセンサーがないか、センサーへのアクセスが許可されていません。");
                 return;
             }
-            isRecording = true; recordedData = [];
+            isRecording = true;
+            currentRecordingData = []; // Reset for new recording
+            currentRecordingPhotos = []; // Reset photos for new recording
+            lastPhotoPreviewContainer.innerHTML = ""; // Clear last photo preview
+
             if (recordingIntervalId) clearInterval(recordingIntervalId);
             recordingIntervalId = setInterval(recordCurrentData, RECORDING_INTERVAL_MS);
             updateRecordingButtonState();
+            downloadCSVIconButton.disabled = true; // Disable download while recording
         }
+
         function stopRecording() {
             isRecording = false;
             if (recordingIntervalId) {
                 clearInterval(recordingIntervalId);
                 recordingIntervalId = null;
             }
-            recordingStatusEl.textContent = `記録を停止しました。${recordedData.length}件のデータを記録。`;
+            
+            if (currentRecordingData.length > 0) {
+                const session = {
+                    id: Date.now(), // Unique ID for the session
+                    startTime: currentRecordingData[0].timestamp,
+                    endTime: currentRecordingData[currentRecordingData.length - 1].timestamp,
+                    data: [...currentRecordingData],
+                    photos: [...currentRecordingPhotos] // Store copies
+                };
+                allRecordedSessions.push(session);
+                saveHistoryToLocalStorage();
+                recordingStatusEl.textContent = `記録を停止しました。${currentRecordingData.length}件のデータを記録。履歴に追加されました。`;
+            } else {
+                recordingStatusEl.textContent = `記録を停止しました。データはありませんでした。`;
+            }
             updateRecordingButtonState();
         }
-        function downloadCSV() {
-            if (recordedData.length === 0) {
+        
+        function downloadCSV(dataToExport, filenamePrefix = "sensor_data_current") {
+            if (!dataToExport || dataToExport.length === 0) {
                 alert("記録データがありません。");
                 return;
             }
 
-            const header = "timestamp,accelX,accelY,accelZ,orientAlpha,orientBeta,orientGamma,gyroAlpha,gyroBeta,gyroGamma,illuminance";
-            const rows = recordedData.map(row => {
+            const header = "timestamp,accelX,accelY,accelZ,orientAlpha,orientBeta,orientGamma,gyroAlpha,gyroBeta,gyroGamma,illuminance,decibels,photoTakenId";
+            const rows = dataToExport.map(row => {
                 return [
                     row.timestamp,
                     row.accelX !== null ? row.accelX.toFixed(3) : '',
@@ -517,7 +772,9 @@
                     row.gyroAlpha !== null ? row.gyroAlpha.toFixed(3) : '',
                     row.gyroBeta !== null ? row.gyroBeta.toFixed(3) : '',
                     row.gyroGamma !== null ? row.gyroGamma.toFixed(3) : '',
-                    row.illuminance !== null ? row.illuminance.toFixed(0) : ''
+                    row.illuminance !== null ? row.illuminance.toFixed(0) : '',
+                    row.decibels !== null && isFinite(row.decibels) ? row.decibels.toFixed(1) : '',
+                    row.photoTakenId || '' // Add photo timestamp if taken
                 ].join(',');
             });
 
@@ -525,30 +782,166 @@
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             
             const link = document.createElement("a");
-            if (link.download !== undefined) { // feature detection
-                const url = URL.createObjectURL(blob);
-                const now = new Date();
-                const timestampStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
-                link.setAttribute("href", url);
-                link.setAttribute("download", `sensor_data_${timestampStr}.csv`);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-                recordingStatusEl.textContent = `CSVファイルをダウンロードしました。 (${recordedData.length}件)`;
-            } else {
-                alert("お使いのブラウザでは自動ダウンロードがサポートされていません。");
+            const url = URL.createObjectURL(blob);
+            const now = new Date(dataToExport[0].timestamp); // Use start time of data for filename
+            const timestampStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
+            link.setAttribute("href", url);
+            link.setAttribute("download", `${filenamePrefix}_${timestampStr}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            // Status update depends on context (current recording vs history)
+            if (filenamePrefix === "sensor_data_current") {
+                 recordingStatusEl.textContent = `CSVファイルをダウンロードしました。 (${dataToExport.length}件)`;
             }
         }
-
         // Event Listeners for Recording Controls
         if(startRecordingIconButton) startRecordingIconButton.addEventListener('click', startRecording);
         if(stopRecordingIconButton) stopRecordingIconButton.addEventListener('click', stopRecording);
-        if(downloadCSVIconButton) downloadCSVIconButton.addEventListener('click', downloadCSV);
+        if(downloadCSVIconButton) downloadCSVIconButton.addEventListener('click', () => downloadCSV(currentRecordingData, "sensor_data_current"));
 
-        // Initial button state
-        updateRecordingButtonState();
+        // --- History Logic ---
+        const HISTORY_STORAGE_KEY = 'sensorDemoProHistory';
+
+        function saveHistoryToLocalStorage() {
+            try {
+                localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(allRecordedSessions));
+            } catch (e) {
+                console.error("Error saving history to localStorage:", e);
+                alert("履歴の保存に失敗しました。ストレージ容量が不足している可能性があります。");
+            }
+        }
+
+        function loadHistoryFromLocalStorage() {
+            const storedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
+            if (storedHistory) {
+                try {
+                    allRecordedSessions = JSON.parse(storedHistory);
+                } catch (e) {
+                    console.error("Error parsing history from localStorage:", e);
+                    allRecordedSessions = []; // Reset if parsing fails
+                }
+            } else {
+                allRecordedSessions = [];
+            }
+        }
+
+        function displayHistoryList() {
+            historyListContainer.innerHTML = ''; // Clear previous list
+            historyDetailView.style.display = 'none';
+            historyListContainer.style.display = 'block';
+
+            if (allRecordedSessions.length === 0) {
+                noHistoryText.style.display = 'block';
+                return;
+            }
+            noHistoryText.style.display = 'none';
+
+            allRecordedSessions.sort((a,b) => b.id - a.id); // Show newest first
+
+            allRecordedSessions.forEach(session => {
+                const sessionCard = document.createElement('md-elevated-card');
+                sessionCard.style.marginBottom = '10px';
+                sessionCard.style.cursor = 'pointer';
+                
+                const startTime = new Date(session.startTime);
+                const endTime = new Date(session.endTime);
+                const durationMs = session.endTime - session.startTime;
+                const durationSec = Math.floor(durationMs / 1000);
+                const durationMin = Math.floor(durationSec / 60);
+
+                let content = `<div style="padding:16px;">`;
+                content += `<h4>記録: ${startTime.toLocaleString()}</h4>`;
+                content += `<p>期間: ${durationMin}分 ${durationSec % 60}秒 (${session.data.length}点)</p>`;
+                content += `<p>写真: ${session.photos.length}枚</p>`;
+                content += `</div>`;
+                sessionCard.innerHTML = content;
+
+                sessionCard.addEventListener('click', () => displayHistoryDetail(session.id));
+                historyListContainer.appendChild(sessionCard);
+            });
+        }
+
+        function displayHistoryDetail(sessionId) {
+            const session = allRecordedSessions.find(s => s.id === sessionId);
+            if (!session) return;
+
+            historyListContainer.style.display = 'none';
+            historyDetailView.style.display = 'block';
+
+            historyDetailTitle.textContent = `記録詳細: ${new Date(session.startTime).toLocaleString()}`;
+            
+            // Photos
+            historyPhotosContainer.innerHTML = '';
+            if (session.photos && session.photos.length > 0) {
+                session.photos.forEach(photo => {
+                    const img = document.createElement('img');
+                    img.src = photo.dataUrl;
+                    img.alt = `Photo from ${new Date(photo.timestamp).toLocaleTimeString()}`;
+                    img.style.maxWidth = '100px';
+                    img.style.maxHeight = '100px';
+                    img.style.borderRadius = '4px';
+                    img.style.border = '1px solid var(--md-sys-color-outline)';
+                    historyPhotosContainer.appendChild(img);
+                });
+            } else {
+                historyPhotosContainer.innerHTML = '<p>この記録中に撮影された写真はありません。</p>';
+            }
+
+            // CSV Export Button for this session
+            exportHistoryCSVButton.onclick = () => downloadCSV(session.data, `sensor_data_history_${session.id}`);
+            
+            // Chart
+            if (historyChartInstance) {
+                historyChartInstance.destroy();
+            }
+            const ctx = historyChartCanvas.getContext('2d');
+            const labels = session.data.map(d => new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 1 }));
+            
+            const datasets = [];
+            // Accelerometer
+            if (session.data.some(d => d.accelX !== null)) datasets.push({ label: 'Accel X', data: session.data.map(d => d.accelX), borderColor: 'red', fill: false, tension: 0.1, hidden: true });
+            if (session.data.some(d => d.accelY !== null)) datasets.push({ label: 'Accel Y', data: session.data.map(d => d.accelY), borderColor: 'green', fill: false, tension: 0.1, hidden: true });
+            if (session.data.some(d => d.accelZ !== null)) datasets.push({ label: 'Accel Z', data: session.data.map(d => d.accelZ), borderColor: 'blue', fill: false, tension: 0.1 }); // Show one by default
+            // Gyroscope
+            if (session.data.some(d => d.gyroAlpha !== null)) datasets.push({ label: 'Gyro Alpha', data: session.data.map(d => d.gyroAlpha), borderColor: 'purple', fill: false, tension: 0.1, hidden: true });
+            // Orientation
+            if (session.data.some(d => d.orientBeta !== null)) datasets.push({ label: 'Orient Beta (X)', data: session.data.map(d => d.orientBeta), borderColor: 'orange', fill: false, tension: 0.1, hidden: true });
+            // Illuminance
+            if (session.data.some(d => d.illuminance !== null)) datasets.push({ label: 'Illuminance (lux)', data: session.data.map(d => d.illuminance), borderColor: 'teal', fill: false, tension: 0.1, yAxisID: 'yLux', hidden: true });
+            // Decibels
+            if (session.data.some(d => d.decibels !== null && isFinite(d.decibels))) datasets.push({ label: 'Decibels (dBFS)', data: session.data.map(d => isFinite(d.decibels) ? d.decibels : null), borderColor: 'magenta', fill: false, tension: 0.1, yAxisID: 'yDb', hidden: false });
+
+            historyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Time' } },
+                        y: { title: { display: true, text: 'Sensor Values (m/s², °/s, °)' } },
+                        yLux: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Lux'}, grid: { drawOnChartArea: false, } },
+                        yDb: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'dBFS'}, grid: { drawOnChartArea: false, } }
+                    },
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+        }
+        
+        backToHistoryListButton.addEventListener('click', displayHistoryList);
+
+        function loadAndDisplayHistory() {
+            loadHistoryFromLocalStorage();
+            displayHistoryList();
+        }
+
+        // --- Initial Setup ---
+        loadHistoryFromLocalStorage(); // Load history on app start
+        updateRecordingButtonState(); // Initial button state
+        showPage('recordPage'); // Show record page by default
+
     </script>
 </body>
 </html>
