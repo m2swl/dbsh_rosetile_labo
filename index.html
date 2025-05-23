@@ -163,6 +163,19 @@
                     </div>
                 </md-card>
 
+                <!-- Delete Dialog -->
+                <md-dialog id="deleteConfirmDialog">
+                    <div slot="headline">記録の削除</div>
+                    <form slot="content" id="deleteConfirmForm" method="dialog">
+                        <p>この記録セッションを本当に削除しますか？この操作は元に戻せません。</p>
+                        <p id="deleteDialogSessionInfo" style="font-size: 0.9em; color: var(--md-sys-color-on-surface-variant);"></p>
+                    </form>
+                    <div slot="actions">
+                        <md-text-button form="deleteConfirmForm" value="cancel">キャンセル</md-text-button>
+                        <md-filled-tonal-button id="confirmDeleteButton" value="delete">削除</md-filled-tonal-button>
+                    </div>
+                </md-dialog>
+
                 <p style="font-size: 0.8em; text-align: center; margin-top: 20px; color: var(--md-sys-color-on-surface-variant);">
                     注意: センサーの利用にはブラウザからの許可が必要な場合があります。
                 </p>
@@ -274,6 +287,11 @@
         const exportHistoryCSVButton = document.getElementById('exportHistoryCSVButton');
         let historyChartInstance = null;
 
+        // Delete Dialog
+        const deleteConfirmDialog = document.getElementById('deleteConfirmDialog');
+        const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+        const deleteDialogSessionInfo = document.getElementById('deleteDialogSessionInfo');
+        let sessionIdToDelete = null;
 
         // --- Global State ---
         let isRecording = false;
@@ -363,9 +381,9 @@
                                            (!needsExplicitPermission && anySensorSupported); // if no explicit perm needed, and a sensor works
 
             if (needsExplicitPermission && !(motionPermissionGranted && orientationPermissionGranted && micPermissionGranted && cameraPermissionGranted) && sensorPermissionIconButton) {
-                 sensorPermissionIconButton.style.display = 'inline-flex';
-                 sensorPermissionIconButton.disabled = false;
-                 if (permissionIconEl) permissionIconEl.textContent = 'lock';
+                sensorPermissionIconButton.style.display = 'inline-flex';
+                sensorPermissionIconButton.disabled = false;
+                if (permissionIconEl) permissionIconEl.textContent = 'lock';
             } else if (sensorPermissionIconButton) {
                 sensorPermissionIconButton.style.display = 'inline-flex';
                 sensorPermissionIconButton.disabled = true;
@@ -856,7 +874,7 @@
                     allRecordedSessions = JSON.parse(storedHistory);
                 } catch (e) {
                     console.error("Error parsing history from localStorage:", e);
-                    allRecordedSessions = []; // Reset if parsing fails
+                    allRecordedSessions = [];
                 }
             } else {
                 allRecordedSessions = [];
@@ -864,7 +882,7 @@
         }
 
         function displayHistoryList() {
-            historyListContainer.innerHTML = ''; // Clear previous list
+            historyListContainer.innerHTML = '';
             historyDetailView.style.display = 'none';
             historyListContainer.style.display = 'block';
 
@@ -874,41 +892,121 @@
             }
             noHistoryText.style.display = 'none';
 
-            allRecordedSessions.sort((a,b) => b.id - a.id); // Show newest first
+            allRecordedSessions.sort((a, b) => b.id - a.id);
 
             allRecordedSessions.forEach(session => {
                 const sessionCard = document.createElement('md-elevated-card');
-                sessionCard.style.marginBottom = '10px';
-                sessionCard.style.cursor = 'pointer';
-                
+                sessionCard.style.marginBottom = '12px'; // 少し間隔を調整
+                // sessionCard.style.cursor = 'pointer'; // 詳細表示への導線として残す
+
                 const startTime = new Date(session.startTime);
-                const endTime = new Date(session.endTime);
                 const durationMs = session.endTime - session.startTime;
                 const durationSec = Math.floor(durationMs / 1000);
                 const durationMin = Math.floor(durationSec / 60);
 
-                let content = `<div style="padding:16px;">`;
-                content += `<h4>記録: ${startTime.toLocaleString()}</h4>`;
-                content += `<p>期間: ${durationMin}分 ${durationSec % 60}秒 (${session.data.length}点)</p>`;
-                content += `<p>写真: ${session.photos.length}枚</p>`;
-                content += `</div>`;
+                // 日時フォーマットを改善
+                const formattedStartTime = startTime.toLocaleString('ja-JP', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
+                });
+
+                let content = `
+                    <div style="padding: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <h4 style="margin-top:0; margin-bottom: 8px; font-size: 1.1em;">記録: ${formattedStartTime}</h4>
+                            <md-icon-button class="delete-session-button" data-session-id="${session.id}" aria-label="この記録を削除">
+                                <md-icon>delete</md-icon>
+                            </md-icon-button>
+                        </div>
+                        <p style="font-size: 0.9em; margin: 4px 0;">
+                            <md-icon style="font-size: 1.1em; vertical-align: bottom;">timer</md-icon>
+                            記録時間: ${durationMin}分 ${durationSec % 60}秒
+                        </p>
+                        <p style="font-size: 0.9em; margin: 4px 0;">
+                            <md-icon style="font-size: 1.1em; vertical-align: bottom;">list_alt</md-icon>
+                            データ点数: ${session.data.length}件
+                        </p>
+                        <p style="font-size: 0.9em; margin: 4px 0;">
+                            <md-icon style="font-size: 1.1em; vertical-align: bottom;">photo_library</md-icon>
+                            写真枚数: ${session.photos.length}枚
+                        </p>
+                    </div>
+                `;
                 sessionCard.innerHTML = content;
 
-                sessionCard.addEventListener('click', () => displayHistoryDetail(session.id));
+                // カード全体（削除ボタン以外）のクリックで詳細表示
+                sessionCard.addEventListener('click', (event) => {
+                    // クリックされた要素が削除ボタン自身またはその子要素でない場合のみ詳細表示
+                    if (!event.target.closest('.delete-session-button')) {
+                        displayHistoryDetail(session.id);
+                    }
+                });
+                
+                // 削除ボタンのイベントリスナー
+                const deleteButton = sessionCard.querySelector('.delete-session-button');
+                deleteButton.addEventListener('click', (event) => {
+                    event.stopPropagation(); // カード全体のクリックイベントを発火させない
+                    promptDeleteSession(session.id, formattedStartTime);
+                });
+
                 historyListContainer.appendChild(sessionCard);
             });
         }
 
+        function promptDeleteSession(sessionId, sessionStartTimeFormatted) {
+            sessionIdToDelete = sessionId;
+            deleteDialogSessionInfo.textContent = `記録日時: ${sessionStartTimeFormatted}`;
+            deleteConfirmDialog.show();
+        }
+
+        async function deleteSession(sessionId) {
+            allRecordedSessions = allRecordedSessions.filter(session => session.id !== sessionId);
+            saveHistoryToLocalStorage();
+            displayHistoryList(); // リストを再描画
+            // もし詳細ビューが表示されていて、それが削除されたセッションのものだったらリストに戻る
+            if (historyDetailView.style.display === 'block' && historyDetailTitle.textContent.includes(new Date(allRecordedSessions.find(s => s.id === sessionId)?.startTime || 0).toLocaleString())) {
+                 // この部分はより堅牢なチェックが必要かもしれないが、ここでは簡易的に
+                displayHistoryList();
+            }
+            sessionIdToDelete = null; // リセット
+        }
+
+        // ダイアログの削除ボタンのイベントリスナー
+        confirmDeleteButton.addEventListener('click', () => {
+            if (sessionIdToDelete !== null) {
+                deleteSession(sessionIdToDelete);
+            }
+            // ダイアログを閉じる (md-dialogはvalueで閉じるが、明示的に呼ぶことも可能)
+            if (deleteConfirmDialog.close) deleteConfirmDialog.close('delete');
+
+        });
+        // ダイアログが何らかの理由で閉じたとき（キャンセル含む）
+        deleteConfirmDialog.addEventListener('closed', (event) => {
+            // valueが'delete'でなければ（つまりキャンセルやESCキーなどで閉じられた場合）sessionIdToDeleteをリセット
+            if(event.detail.action !== 'delete') {
+                sessionIdToDelete = null;
+            }
+        });
+
+
         function displayHistoryDetail(sessionId) {
+            // ... (既存の displayHistoryDetail 関数の内容は変更なし) ...
             const session = allRecordedSessions.find(s => s.id === sessionId);
-            if (!session) return;
+            if (!session) { // セッションが見つからない場合（削除された直後など）
+                displayHistoryList(); // 履歴リスト表示に戻る
+                return;
+            }
 
             historyListContainer.style.display = 'none';
             historyDetailView.style.display = 'block';
 
-            historyDetailTitle.textContent = `記録詳細: ${new Date(session.startTime).toLocaleString()}`;
+            const startTime = new Date(session.startTime);
+            const formattedStartTime = startTime.toLocaleString('ja-JP', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            });
+            historyDetailTitle.textContent = `記録詳細: ${formattedStartTime}`;
             
-            // Photos
             historyPhotosContainer.innerHTML = '';
             if (session.photos && session.photos.length > 0) {
                 session.photos.forEach(photo => {
@@ -925,10 +1023,8 @@
                 historyPhotosContainer.innerHTML = '<p>この記録中に撮影された写真はありません。</p>';
             }
 
-            // CSV Export Button for this session
             exportHistoryCSVButton.onclick = () => downloadCSV(session.data, `sensor_data_history_${session.id}`);
             
-            // Chart
             if (historyChartInstance) {
                 historyChartInstance.destroy();
             }
@@ -936,17 +1032,12 @@
             const labels = session.data.map(d => new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 1 }));
             
             const datasets = [];
-            // Accelerometer
             if (session.data.some(d => d.accelX !== null)) datasets.push({ label: 'Accel X', data: session.data.map(d => d.accelX), borderColor: 'red', fill: false, tension: 0.1, hidden: true });
             if (session.data.some(d => d.accelY !== null)) datasets.push({ label: 'Accel Y', data: session.data.map(d => d.accelY), borderColor: 'green', fill: false, tension: 0.1, hidden: true });
-            if (session.data.some(d => d.accelZ !== null)) datasets.push({ label: 'Accel Z', data: session.data.map(d => d.accelZ), borderColor: 'blue', fill: false, tension: 0.1 }); // Show one by default
-            // Gyroscope
+            if (session.data.some(d => d.accelZ !== null)) datasets.push({ label: 'Accel Z', data: session.data.map(d => d.accelZ), borderColor: 'blue', fill: false, tension: 0.1 }); 
             if (session.data.some(d => d.gyroAlpha !== null)) datasets.push({ label: 'Gyro Alpha', data: session.data.map(d => d.gyroAlpha), borderColor: 'purple', fill: false, tension: 0.1, hidden: true });
-            // Orientation
             if (session.data.some(d => d.orientBeta !== null)) datasets.push({ label: 'Orient Beta (X)', data: session.data.map(d => d.orientBeta), borderColor: 'orange', fill: false, tension: 0.1, hidden: true });
-            // Illuminance
             if (session.data.some(d => d.illuminance !== null)) datasets.push({ label: 'Illuminance (lux)', data: session.data.map(d => d.illuminance), borderColor: 'teal', fill: false, tension: 0.1, yAxisID: 'yLux', hidden: true });
-            // Decibels
             if (session.data.some(d => d.decibels !== null && isFinite(d.decibels))) datasets.push({ label: 'Decibels (dBFS)', data: session.data.map(d => isFinite(d.decibels) ? d.decibels : null), borderColor: 'magenta', fill: false, tension: 0.1, yAxisID: 'yDb', hidden: false });
 
             historyChartInstance = new Chart(ctx, {
