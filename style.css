@@ -192,12 +192,33 @@ body {
      align-items: center;
      padding: 12px 16px;
      padding-bottom: 0;
+     /* Added cursor and transition for toggle cards */
+     cursor: default;
 }
+.sensor-card-toggle .card-header {
+     cursor: pointer;
+     transition: background-color 0.2s ease;
+}
+.sensor-card-toggle .card-header:hover {
+    background-color: color-mix(in srgb, var(--md-sys-color-surface-container-low) 90%, var(--md-sys-color-on-surface-variant) 5%);
+}
+
 .card-header md-icon {
      margin-right: 8px;
      color: var(--md-sys-color-primary); /* Use primary color for icons */
      font-size: 24px;
 }
+/* Style for the toggle icon */
+.card-header .toggle-icon {
+    margin-left: auto; /* Push to the right */
+    color: var(--md-sys-color-on-surface-variant);
+    transition: transform 0.3s ease;
+}
+.card-expanded .card-header .toggle-icon {
+    transform: rotate(180deg);
+}
+
+
 .card-header h2 {
     margin: 0;
     font-size: 1rem; /* Adjusted title size */
@@ -265,6 +286,19 @@ body {
 
 .error { color: var(--md-sys-color-error) !important; font-weight: 500; }
 .not-supported { color: var(--md-sys-color-outline) !important; }
+
+/* Sensor Card Toggle Views */
+.sensor-detail {
+    display: none; /* Hidden by default */
+    /* Add padding/margin if needed to separate from summary */
+}
+.card-expanded .sensor-detail {
+    display: block; /* Show when card is expanded */
+}
+.card-expanded .sensor-summary {
+    display: none; /* Hide summary when card is expanded */
+}
+
 
 /* Sensor Visualizations */
 .cube-container { width: var(--cube-size); height: var(--cube-size); margin: 10px auto 20px auto; perspective: 600px; }
@@ -357,10 +391,29 @@ md-navigation-tab[active] md-icon[slot="activeIcon"] { display: inline-flex !imp
      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
      cursor: pointer; /* Indicate cards are clickable */
      transition: background-color 0.2s ease;
+     position: relative; /* Needed for absolute positioning of indicator */
 }
 #historyListContainer md-elevated-card:hover {
      --md-elevated-card-container-color: var(--md-sys-color-surface-container-low);
 }
+
+.history-tag-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 6px; /* Width of the color bar */
+    background-color: var(--md-sys-color-outline-variant); /* Default color */
+    border-radius: 12px 0 0 12px; /* Match card corner */
+}
+/* Tag Color Classes */
+.history-tag-indicator.tag-color-赤 { background-color: var(--md-sys-color-error); }
+.history-tag-indicator.tag-color-青 { background-color: var(--md-sys-color-primary); } /* Using primary color for blue */
+.history-tag-indicator.tag-color-緑 { background-color: var(--md-sys-color-secondary); } /* Using secondary color for green */
+.history-tag-indicator.tag-color-黄 { background-color: #FFD700; } /* Gold */
+.history-tag-indicator.tag-color-その他 { background-color: var(--md-sys-color-tertiary); } /* Using tertiary color for other */
+.history-tag-indicator.tag-color-未選択 { background-color: var(--md-sys-color-outline-variant); } /* Default gray */
+
 
 #historyChart {
      max-height: 300px; /* Limit chart height */
@@ -429,9 +482,25 @@ md-filled-tonal-button {
 #recordingTagsDialog select {
      font-family: var(--app-font-family);
      font-size: 1rem;
+     padding: 8px;
+     border-radius: 4px;
+     border: 1px solid var(--md-sys-color-outline);
+     width: 100%;
+     box-sizing: border-box; /* Include padding and border in the element's total width and height */
      background-color: var(--md-sys-color-surface);
      color: var(--md-sys-color-on-surface);
      cursor: pointer;
+     /* Add arrow styling for consistency */
+     -webkit-appearance: none;
+     -moz-appearance: none;
+     appearance: none;
+     background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23414941%22%20d%3D%22M287%2C114.5L153.4%2C252.1c-2.7%2C2.7-6.8%2C2.7-9.6%2C0L5.4%2C114.5c-3.1-3.1-0.9-9.6%2C4.8-9.6h276.3C287.9%2C104.9%2C290.1%2C111.4%2C287%2C114.5z%22%2F%3E%3C%2Fsvg%3E');
+     background-repeat: no-repeat;
+     background-position: right 8px top 50%;
+     background-size: 12px auto;
+}
+[data-theme="dark"] #recordingTagsDialog select {
+     background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23C1C9BF%22%20d%3D%22M287%2C114.5L153.4%2C252.1c-2.7%2C2.7-6.8%2C2.7-9.6%2C0L5.4%2C114.5c-3.1-3.1-0.9-9.6%2C4.8-9.6h276.3C287.9%2C104.9%2C290.1%2C111.4%2C287%2C114.5z%22%2F%3E%3C%2Fsvg%3E');
 }
 #recordingTagsDialog select option {
      background-color: var(--md-sys-color-surface);

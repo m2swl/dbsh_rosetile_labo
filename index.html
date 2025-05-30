@@ -59,6 +59,7 @@
 
                 <div class="sensor-grid">
                     <!-- Device Orientation Card -->
+                    <!-- Orientation Card: Always show all values -->
                     <md-card class="card-full-width">
                         <div class="card-header">
                             <md-icon>screen_rotation</md-icon>
@@ -85,6 +86,7 @@
                     </md-card>
 
                     <!-- Accelerometer Card -->
+                     <!-- Accelerometer Card: Always show all values -->
                     <md-card class="card-full-width">
                         <div class="card-header">
                             <md-icon>vibration</md-icon>
@@ -106,20 +108,28 @@
                     </md-card>
 
                     <!-- Gyroscope Card -->
-                    <md-card class="card-half-width">
+                     <!-- Gyroscope Card: Toggle detail -->
+                    <md-card class="card-half-width sensor-card-toggle">
                          <div class="card-header">
                             <md-icon>explore</md-icon>
                             <h2>ジャイロスコープ</h2>
+                             <md-icon class="toggle-icon">expand_more</md-icon>
                         </div>
                         <div class="card-content">
-                            <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="gyro-alpha">-</span> °/s</p>
-                            <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta">-</span> °/s</p>
-                            <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="gyro-gamma">-</span> °/s</p>
+                             <div class="sensor-summary">
+                                <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta">-</span> °/s</p>
+                             </div>
+                             <div class="sensor-detail">
+                                <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="gyro-alpha">-</span> °/s</p>
+                                <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta-detail">-</span> °/s</p> <!-- Duplicate ID fixed in JS -->
+                                <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="gyro-gamma">-</span> °/s</p>
+                             </div>
                             <p class="status-text" id="gyro-status">待機中...</p>
                         </div>
                     </md-card>
 
                     <!-- Pedometer Card -->
+                     <!-- Pedometer Card: Always show all values -->
                     <md-card class="card-half-width">
                         <div class="card-header">
                             <md-icon>directions_walk</md-icon>
@@ -133,6 +143,7 @@
                     </md-card>
 
                      <!-- Light Sensor Card -->
+                      <!-- Light Sensor Card: Always show all values -->
                     <md-card class="card-half-width">
                         <div class="card-header">
                             <md-icon>lightbulb</md-icon>
@@ -149,6 +160,7 @@
                     </md-card>
 
                     <!-- Microphone Card -->
+                     <!-- Microphone Card: Always show all values -->
                     <md-card class="card-half-width">
                         <div class="card-header">
                             <md-icon>mic</md-icon>
@@ -164,25 +176,33 @@
                     </md-card>
 
                     <!-- Geolocation & Weather Card -->
-                    <md-card class="card-full-width">
+                     <!-- Geolocation & Weather Card: Toggle detail -->
+                    <md-card class="card-full-width sensor-card-toggle">
                         <div class="card-header">
                             <md-icon>location_on</md-icon>
                             <h2>位置情報 & 天気</h2>
+                            <md-icon class="toggle-icon">expand_more</md-icon>
                         </div>
                         <div class="card-content">
-                             <div class="sensor-values-group">
+                             <div class="sensor-summary sensor-values-group">
                                 <p class="sensor-value"><strong>緯度:</strong> <span id="geo-lat">-</span></p>
                                 <p class="sensor-value"><strong>経度:</strong> <span id="geo-lon">-</span></p>
+                                <p class="sensor-value"><strong>場所:</strong> <span id="geo-address">-</span></p>
+                                <p class="sensor-value"><strong>現在地の気温:</strong> <span id="weather-temp">-</span> °C</p>
+                            </div>
+                             <div class="sensor-detail sensor-values-group">
+                                <p class="sensor-value"><strong>緯度:</strong> <span id="geo-lat-detail">-</span></p> <!-- Duplicate ID fixed in JS -->
+                                <p class="sensor-value"><strong>経度:</strong> <span id="geo-lon-detail">-</span></p> <!-- Duplicate ID fixed in JS -->
                                 <p class="sensor-value"><strong>精度:</strong> <span id="geo-acc">-</span> m</p>
                                 <p class="sensor-value"><strong>高度:</strong> <span id="geo-alt">-</span> m</p>
                                 <p class="sensor-value"><strong>速度:</strong> <span id="geo-speed">-</span> m/s</p>
                                 <p class="sensor-value"><strong>方角:</strong> <span id="geo-head">-</span> °</p>
-                                <p class="sensor-value"><strong>場所:</strong> <span id="geo-address">-</span></p>
-                            </div>
+                                <p class="sensor-value"><strong>場所:</strong> <span id="geo-address-detail">-</span></p> <!-- Duplicate ID fixed in JS -->
+                                <hr style="margin: 12px 0 8px; border: 0; border-top: 1px solid var(--md-sys-color-outline-variant);">
+                                <p class="sensor-value"><strong>現在地の気温:</strong> <span id="weather-temp-detail">-</span> °C</p> <!-- Duplicate ID fixed in JS -->
+                             </div>
                             <p class="status-text" id="geo-address-status"></p>
                             <p class="status-text" id="geo-status">待機中...</p>
-                            <hr style="margin: 12px 0 8px; border: 0; border-top: 1px solid var(--md-sys-color-outline-variant);">
-                            <p class="sensor-value"><strong>現在地の気温:</strong> <span id="weather-temp">-</span> °C</p>
                             <p class="status-text" id="weather-status">GPS位置情報取得後に更新</p>
                         </div>
                     </md-card>
