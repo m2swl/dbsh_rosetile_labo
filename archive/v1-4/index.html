@@ -263,51 +263,6 @@
         </div>
     </md-dialog>
 
-    <!-- New Dialog for Recording Tags -->
-     <md-dialog id="recordingTagsDialog">
-        <div slot="headline">記録セッションのタグ付け</div>
-        <form slot="content" id="recordingTagsForm" method="dialog">
-            <div style="margin-bottom: 16px;">
-                <p style="margin-bottom: 8px;"><strong>色:</strong></p>
-                <select name="color" required style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--md-sys-color-outline);">
-                    <option value="">選択してください</option>
-                    <option value="赤">赤</option>
-                    <option value="青">青</option>
-                    <option value="緑">緑</option>
-                    <option value="黄">黄</option>
-                    <option value="その他">その他</option>
-                </select>
-            </div>
-            <div style="margin-bottom: 16px;">
-                 <p style="margin-bottom: 8px;"><strong>感情:</strong></p>
-                <select name="emotion" required style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--md-sys-color-outline);">
-                    <option value="">選択してください</option>
-                    <option value="楽しい">楽しい</option>
-                    <option value="悲しい">悲しい</option>
-                    <option value="普通">普通</option>
-                    <option value="怒り">怒り</option>
-                    <option value="驚き">驚き</option>
-                    <option value="その他">その他</option>
-                </select>
-            </div>
-             <div>
-                <p style="margin-bottom: 8px;"><strong>形:</strong></p>
-                <select name="shape" required style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--md-sys-color-outline);">
-                    <option value="">選択してください</option>
-                    <option value="丸">丸</option>
-                    <option value="四角">四角</option>
-                    <option value="三角">三角</option>
-                    <option value="星">星</option>
-                    <option value="その他">その他</option>
-                </select>
-            </div>
-        </form>
-        <div slot="actions">
-            <md-text-button form="recordingTagsForm" value="cancel">キャンセル</md-text-button>
-            <md-filled-button form="recordingTagsForm" value="confirm">保存</md-filled-button>
-        </div>
-    </md-dialog>
-
 
     <script type="module" src="script.js"></script>
 </body>
