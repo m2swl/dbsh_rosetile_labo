@@ -12,323 +12,36 @@
     <meta name="apple-mobile-web-app-title" content="Nagame">
     <link rel="apple-touch-icon" href="./icons/iosicon-512x512.png">
 
-    <script type="module" src="https://unpkg.com/@material/web/all.js?module"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <link href="style.css" rel="stylesheet">
 </head>
-
-<body data-theme="light">
-    <div class="app-bar">
-        <h1>Nagame</h1>
-        <div class="theme-switch-container">
-            <md-icon>light_mode</md-icon>
-            <md-switch id="themeSwitch"></md-switch>
-            <md-icon>dark_mode</md-icon>
-        </div>
+<body>
+    <div id="controls">
+        <input type="file" id="csvFile" accept=".csv">
+        <button id="playButton" disabled>再生</button>
+        <button id="pauseButton" disabled>一時停止</button>
+        <button id="resetButton" disabled>リセット</button>
+        <label for="speedControl">再生速度:</label>
+        <input type="range" id="speedControl" min="0.1" max="5" step="0.1" value="1">
+        <span id="speedValue">1.0x</span>
     </div>
+    <div id="visualizationContainer"></div>
 
-    <div class="main-content">
-        <!-- Page for Recording -->
-        <div id="recordPage" class="page active-page">
-            <div class="app-container">
-                <!-- Recording Controls -->
-                <div class="recording-controls-bar card-full-width">
-                    <div class="recording-status-area">
-                        <p class="status-text" id="recordingStatus">待機中...</p>
-                    </div>
-                    <div class="recording-buttons-area">
-                        <md-icon-button id="sensorPermissionIconButton" aria-label="センサーアクセス許可">
-                            <md-icon>lock</md-icon>
-                        </md-icon-button>
-                        <md-icon-button id="startRecordingIconButton" aria-label="記録開始" disabled>
-                            <md-icon>play_arrow</md-icon>
-                        </md-icon-button>
-                        <md-icon-button id="stopRecordingIconButton" aria-label="記録停止" disabled>
-                            <md-icon>stop</md-icon>
-                        </md-icon-button>
-                        <md-icon-button id="downloadCSVIconButton" aria-label="CSVダウンロード" disabled>
-                            <md-icon>download</md-icon>
-                        </md-icon-button>
-                    </div>
-                </div>
+    <!-- ライブラリの読み込み -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.0/papaparse.min.js"></script>
+    <!-- Three.jsのポストプロセッシング関連 -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/BokehShader.js"></script> <!-- BokehShader2.js も検討可 -->
+    
+    <script src="main.js"></script>
 
-                <div class="sensor-grid">
-                    <!-- Device Orientation Card -->
-                    <!-- Orientation Card: Always show all values -->
-                    <md-card class="card-full-width">
-                        <div class="card-header">
-                            <md-icon>screen_rotation</md-icon>
-                            <h2>デバイスの向き</h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="cube-container">
-                                <div class="cube" id="orientationCube">
-                                    <div class="cube__face cube__face--front">前</div>
-                                    <div class="cube__face cube__face--back">後</div>
-                                    <div class="cube__face cube__face--right">右</div>
-                                    <div class="cube__face cube__face--left">左</div>
-                                    <div class="cube__face cube__face--top">上</div>
-                                    <div class="cube__face cube__face--bottom">下</div>
-                                </div>
-                            </div>
-                            <div class="sensor-values-group">
-                                <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="orient-alpha">-</span> °</p>
-                                <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="orient-beta">-</span> °</p>
-                                <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="orient-gamma">-</span> °</p>
-                            </div>
-                            <p class="status-text" id="orient-status">待機中...</p>
-                        </div>
-                    </md-card>
-
-                    <!-- Accelerometer Card -->
-                     <!-- Accelerometer Card: Always show all values -->
-                    <md-card class="card-full-width">
-                        <div class="card-header">
-                            <md-icon>vibration</md-icon>
-                            <h2>加速度 (重力含む)</h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="bars-container">
-                                <div class="bar" id="accel-bar-x"><span class="bar-label">X</span></div>
-                                <div class="bar" id="accel-bar-y"><span class="bar-label">Y</span></div>
-                                <div class="bar" id="accel-bar-z"><span class="bar-label">Z</span></div>
-                            </div>
-                            <div class="sensor-values-group">
-                                <p class="sensor-value"><strong>X:</strong> <span id="accel-x">-</span> m/s²</p>
-                                <p class="sensor-value"><strong>Y:</strong> <span id="accel-y">-</span> m/s²</p>
-                                <p class="sensor-value"><strong>Z:</strong> <span id="accel-z">-</span> m/s²</p>
-                            </div>
-                            <p class="status-text" id="accel-status">待機中...</p>
-                        </div>
-                    </md-card>
-
-                    <!-- Gyroscope Card -->
-                     <!-- Gyroscope Card: Toggle detail -->
-                    <md-card class="card-half-width sensor-card-toggle">
-                         <div class="card-header">
-                            <md-icon>explore</md-icon>
-                            <h2>ジャイロスコープ</h2>
-                             <md-icon class="toggle-icon">expand_more</md-icon>
-                        </div>
-                        <div class="card-content">
-                             <div class="sensor-summary">
-                                <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta">-</span> °/s</p>
-                             </div>
-                             <div class="sensor-detail">
-                                <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="gyro-alpha">-</span> °/s</p>
-                                <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta-detail">-</span> °/s</p> <!-- Duplicate ID fixed in JS -->
-                                <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="gyro-gamma">-</span> °/s</p>
-                             </div>
-                            <p class="status-text" id="gyro-status">待機中...</p>
-                        </div>
-                    </md-card>
-
-                    <!-- Pedometer Card -->
-                     <!-- Pedometer Card: Always show all values -->
-                    <md-card class="card-half-width">
-                        <div class="card-header">
-                            <md-icon>directions_walk</md-icon>
-                            <h2>歩数計</h2>
-                        </div>
-                        <div class="card-content">
-                            <p class="sensor-value" style="font-size: 1.1em; margin-bottom: 4px;"><strong>記録中の歩数:</strong> <span id="pedometer-steps">0</span> 歩</p>
-                            <p class="status-text" id="pedometer-status">待機中...</p>
-                            <p style="font-size: 0.7em; color: var(--md-sys-color-on-surface-variant); margin-top: 8px;">※ 加速度センサーに基づく簡易推定です。</p>
-                        </div>
-                    </md-card>
-
-                     <!-- Light Sensor Card -->
-                      <!-- Light Sensor Card: Always show all values -->
-                    <md-card class="card-half-width">
-                        <div class="card-header">
-                            <md-icon>lightbulb</md-icon>
-                            <h2>光センサー</h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="light-viz">
-                                <md-icon id="light-icon-sun" style="display:none;">wb_sunny</md-icon>
-                                <md-icon id="light-icon-moon" style="display:none;">nightlight_round</md-icon>
-                            </div>
-                            <p class="sensor-value" style="font-size: 1.1em; text-align: center;"><strong>明るさ:</strong> <span id="light-value">-</span> lux</p>
-                            <p class="status-text" id="light-status" style="text-align: center;">待機中...</p>
-                        </div>
-                    </md-card>
-
-                    <!-- Microphone Card -->
-                     <!-- Microphone Card: Always show all values -->
-                    <md-card class="card-half-width">
-                        <div class="card-header">
-                            <md-icon>mic</md-icon>
-                            <h2>マイク</h2>
-                        </div>
-                        <div class="card-content">
-                            <p class="sensor-value" style="font-size: 1.1em; margin-bottom: 4px;"><strong>音量 (dBFS):</strong> <span id="mic-dbfs">-</span> dBFS</p>
-                            <div class="mic-level-bar-container">
-                                <div class="mic-level-bar" id="micLevelBar"></div>
-                            </div>
-                            <p class="status-text" id="mic-status">待機中...</p>
-                        </div>
-                    </md-card>
-
-                    <!-- Geolocation & Weather Card -->
-                     <!-- Geolocation & Weather Card: Toggle detail -->
-                    <md-card class="card-full-width sensor-card-toggle">
-                        <div class="card-header">
-                            <md-icon>location_on</md-icon>
-                            <h2>位置情報 & 天気</h2>
-                            <md-icon class="toggle-icon">expand_more</md-icon>
-                        </div>
-                        <div class="card-content">
-                             <div class="sensor-summary sensor-values-group">
-                                <p class="sensor-value"><strong>緯度:</strong> <span id="geo-lat">-</span></p>
-                                <p class="sensor-value"><strong>経度:</strong> <span id="geo-lon">-</span></p>
-                                <p class="sensor-value"><strong>場所:</strong> <span id="geo-address">-</span></p>
-                                <p class="sensor-value"><strong>現在地の気温:</strong> <span id="weather-temp">-</span> °C</p>
-                            </div>
-                             <div class="sensor-detail sensor-values-group">
-                                <p class="sensor-value"><strong>緯度:</strong> <span id="geo-lat-detail">-</span></p> <!-- Duplicate ID fixed in JS -->
-                                <p class="sensor-value"><strong>経度:</strong> <span id="geo-lon-detail">-</span></p> <!-- Duplicate ID fixed in JS -->
-                                <p class="sensor-value"><strong>精度:</strong> <span id="geo-acc">-</span> m</p>
-                                <p class="sensor-value"><strong>高度:</strong> <span id="geo-alt">-</span> m</p>
-                                <p class="sensor-value"><strong>速度:</strong> <span id="geo-speed">-</span> m/s</p>
-                                <p class="sensor-value"><strong>方角:</strong> <span id="geo-head">-</span> °</p>
-                                <p class="sensor-value"><strong>場所:</strong> <span id="geo-address-detail">-</span></p> <!-- Duplicate ID fixed in JS -->
-                                <hr style="margin: 12px 0 8px; border: 0; border-top: 1px solid var(--md-sys-color-outline-variant);">
-                                <p class="sensor-value"><strong>現在地の気温:</strong> <span id="weather-temp-detail">-</span> °C</p> <!-- Duplicate ID fixed in JS -->
-                             </div>
-                            <p class="status-text" id="geo-address-status"></p>
-                            <p class="status-text" id="geo-status">待機中...</p>
-                            <p class="status-text" id="weather-status">GPS位置情報取得後に更新</p>
-                        </div>
-                    </md-card>
-
-                    <!-- Camera Card -->
-                    <md-card class="card-full-width">
-                        <div class="card-header">
-                            <md-icon>photo_camera</md-icon>
-                            <h2>写真撮影</h2>
-                        </div>
-                        <div class="card-content">
-                            <video id="cameraPreview" playsinline autoplay muted style="display:none; width: 100%; max-width:300px; border-radius: 8px; margin-bottom:10px;"></video>
-                            <canvas id="photoCanvas" style="display:none;"></canvas>
-                            <md-filled-button id="takePictureButton" disabled>
-                                <md-icon slot="icon">camera_alt</md-icon>
-                                写真を撮る
-                            </md-filled-button>
-                            <p class="status-text" id="camera-status">カメラ準備中...</p>
-                            <div id="lastPhotoPreviewContainer" style="margin-top: 10px;"></div>
-                        </div>
-                    </md-card>
-
-                    <p style="font-size: 0.8em; text-align: center; margin-top: 20px; color: var(--md-sys-color-on-surface-variant);" class="card-full-width">
-                        注意: センサーの利用にはブラウザからの許可が必要な場合があります。
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Page for Recording History -->
-        <div id="historyPage" class="page">
-            <div class="app-container">
-                <h2>記録履歴</h2>
-                <p id="noHistoryText" style="text-align:center; color: var(--md-sys-color-on-surface-variant);">記録されたセッションはありません。</p>
-                <div id="historyListContainer">
-                    <!-- History items will be injected here -->
-                </div>
-                <div id="historyDetailView" style="display:none; margin-top:20px;">
-                    <h3 id="historyDetailTitle"></h3>
-                    <md-outlined-button id="backToHistoryListButton" style="margin-bottom:10px;">
-                        <md-icon slot="icon">arrow_back</md-icon>
-                        一覧へ戻る
-                    </md-outlined-button>
-                    <h4>センサーデータグラフ</h4>
-                    <canvas id="historyChart" width="400" height="300"></canvas>
-                    <h4>撮影された写真</h4>
-                    <div id="historyPhotosContainer" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;"></div>
-                    <md-filled-button id="exportHistoryCSVButton" style="margin-top:20px;">
-                        <md-icon slot="icon">download</md-icon>
-                        この記録をCSVでエクスポート
-                    </md-filled-button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bottom Navigation Bar -->
-    <md-navigation-bar>
-        <md-navigation-tab id="navRecordTab" label="記録">
-            <md-icon slot="activeIcon">sensors</md-icon>
-            <md-icon slot="inactiveIcon">sensors</md-icon>
-        </md-navigation-tab>
-        <md-navigation-tab id="navHistoryTab" label="記録履歴">
-            <md-icon slot="activeIcon">history</md-icon>
-            <md-icon slot="inactiveIcon">history</md-icon>
-        </md-navigation-tab>
-    </md-navigation-bar>
-
-    <md-dialog id="deleteConfirmDialog">
-        <div slot="headline">記録の削除</div>
-        <form slot="content" id="deleteConfirmForm" method="dialog">
-            <p>この記録セッションを本当に削除しますか？この操作は元に戻せません。</p>
-            <p id="deleteDialogSessionInfo" style="font-size: 0.9em; color: var(--md-sys-color-on-surface-variant);"></p>
-        </form>
-        <div slot="actions">
-            <md-text-button form="deleteConfirmForm" value="cancel">キャンセル</md-text-button>
-            <md-filled-tonal-button id="confirmDeleteButton" value="delete">削除</md-filled-tonal-button>
-        </div>
-    </md-dialog>
-
-    <!-- New Dialog for Recording Tags -->
-     <md-dialog id="recordingTagsDialog">
-        <div slot="headline">記録セッションのタグ付け</div>
-        <form slot="content" id="recordingTagsForm" method="dialog">
-            <div style="margin-bottom: 16px;">
-                <p style="margin-bottom: 8px;"><strong>色:</strong></p>
-                <select name="color" required style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--md-sys-color-outline);">
-                    <option value="">選択してください</option>
-                    <option value="赤">赤</option>
-                    <option value="青">青</option>
-                    <option value="緑">緑</option>
-                    <option value="黄">黄</option>
-                    <option value="その他">その他</option>
-                </select>
-            </div>
-            <div style="margin-bottom: 16px;">
-                 <p style="margin-bottom: 8px;"><strong>感情:</strong></p>
-                <select name="emotion" required style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--md-sys-color-outline);">
-                    <option value="">選択してください</option>
-                    <option value="楽しい">楽しい</option>
-                    <option value="悲しい">悲しい</option>
-                    <option value="普通">普通</option>
-                    <option value="怒り">怒り</option>
-                    <option value="驚き">驚き</option>
-                    <option value="その他">その他</option>
-                </select>
-            </div>
-             <div>
-                <p style="margin-bottom: 8px;"><strong>形:</strong></p>
-                <select name="shape" required style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--md-sys-color-outline);">
-                    <option value="">選択してください</option>
-                    <option value="丸">丸</option>
-                    <option value="四角">四角</option>
-                    <option value="三角">三角</option>
-                    <option value="星">星</option>
-                    <option value="その他">その他</option>
-                </select>
-            </div>
-        </form>
-        <div slot="actions">
-            <md-text-button form="recordingTagsForm" value="cancel">キャンセル</md-text-button>
-            <md-filled-button form="recordingTagsForm" value="confirm">保存</md-filled-button>
-        </div>
-    </md-dialog>
-
-
-    <script type="module" src="script.js"></script>
 </body>
 </html>
