@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nagame</title>
+    <link rel="icon" href="favicon.ico">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#D1E4FF"> <!-- Default theme color (light mode primary-container) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Nagame">
+    <link rel="apple-touch-icon" href="./icons/iosicon-512x512.png">
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+    <div id="controls">
+        <input type="file" id="csvFile" accept=".csv">
+        <button id="playButton" disabled><span class="material-symbols-outlined">play_arrow</span> 再生</button>
+        <button id="pauseButton" disabled><span class="material-symbols-outlined">pause</span> 一時停止</button>
+        <button id="resetButton" disabled><span class="material-symbols-outlined">restart_alt</span> リセット</button>
+        <label for="speedControl">再生速度:</label>
+        <input type="range" id="speedControl" min="0.1" max="5" step="0.1" value="1.0">
+        <span id="speedValue">1.0x</span>
+        
+        <button id="toggleDarkModeButton" class="icon-button"><span class="material-symbols-outlined">dark_mode</span></button>
+        <button id="toggleCustomizationButton" class="icon-button"><span class="material-symbols-outlined">tune</span> カスタム</button>
+
+        <div id="seekBarContainer">
+            <input type="range" id="seekBar" value="0" min="0" step="1"> <!-- step=1ms -->
+            <span id="currentTimeDisplay">0:00</span>/<span id="totalTimeDisplay">0:00</span>
+        </div>
+
+        <div id="customizationPanel" class="hidden">
+            <div class="slider-group">
+                <label for="intensityMultiplier">強度乗数:</label>
+                <input type="range" id="intensityMultiplier" min="0.1" max="3.0" step="0.1" value="1.0">
+                <span id="intensityValue">1.0x</span>
+            </div>
+            <div class="slider-group">
+                <label for="varietyMultiplier">多様性乗数:</label>
+                <input type="range" id="varietyMultiplier" min="0.1" max="3.0" step="0.1" value="1.0">
+                <span id="varietyValue">1.0x</span>
+            </div>
+            <div class="slider-group">
+                 <label for="highlightMultiplier">ハイライト乗数:</label>
+                 <input type="range" id="highlightMultiplier" min="0.1" max="3.0" step="0.1" value="1.0">
+                 <span id="highlightValue">1.0x</span>
+             </div>
+        </div>
+    </div>
+
+    <div id="dataDisplayContainer">
+        <p>CSV File: <span id="csvFileName">N/A</span></p>
+        <div id="currentData">
+            <!-- データはJSで動的に挿入 -->
+        </div>
+    </div>
+
+    <div id="visualizationContainer"></div>
+
+    <!-- ライブラリの読み込み -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+    
+    <!-- Three.jsのポストプロセッシング関連 -->
+    <!-- Note: BokehPass and ShaderPass are commented out in main.js, but the scripts are kept just in case future features need them -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/BokehPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/BokehShader.js"></script>
+    
+    <script src="main.js" defer></script>
+    
+</body>
+</html>
