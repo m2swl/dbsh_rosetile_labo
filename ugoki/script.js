@@ -762,7 +762,7 @@ async function fetchReverseGeocode(latitude, longitude) {
 async function fetchWeatherData(latitude, longitude) {
     if (latitude === null || longitude === null) return;
     updateSensorStatus(weatherStatusEl, "天気情報取得中...");
-    const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}¤t_weather=true&timezone=auto`;
+    const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}current_weather=true&timezone=auto`;
     try {
         const response = await fetch(apiUrl);
         if (!response.ok) throw new Error(`Weather API error: ${response.status}`);
