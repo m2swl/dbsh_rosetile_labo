@@ -44,7 +44,7 @@ body {
     border-radius: 5px;
     z-index: 10;
     font-size: 0.8em;
-    max-width: 300px; 
+    max-width: 300px;
     max-height: 200px;
     overflow-y: auto;
 }

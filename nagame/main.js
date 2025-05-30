@@ -1,12 +1,11 @@
 // nagame/main.js
 
 // グローバル変数
-let scene, camera, renderer, composer, bokehPass;
-let particles;
+let scene, camera, renderer;
 let sensorData = [];
 let currentIndex = 0;
-let animationStartTime = 0; 
-let lastProcessedTimestamp = 0; 
+let animationStartTime = 0;
+let lastProcessedTimestamp = 0;
 let playbackSpeed = 1.0;
 let isPlaying = false;
 let animationFrameId;
@@ -15,8 +14,6 @@ let bgShaderMaterial, backgroundScene, backgroundCamera; // 背景用
 let audioContext, oscillator, gainNode, filterNode; // 音声用
 let isAudioInitialized = false;
 let isSeeking = false; // シークバー操作中フラグ
-
-const PARTICLE_COUNT = 500;
 
 // DOM要素
 const csvFileInput = document.getElementById('csvFile');
@@ -38,90 +35,153 @@ const totalTimeDisplay = document.getElementById('totalTimeDisplay');
 const backgroundVertexShader = `
     varying vec2 vUv;
     void main() {
-        vUv = uv; // PlaneGeometryのUV座標(0-1)
-        // OrthographicCamera を使っているので、ジオメトリを画面いっぱいに広げるだけで良い
+        vUv = uv;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }
 `;
 
+// このシェーダーはユニフォーム名 uEmotionSpeed, uEmotionIntensity, uColorVariety を使用します
 const backgroundFragmentShader = `
     varying vec2 vUv;
     uniform float uTime;
-    uniform vec3 uColor1;
-    uniform vec3 uColor2;
-    uniform vec3 uColor3;
+    uniform vec3 uBaseColor; 
+    uniform float uHighlightIntensity; 
+    uniform float uEmotionSpeed;      // 感情による速度係数
+    uniform float uEmotionIntensity;  // 感情による変化の強さ係数
+    uniform float uColorVariety;      // 感情による色の多様性
 
-    // Simple pseudo-random function
     float random(vec2 st) {
         return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
     }
 
-    // Simple noise function (value noise)
     float noise(vec2 st) {
         vec2 i = floor(st);
         vec2 f = fract(st);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(random(i), random(i + vec2(1.0, 0.0)), u.x) +
+               (random(i + vec2(0.0, 1.0)) - random(i)) * u.y * (1.0 - u.x) +
+               (random(i + vec2(1.0, 1.0)) - random(i + vec2(1.0, 0.0))) * u.y * u.x;
+    }
 
-        float a = random(i);
-        float b = random(i + vec2(1.0, 0.0));
-        float c = random(i + vec2(0.0, 1.0));
-        float d = random(i + vec2(1.0, 1.0));
+    float fbm(vec2 st) {
+        float value = 0.0;
+        float amplitude = 0.6; 
+        float frequency = 1.0; 
+        for (int i = 0; i < 4; i++) { // オクターブ数を増やしても良い (例: 5 or 6)
+            value += amplitude * noise(st * frequency);
+            frequency *= 1.8; // 周波数増加率を少し下げる (滑らかに)
+            amplitude *= 0.5; // 振幅減衰率
+        }
+        return value;
+    }
 
-        vec2 u = f * f * (3.0 - 2.0 * f); // Smoothstep interpolation
-        return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.y * u.x;
+    vec3 hslToRgb(vec3 hsl) {
+        vec3 rgb;
+        float h = hsl.x;
+        float s = hsl.y;
+        float l = hsl.z;
+        if (s == 0.0) {
+            rgb = vec3(l); 
+        } else {
+            auto q = l < 0.5 ? l * (1.0 + s) : l + s - l * s;
+            auto p = 2.0 * l - q;
+            auto hueToRgb = [&](float t){
+                if (t < 0.0) t += 1.0;
+                if (t > 1.0) t -= 1.0;
+                if (t < 1.0/6.0) return p + (q - p) * 6.0 * t;
+                if (t < 1.0/2.0) return q;
+                if (t < 2.0/3.0) return p + (q - p) * (2.0/3.0 - t) * 6.0;
+                return p;
+            };
+            rgb.r = hueToRgb(h + 1.0/3.0);
+            rgb.g = hueToRgb(h);
+            rgb.b = hueToRgb(h - 1.0/3.0);
+        }
+        return rgb;
     }
 
     void main() {
         vec2 uv = vUv;
-        float t = uTime * 0.05; // Slower time progression
-        
-        vec3 color = vec3(0.0);
-        
-        // Adjust noise parameters for a softer, more blurred look
-        float n1 = noise(uv * 2.0 + vec2(t * 0.2, t * 0.1));
-        float n2 = noise(uv * 1.5 - vec2(t * 0.1, t * 0.3) + 0.5);
-        float n3 = noise(uv * 2.5 + vec2(t * 0.3, -t * 0.2) - 0.3);
+        // uEmotionSpeed の影響を時間に大きくかける
+        float time = uTime * (0.05 + uEmotionSpeed * 0.25); 
 
-        // Smoother mixing
-        color = mix(uColor1, uColor2, smoothstep(0.2, 0.8, n1 + n2 * 0.2));
-        color = mix(color, uColor3, smoothstep(0.3, 0.7, n2 - n3 * 0.3));
-        color = mix(color, uColor1, smoothstep(0.4, 0.9, n3 + n1 * 0.1));
+        // ベースのHSL値を計算 uBaseColor (RGB) から変換的に
+        float baseHue = mod( (uBaseColor.r + uBaseColor.g + uBaseColor.b) / 3.0 + uTime * 0.003 * (0.5 + uEmotionSpeed), 1.0);
+        float baseSat = 0.6 + uColorVariety * 0.3; // 色の多様性で彩度も変化
+        float baseLight = 0.5 + (uBaseColor.g - 0.5) * 0.2; // 緑成分で明るさを少し
+        vec3 baseHsl = vec3(baseHue, clamp(baseSat, 0.4, 0.9), clamp(baseLight, 0.3, 0.7));
         
-        // Add a subtle vignette effect
-        float dist = length(uv - vec2(0.5));
-        color *= smoothstep(0.9, 0.3, dist);
+        // 2つの派生色を生成
+        vec3 color1Hsl = baseHsl + 
+            vec3( (noise(uv * 0.8 + time * 0.15) - 0.5) * (0.2 + uColorVariety * 0.3) * (0.5 + uEmotionIntensity), // Hueの揺れを大きく
+                  (noise(uv * 1.0 - time * 0.1) - 0.5) * 0.2 * uEmotionIntensity,
+                  (noise(uv * 1.2 + time * 0.08) - 0.5) * 0.15 * uEmotionIntensity);
+        color1Hsl.x = mod(color1Hsl.x, 1.0);
+        color1Hsl.y = clamp(color1Hsl.y, 0.3, 0.95);
+        color1Hsl.z = clamp(color1Hsl.z, 0.2, 0.8);
+        vec3 color1 = hslToRgb(color1Hsl);
 
-        gl_FragColor = vec4(color, 1.0);
+        vec3 color2Hsl = baseHsl + 
+            vec3( (noise(uv * 0.7 - time * 0.18) - 0.5) * (0.25 + uColorVariety * 0.35) * (0.5 + uEmotionIntensity) + 0.05,
+                  (noise(uv * 0.9 + time * 0.11) - 0.5) * 0.25 * uEmotionIntensity + 0.05,
+                  (noise(uv * 1.1 - time * 0.09) - 0.5) * 0.2 * uEmotionIntensity - 0.05);
+        color2Hsl.x = mod(color2Hsl.x, 1.0);
+        color2Hsl.y = clamp(color2Hsl.y, 0.3, 0.95);
+        color2Hsl.z = clamp(color2Hsl.z, 0.2, 0.8);
+        vec3 color2 = hslToRgb(color2Hsl);
+        
+        // FBMパターンのスケールと時間進行を調整
+        float patternScale = 0.6 + uEmotionIntensity * 1.5; // スケールの変化幅を大きく
+        float fbmTimeX = time * (0.15 + uEmotionSpeed * 0.15);
+        float fbmTimeY = time * (0.1 + uEmotionSpeed * 0.12);
+        float fbmPattern = fbm(uv * patternScale + vec2(fbmTimeX, fbmTimeY));
+        
+        vec3 blendedColor = mix(color1, color2, smoothstep(0.15, 0.85, fbmPattern)); // mixの範囲を広く
+
+        // ハイライトの動きと影響をさらに強調
+        vec2 highlightOffset = vec2(sin(time * (0.3 + uEmotionSpeed * 0.1) + uEmotionIntensity * 0.5) * 0.4, 
+                                    cos(time * (0.22 + uEmotionSpeed * 0.08) - uEmotionIntensity * 0.4) * 0.4);
+        float distToHighlight = length(uv - (vec2(0.5, 0.5) + highlightOffset));
+        float highlightEffect = smoothstep(0.8, 0.01, distToHighlight) * uHighlightIntensity * 2.5; // よりシャープで強いハイライト
+        
+        vec3 finalColor = mix(blendedColor, vec3(1.0, 1.0, 1.0), highlightEffect); 
+
+        float vigStrength = 0.4 + uEmotionIntensity * 0.3; // Vignetteの強さも感情で少し変える
+        float vig = smoothstep(1.0, vigStrength, length(uv - vec2(0.5)));
+        finalColor *= vig;
+        
+        finalColor = pow(finalColor, vec3(0.8)); // 全体のコントラストを少し上げる
+
+        gl_FragColor = vec4(finalColor, 1.0);
     }
 `;
 
 
 // 初期化処理
 function init() {
-    // Three.js シーン設定
     scene = new THREE.Scene();
-    // scene.background は背景シェーダーで描画するため設定しない
-
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 50;
+    camera.position.z = 1.0; // 背景シェーダーがメインなので、カメラはかなり手前
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.autoClear = false; // 手動でクリアと背景描画を行うため
+    renderer.autoClear = false;
     vizContainer.appendChild(renderer.domElement);
 
-    // 背景シェーダー設定
     backgroundScene = new THREE.Scene();
     backgroundCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    const bgPlaneGeo = new THREE.PlaneGeometry(2, 2); // スクリーン全体をカバー
+    const bgPlaneGeo = new THREE.PlaneGeometry(2, 2);
     bgShaderMaterial = new THREE.ShaderMaterial({
         vertexShader: backgroundVertexShader,
         fragmentShader: backgroundFragmentShader,
         uniforms: {
             uTime: { value: 0.0 },
-            uColor1: { value: new THREE.Color(0.1, 0.1, 0.2) }, // Initial dark colors
-            uColor2: { value: new THREE.Color(0.2, 0.1, 0.3) },
-            uColor3: { value: new THREE.Color(0.1, 0.2, 0.2) },
+            uBaseColor: { value: new THREE.Color(0.2, 0.3, 0.7) }, // 初期ベースカラー (RGB)
+            uHighlightIntensity: { value: 0.1 },                 // 初期ハイライト強度
+            uEmotionSpeed: { value: 0.5 },                       // 感情による速度係数 (初期値を少し抑えめに)
+            uEmotionIntensity: { value: 0.3 },                   // 感情による変化の強さ係数 (初期値を少し抑えめに)
+            uColorVariety: { value: 0.2 }                        // 感情による色の多様性 (初期値を少し抑えめに)
         },
         depthTest: false,
         depthWrite: false
@@ -129,63 +189,6 @@ function init() {
     const bgMesh = new THREE.Mesh(bgPlaneGeo, bgShaderMaterial);
     backgroundScene.add(bgMesh);
 
-    // パーティクル初期化
-    const particleGeometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(PARTICLE_COUNT * 3);
-    const colors = new Float32Array(PARTICLE_COUNT * 3);
-    const sizes = new Float32Array(PARTICLE_COUNT);
-    const customAttributes = {
-        startTimeOffset: new Float32Array(PARTICLE_COUNT),
-        velocity: new Float32Array(PARTICLE_COUNT * 3)
-    };
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-        positions[i * 3] = (Math.random() - 0.5) * 150;
-        positions[i * 3 + 1] = (Math.random() - 0.5) * 150;
-        positions[i * 3 + 2] = (Math.random() - 0.5) * 100 - 50;
-        colors[i * 3] = 1.0; colors[i * 3 + 1] = 1.0; colors[i * 3 + 2] = 1.0;
-        sizes[i] = Math.random() * 8 + 3;
-        customAttributes.startTimeOffset[i] = Math.random() * 5000;
-        customAttributes.velocity[i*3] = (Math.random() - 0.5) * 0.05;
-        customAttributes.velocity[i*3+1] = (Math.random() - 0.5) * 0.05 + 0.05;
-        customAttributes.velocity[i*3+2] = (Math.random() - 0.5) * 0.02;
-    }
-    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1)); // シェーダーで使う場合は'size', PointsMaterialでは直接使われない
-    particleGeometry.setAttribute('startTimeOffset', new THREE.BufferAttribute(customAttributes.startTimeOffset, 1));
-    particleGeometry.setAttribute('velocity', new THREE.BufferAttribute(customAttributes.velocity, 3));
-    
-    const particleMaterial = new THREE.PointsMaterial({
-        size: 1, 
-        map: new THREE.TextureLoader().load('assets/particle.png'), // パスを確認
-        vertexColors: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        transparent: true,
-        sizeAttenuation: true,
-        opacity: 0.8
-    });
-
-    particles = new THREE.Points(particleGeometry, particleMaterial);
-    scene.add(particles);
-
-    // ポストプロセッシング
-    const renderPass = new THREE.RenderPass(scene, camera);
-    renderPass.clear = false; // 背景描画の上に重ねるため、RenderPassではクリアしない
-
-    bokehPass = new THREE.BokehPass(scene, camera, {
-        focus: 30.0, aperture: 0.0002, maxblur: 0.008,
-        width: window.innerWidth, height: window.innerHeight
-    });
-
-    composer = new THREE.EffectComposer(renderer);
-    composer.addPass(renderPass);
-    composer.addPass(bokehPass);
-
-    window.addEventListener('resize', onWindowResize, false);
-
-    // UIイベントリスナー
     csvFileInput.addEventListener('change', handleFileLoad);
     playButton.addEventListener('click', playAnimation);
     pauseButton.addEventListener('click', pauseAnimation);
@@ -202,7 +205,7 @@ function init() {
 function handleFileLoad(event) {
     const file = event.target.files[0];
     if (file) {
-        csvFileNameDisplay.textContent = file.name; // ファイル名表示
+        csvFileNameDisplay.textContent = file.name;
         Papa.parse(file, {
             header: true, dynamicTyping: true, skipEmptyLines: true,
             complete: function(results) {
@@ -215,12 +218,10 @@ function handleFileLoad(event) {
                     seekBar.value = 0;
                     totalTimeDisplay.textContent = formatTime(lastTs - firstTs);
                     currentTimeDisplay.textContent = formatTime(0);
-                    
-                    resetAnimation(); // 状態をリセットして最初のフレームを表示
+                    resetAnimation();
                     playButton.disabled = false;
                     resetButton.disabled = false;
                     seekBar.disabled = false;
-                    console.log("CSV data loaded and parsed:", sensorData.length, "rows");
                 } else {
                     alert("有効なデータが見つかりませんでした。タイムスタンプ列を確認してください。");
                     csvFileNameDisplay.textContent = "N/A";
@@ -235,37 +236,37 @@ function handleFileLoad(event) {
     }
 }
 
-let actualStartTime = 0; 
-
 function playAnimation() {
     if (sensorData.length === 0 || currentIndex >= sensorData.length) return;
-    
-    if (!isAudioInitialized) { // 最初の再生時にAudioContextを初期化
-        initAudio();
-    }
-    if (audioContext && audioContext.state === 'suspended') {
-        audioContext.resume();
-    }
-    if(gainNode) gainNode.gain.setTargetAtTime(0.05, audioContext.currentTime, 0.1); // 音量少し上げる
+    if (!isAudioInitialized) initAudio();
+    if (audioContext && audioContext.state === 'suspended') audioContext.resume();
+    if (gainNode) gainNode.gain.setTargetAtTime(0.05, audioContext.currentTime, 0.1);
 
     isPlaying = true;
     playButton.disabled = true;
     pauseButton.disabled = false;
-
-    const csvTimeOffset = parseFloat(seekBar.value); // シークバーの現在値 (ms)
+    const csvTimeOffset = parseFloat(seekBar.value);
     actualStartTime = performance.now() - (csvTimeOffset / playbackSpeed);
     
-    animate();
+    if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime.lastTime === undefined && currentIndex > 0) {
+        // 再開時に lastTime が未定義の場合、現在の時刻で初期化
+        bgShaderMaterial.uniforms.uTime.lastTime = performance.now();
+    } else if (currentIndex === 0) {
+         // 最初から再生の場合も lastTime をリセットまたは初期化
+        if(bgShaderMaterial) delete bgShaderMaterial.uniforms.uTime.lastTime;
+    }
+
+
+    animationFrameId = requestAnimationFrame(animate);
 }
 
 function pauseAnimation() {
     isPlaying = false;
     playButton.disabled = false;
     pauseButton.disabled = true;
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-    }
-    if(gainNode) gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.1); // 音量下げる
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+    if (gainNode) gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.1);
 }
 
 function resetAnimation() {
@@ -273,7 +274,6 @@ function resetAnimation() {
     currentIndex = 0;
     seekBar.value = 0;
     currentTimeDisplay.textContent = formatTime(0);
-
     if (sensorData.length > 0) {
         lastProcessedTimestamp = sensorData[0].timestamp;
         updateVisuals(sensorData[0]);
@@ -284,23 +284,33 @@ function resetAnimation() {
         currentDataDisplay.innerHTML = "";
         totalTimeDisplay.textContent = formatTime(0);
         seekBar.disabled = true;
+        if (bgShaderMaterial) {
+            bgShaderMaterial.uniforms.uBaseColor.value.setRGB(0.2, 0.3, 0.7);
+            bgShaderMaterial.uniforms.uHighlightIntensity.value = 0.1;
+            bgShaderMaterial.uniforms.uEmotionSpeed.value = 0.5;
+            bgShaderMaterial.uniforms.uEmotionIntensity.value = 0.3;
+            bgShaderMaterial.uniforms.uColorVariety.value = 0.2;
+            bgShaderMaterial.uniforms.uTime.value = 0.0;
+            delete bgShaderMaterial.uniforms.uTime.lastTime;
+        }
     }
-    resetButton.disabled = true; 
-    if (composer) composer.render(); else if (renderer) renderer.render(scene, camera); // Ensure one frame is rendered for reset state
+    resetButton.disabled = true;
+    if (renderer && backgroundScene && backgroundCamera) {
+        renderer.clear();
+        renderer.render(backgroundScene, backgroundCamera);
+    }
 }
-
 
 function animate() {
     if (!isPlaying) return;
     animationFrameId = requestAnimationFrame(animate);
 
-    const performanceElapsed = performance.now() - actualStartTime;
+    const performanceNow = performance.now();
+    const performanceElapsed = performanceNow - actualStartTime;
     const currentCsvTimestampTarget = sensorData[0].timestamp + (performanceElapsed * playbackSpeed);
 
-    let advanced = false;
     while (currentIndex < sensorData.length - 1 && sensorData[currentIndex + 1].timestamp <= currentCsvTimestampTarget) {
         currentIndex++;
-        advanced = true;
     }
     
     const currentRow = sensorData[currentIndex];
@@ -308,144 +318,143 @@ function animate() {
         updateVisuals(currentRow);
         lastProcessedTimestamp = currentRow.timestamp;
     }
-
-    // パーティクルの動き
-    const positions = particles.geometry.attributes.position.array;
-    const velocities = particles.geometry.attributes.velocity.array;
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-        positions[i * 3] += velocities[i * 3] * playbackSpeed;
-        positions[i * 3 + 1] += velocities[i * 3 + 1] * playbackSpeed;
-        positions[i * 3 + 2] += velocities[i * 3 + 2] * playbackSpeed;
-
-        if (positions[i * 3 + 1] > 75) { positions[i * 3 + 1] = -75; positions[i * 3] = (Math.random() - 0.5) * 150; }
-        else if (positions[i * 3 + 1] < -75) { positions[i * 3 + 1] = 75; positions[i * 3] = (Math.random() - 0.5) * 150; }
-        if (positions[i * 3] > 75) positions[i * 3] = -75; else if (positions[i * 3] < -75) positions[i * 3] = 75;
-        if (positions[i * 3 + 2] > camera.position.z) positions[i * 3 + 2] = -50 + Math.random()*10;
-        if (positions[i * 3 + 2] < -50) positions[i * 3 + 2] = camera.position.z - 10 + Math.random()*10;
-    }
-    particles.geometry.attributes.position.needsUpdate = true;
     
-    // 背景シェーダーの時刻更新
     if (bgShaderMaterial) {
-        bgShaderMaterial.uniforms.uTime.value = (performance.now() / 2000.0) * playbackSpeed; // 2000.0で少し遅く
+        const lastTime = bgShaderMaterial.uniforms.uTime.lastTime || performanceNow;
+        const deltaTime = (performanceNow - lastTime) / 1000.0; // デルタタイムを秒で計算
+        bgShaderMaterial.uniforms.uTime.value += deltaTime; // playbackSpeedの影響はシェーダー内でuEmotionSpeed等で間接的に制御
+        bgShaderMaterial.uniforms.uTime.lastTime = performanceNow;
+        if(isNaN(bgShaderMaterial.uniforms.uTime.value)) bgShaderMaterial.uniforms.uTime.value = 0;
     }
 
-    // シークバー更新
     if (sensorData.length > 0 && !isSeeking) {
         const elapsedCsvTime = currentCsvTimestampTarget - sensorData[0].timestamp;
         seekBar.value = Math.max(0, Math.min(parseFloat(seekBar.max), elapsedCsvTime));
         currentTimeDisplay.textContent = formatTime(elapsedCsvTime);
     }
     
-    renderer.clear(); // 手動でクリア
-    renderer.render(backgroundScene, backgroundCamera); // 背景を描画
-    composer.render(); // メインシーンとポストプロセス
+    renderer.clear();
+    renderer.render(backgroundScene, backgroundCamera);
 
     if (currentIndex >= sensorData.length - 1 && currentCsvTimestampTarget >= sensorData[sensorData.length-1].timestamp) {
         pauseAnimation();
         resetButton.disabled = false;
-        seekBar.value = seekBar.max; // 最後に到達
+        seekBar.value = seekBar.max;
         currentTimeDisplay.textContent = totalTimeDisplay.textContent;
-        console.log("Playback finished.");
     }
 }
 
-
 function updateVisuals(data) {
-    if (!data || !particles) return;
+    if (!data) return;
 
-    // データ表示更新
     let dataStr = "";
-    const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval', 'orientAlpha', 'orientBeta', 'orientGamma', 'photoTakenId'];
+    const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval']; // orient系はカメラに使わないので一旦除外
     for(const key of keysToShow){
         if(data[key] !== undefined){
             let value = data[key];
             if (typeof value === 'number' && !Number.isInteger(value)) {
-                value = value.toFixed(2); // 小数は2桁まで
+                value = value.toFixed(2);
             }
             dataStr += `${key}: ${value}\n`;
         }
     }
     currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
 
-
-    // パーティクルの色とサイズ
-    const colors = particles.geometry.attributes.color.array;
-    const pSizes = particles.geometry.attributes.size.array; // これは PointsMaterial.size に乗算される係数として使うか、シェーダーで直接使う
-
-    const baseColor = parseSessionColor(data.sessionColor);
-    const emotionFactor = getEmotionFactor(data.sessionEmotion);
-    const globalBrightness = data.illuminance != null ? Math.min(1, Math.max(0.1, (data.illuminance / 500))) : 0.7;
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-        let r = baseColor.r, g = baseColor.g, b = baseColor.b;
-        if (data.temperature_celsius != null) {
-            const tempNorm = (Math.min(35, Math.max(5, data.temperature_celsius)) - 5) / 30;
-            r = r * (0.8 + tempNorm * 0.4); b = b * (1.2 - tempNorm * 0.4);
-        }
-        const accelYNorm = data.accelY != null ? (data.accelY + 10) / 20 : 0.5;
-        const brightnessFluctuation = 0.8 + accelYNorm * 0.4;
-        
-        colors[i * 3]     = Math.max(0, Math.min(1, r * globalBrightness * brightnessFluctuation * (0.8 + (Math.random()-0.5)*0.3*emotionFactor.colorVariety) ));
-        colors[i * 3 + 1] = Math.max(0, Math.min(1, g * globalBrightness * brightnessFluctuation * (0.8 + (Math.random()-0.5)*0.3*emotionFactor.colorVariety) ));
-        colors[i * 3 + 2] = Math.max(0, Math.min(1, b * globalBrightness * brightnessFluctuation * (0.8 + (Math.random()-0.5)*0.3*emotionFactor.colorVariety) ));
-
-        let baseSize = particles.geometry.attributes.size.array[i]; // initで設定したランダムサイズ
-        let decibelFactor = data.decibels != null ? Math.max(0.5, Math.min(2.5, (Math.abs(data.decibels) / 25))) : 1;
-        decibelFactor *= emotionFactor.sizeVariety;
-        pSizes[i] = baseSize * decibelFactor * (data.steps_in_interval > 0 ? 1.3 : 1); // PointsMaterialではこの個別サイズは直接反映されない
+    let baseColorData = parseSessionColor(data.sessionColor);
+    if (!baseColorData || typeof baseColorData.r === 'undefined') {
+        baseColorData = { r: 0.4, g: 0.4, b: 0.6 };
     }
-    particles.geometry.attributes.color.needsUpdate = true;
-    // particles.geometry.attributes.size.needsUpdate = true; // PointsMaterialでは効果なし
-    const avgSize = pSizes.reduce((a,b) => a+b, 0) / pSizes.length;
-    particles.material.size = Math.max(1, Math.min(15, avgSize / 2)); // マテリアルのsizeプロパティで平均サイズを調整
+    let emotionFactor = getEmotionFactor(data.sessionEmotion);
+    if (!emotionFactor || typeof emotionFactor.speedFactor === 'undefined') {
+        emotionFactor = { speedFactor: 1.0, colorVariety: 1.0, sizeVariety: 1.0, particleMovement: 1.0, apertureFactor: 1.0 };
+    }
 
-    // ボケ効果
-    bokehPass.materialBokeh.uniforms['focus'].value = data.orientBeta != null ? THREE.MathUtils.mapLinear(data.orientBeta, -90, 90, 10, 70) : 30;
-    bokehPass.materialBokeh.uniforms['aperture'].value = data.decibels != null ? Math.max(0.00001, Math.min(0.001, Math.abs(data.decibels) / 40000 * emotionFactor.apertureFactor)) : 0.0002;
-    bokehPass.materialBokeh.uniforms['maxblur'].value = data.gyroAlpha != null ? Math.max(0.001, Math.min(0.02, Math.abs(data.gyroAlpha) / 360 * 0.015)) : 0.008;
-    
-    // カメラ
-    if (data.orientAlpha != null) camera.rotation.y = THREE.MathUtils.degToRad(data.orientAlpha / 2);
-    if (data.orientBeta != null) camera.rotation.x = THREE.MathUtils.degToRad(data.orientBeta / 3);
-    if (data.orientGamma != null) camera.rotation.z = THREE.MathUtils.degToRad(data.orientGamma / 3);
-    camera.lookAt(scene.position);
-
-    if (data.photoTakenId === 1) flashEffect(data.sessionColor);
-
-    // 背景シェーダーの色更新
     if (bgShaderMaterial) {
-        let c1 = new THREE.Color(baseColor.r, baseColor.g, baseColor.b);
-        let c2 = new THREE.Color().setHSL((c1.getHSL({h:0,s:0,l:0}).h + 0.3 * emotionFactor.colorVariety + 0.1) % 1, 0.5 + 0.2 * Math.random(), 0.4 + 0.2 * Math.random());
-        let c3 = new THREE.Color().setHSL((c1.getHSL({h:0,s:0,l:0}).h - 0.3 * emotionFactor.colorVariety - 0.1 + 1) % 1, 0.5 + 0.2 * Math.random(), 0.5 + 0.2 * Math.random());
-        // 色の変化を滑らかに (Lerp)
-        bgShaderMaterial.uniforms.uColor1.value.lerp(c1, 0.05);
-        bgShaderMaterial.uniforms.uColor2.value.lerp(c2, 0.05);
-        bgShaderMaterial.uniforms.uColor3.value.lerp(c3, 0.05);
-    }
+        const targetBaseColor = new THREE.Color(baseColorData.r, baseColorData.g, baseColorData.b);
+        bgShaderMaterial.uniforms.uBaseColor.value.lerp(targetBaseColor, 0.25); // lerpを少し強く
 
-    // 音声パラメータ更新
+        let highlight = 0.05; // 基本強度を低めに
+        if (data.illuminance != null) {
+            // illuminanceの影響をよりダイナミックに（例：対数的に反応するなど工夫も可能）
+            highlight += Math.min(1.0, data.illuminance / 400.0) * 1.2; // 400ルクスで最大効果、影響度UP
+        }
+        if (data.decibels != null) {
+            // デシベルがマイナスの場合も考慮し、絶対値やマッピングで調整
+            const decibelEffect = (Math.max(0, Math.min(60, data.decibels + 30)) / 60.0); // -30dBを0、30dBを1にマッピング
+            highlight += decibelEffect * 0.4;
+        }
+        bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(
+            bgShaderMaterial.uniforms.uHighlightIntensity.value,
+            Math.max(0.0, Math.min(2.0, highlight)), // 最大値を2.0に
+            0.25 // lerpを少し強く
+        );
+        
+        // speedFactor を playbackSpeed と掛け合わせることで、CSVの再生速度と感情の速度を両方反映
+        const effectiveSpeed = emotionFactor.speedFactor * playbackSpeed;
+        bgShaderMaterial.uniforms.uEmotionSpeed.value = THREE.MathUtils.lerp(
+            bgShaderMaterial.uniforms.uEmotionSpeed.value,
+            effectiveSpeed, // 感情x再生速度
+            0.25
+        );
+        // particleMovement を EmotionIntensity に強く反映
+        bgShaderMaterial.uniforms.uEmotionIntensity.value = THREE.MathUtils.lerp(
+            bgShaderMaterial.uniforms.uEmotionIntensity.value,
+            (emotionFactor.particleMovement * 0.6 + 0.2), // 0.2～1.4 程度 (particleMovementが2.5の場合)
+            0.25
+        );
+        // colorVariety をより広範囲に
+        bgShaderMaterial.uniforms.uColorVariety.value = THREE.MathUtils.lerp(
+            bgShaderMaterial.uniforms.uColorVariety.value,
+            emotionFactor.colorVariety * 0.4, // 0.12～0.76 程度 (colorVarietyが1.9の場合)
+            0.25
+        );
+    }
+    
+    if (data.photoTakenId === 1) {
+        if (bgShaderMaterial) {
+            const currentHighlight = bgShaderMaterial.uniforms.uHighlightIntensity.value;
+            // フラッシュは既存のハイライトに加算し、さらに強くする
+            bgShaderMaterial.uniforms.uHighlightIntensity.value = Math.min(3.0, currentHighlight + 1.5); // 最大3.0
+            setTimeout(() => {
+                if (bgShaderMaterial) {
+                    bgShaderMaterial.uniforms.uHighlightIntensity.value = currentHighlight;
+                }
+            }, 150); // フラッシュ時間
+        }
+    }
     updateAudio(data, emotionFactor);
 }
 
-function flashEffect(colorName) { /* ... (既存のまま) ... */ }
-function parseSessionColor(colorName) { /* ... (既存のまま) ... */ }
-function getEmotionFactor(emotionName) { /* ... (既存のまま) ... */ }
-
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    composer.setSize(window.innerWidth, window.innerHeight);
-    if (bokehPass && bokehPass.renderTargetDepth) {
-        bokehPass.renderTargetDepth.width = window.innerWidth * window.devicePixelRatio;
-        bokehPass.renderTargetDepth.height = window.innerHeight * window.devicePixelRatio;
+function parseSessionColor(colorName) { 
+    switch (colorName) {
+        case "黄": return { r: 0.95, g: 0.8, b: 0.2 }; // 少し調整
+        case "赤": return { r: 0.95, g: 0.2, b: 0.2 }; // 少し調整
+        case "青": return { r: 0.2, g: 0.5, b: 0.95 }; // 少し調整
+        case "緑": return { r: 0.2, g: 0.9, b: 0.3 }; // 少し調整
+        case "紫": return { r: 0.7, g: 0.3, b: 0.9 }; // 少し調整
+        default: return { r: 0.5, g: 0.5, b: 0.7 }; // デフォルト調整
     }
-    // 背景シェーダーのuResolutionはgl_FragCoordを使うのであれば更新が必要だが、
-    // 現在はvUvを使っているので不要。
 }
 
-// 音声関連
+function getEmotionFactor(emotionName) { 
+    // 各係数の影響度を上げる
+    switch (emotionName) {
+        case "楽しい": return { speedFactor: 1.6, colorVariety: 2.2, sizeVariety: 1.3, particleMovement: 1.8, apertureFactor: 1.2 };
+        case "悲しい": return { speedFactor: 0.5, colorVariety: 0.2, sizeVariety: 0.7, particleMovement: 0.3, apertureFactor: 0.7 };
+        case "怒り":   return { speedFactor: 2.5, colorVariety: 1.5, sizeVariety: 1.6, particleMovement: 2.8, apertureFactor: 1.5 };
+        case "穏やか": return { speedFactor: 0.7, colorVariety: 0.6, sizeVariety: 0.9, particleMovement: 0.7, apertureFactor: 0.9 };
+        default:     return { speedFactor: 1.0, colorVariety: 1.0, sizeVariety: 1.0, particleMovement: 1.0, apertureFactor: 1.0 };
+    }
+}
+
+function onWindowResize() {
+    if (camera && renderer && backgroundCamera) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+}
+
 function initAudio() {
     if (isAudioInitialized) return;
     try {
@@ -453,119 +462,100 @@ function initAudio() {
         oscillator = audioContext.createOscillator();
         gainNode = audioContext.createGain();
         filterNode = audioContext.createBiquadFilter();
-
         oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
-        
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
         filterNode.type = "lowpass";
-        filterNode.frequency.setValueAtTime(1000, audioContext.currentTime);
-        filterNode.Q.setValueAtTime(1, audioContext.currentTime);
-
+        filterNode.frequency.setValueAtTime(2500, audioContext.currentTime); // フィルターカットオフを上げる
+        filterNode.Q.setValueAtTime(0.8, audioContext.currentTime); // Q値を少し下げる
         oscillator.connect(filterNode);
         filterNode.connect(gainNode);
         gainNode.connect(audioContext.destination);
-        
-        gainNode.gain.setValueAtTime(0, audioContext.currentTime); // 初期ミュート
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
         oscillator.start();
         isAudioInitialized = true;
-        console.log("Audio initialized.");
     } catch (e) {
         console.error("Error initializing audio:", e);
-        alert("Web Audio API is not supported or an error occurred.");
     }
 }
 
 function updateAudio(data, emotionFactor) {
-    if (!isAudioInitialized || !audioContext) return;
+    if (!isAudioInitialized || !audioContext || !oscillator || !filterNode || !gainNode) return; // Ensure all nodes exist
 
-    const baseFreq = 110; // A2
+    const baseFreq = 880;
     let targetFreq = baseFreq;
     
     if (data.temperature_celsius != null) {
         const tempNorm = (Math.min(35, Math.max(5, data.temperature_celsius)) - 5) / 30;
-        targetFreq = baseFreq + tempNorm * 220; 
+        targetFreq = baseFreq + tempNorm * 330; // 温度による周波数変化を大きく
     }
+
+    const effectiveSpeed = emotionFactor.speedFactor * playbackSpeed; // 再生速度も音の変化に影響
 
     switch (data.sessionEmotion) {
         case "楽しい": 
             oscillator.type = 'sawtooth'; 
-            filterNode.frequency.setTargetAtTime(1500 + emotionFactor.particleMovement * 500, audioContext.currentTime, 0.1);
-            filterNode.Q.setTargetAtTime(2 + emotionFactor.sizeVariety, audioContext.currentTime, 0.1);
+            filterNode.frequency.setTargetAtTime(3500 + emotionFactor.particleMovement * 600 * effectiveSpeed, audioContext.currentTime, 0.05);
+            filterNode.Q.setTargetAtTime(1.2 + emotionFactor.sizeVariety * 0.6, audioContext.currentTime, 0.05);
             break;
         case "悲しい": 
             oscillator.type = 'sine'; 
-            targetFreq *= 0.8;
-            filterNode.frequency.setTargetAtTime(500, audioContext.currentTime, 0.1);
-            filterNode.Q.setTargetAtTime(0.5, audioContext.currentTime, 0.1);
+            targetFreq *= (0.9 / effectiveSpeed); // 再生速度が速いとさらに低くならないように調整
+            filterNode.frequency.setTargetAtTime(800 / effectiveSpeed, audioContext.currentTime, 0.1);
+            filterNode.Q.setTargetAtTime(0.7, audioContext.currentTime, 0.1);
             break;
         case "怒り":   
             oscillator.type = 'square'; 
-            targetFreq *= 1.2; 
-            filterNode.frequency.setTargetAtTime(800 + Math.random() * 400, audioContext.currentTime, 0.05);
-            filterNode.Q.setTargetAtTime(5 + Math.random() * 5, audioContext.currentTime, 0.05);
+            targetFreq *= (1.1 * effectiveSpeed);
+            filterNode.frequency.setTargetAtTime(1200 + Math.random() * 600 * effectiveSpeed, audioContext.currentTime, 0.03);
+            filterNode.Q.setTargetAtTime(4 + Math.random() * 3, audioContext.currentTime, 0.03);
             break;
         case "穏やか": 
             oscillator.type = 'triangle'; 
-            filterNode.frequency.setTargetAtTime(1000, audioContext.currentTime, 0.1);
-            filterNode.Q.setTargetAtTime(1, audioContext.currentTime, 0.1);
+            filterNode.frequency.setTargetAtTime(1800 * Math.sqrt(effectiveSpeed), audioContext.currentTime, 0.1); // 速度で少し変わる
+            filterNode.Q.setTargetAtTime(0.9, audioContext.currentTime, 0.1);
             break;
         default:     
             oscillator.type = 'sine';
-            filterNode.frequency.setTargetAtTime(1000, audioContext.currentTime, 0.1);
+            filterNode.frequency.setTargetAtTime(2200 * Math.sqrt(effectiveSpeed), audioContext.currentTime, 0.1);
             break;
     }
-    oscillator.frequency.setTargetAtTime(targetFreq, audioContext.currentTime, 0.1);
+    oscillator.frequency.setTargetAtTime(Math.max(20, Math.min(20000, targetFreq)), audioContext.currentTime, 0.05); // 周波数範囲制限
 
-    let targetGain = 0.03; // 基本音量をさらに小さく
+    let targetGain = 0.02; // 基本ゲインを少し下げる
     if (data.decibels != null) {
-        const decibelNorm = Math.min(1, Math.max(0, (Math.abs(data.decibels) / 60))); // 0-60dB を 0-1
-        targetGain += decibelNorm * 0.07; // 最大0.1
-        filterNode.frequency.setTargetAtTime(filterNode.frequency.value * (1 + decibelNorm * 0.2), audioContext.currentTime, 0.05);
+        const decibelEffect = (Math.max(0, Math.min(70, data.decibels + 40)) / 70.0); // -40dBを0, 30dBを1
+        targetGain += decibelEffect * 0.08; 
+        filterNode.frequency.setTargetAtTime(Math.max(100, filterNode.frequency.value * (1 + decibelEffect * 0.15)), audioContext.currentTime, 0.03);
     }
-    if (isPlaying) { // 再生中のみゲインを調整
-      gainNode.gain.setTargetAtTime(Math.min(0.2, Math.max(0, targetGain)), audioContext.currentTime, 0.1);
+    if (isPlaying) {
+      gainNode.gain.setTargetAtTime(Math.min(0.12, Math.max(0, targetGain)), audioContext.currentTime, 0.05); // 最大ゲインを少し下げる
     }
-
 
     if (data.photoTakenId === 1) {
         const clickOsc = audioContext.createOscillator();
         const clickGain = audioContext.createGain();
         clickOsc.type = 'triangle';
-        clickOsc.frequency.setValueAtTime(1200, audioContext.currentTime);
-        clickGain.gain.setValueAtTime(0.15, audioContext.currentTime); // Flash音量を少し下げる
-        clickGain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
+        clickOsc.frequency.setValueAtTime(1800, audioContext.currentTime);
+        clickGain.gain.setValueAtTime(0.12, audioContext.currentTime);
+        clickGain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.07);
         clickOsc.connect(clickGain);
         clickGain.connect(audioContext.destination);
         clickOsc.start(audioContext.currentTime);
-        clickOsc.stop(audioContext.currentTime + 0.1);
+        clickOsc.stop(audioContext.currentTime + 0.07);
     }
 }
 
-// シークバー関連
 function handleSeekBarInput() {
     isSeeking = true;
     const seekTimeMs = parseFloat(seekBar.value);
     currentTimeDisplay.textContent = formatTime(seekTimeMs);
-    // オプション: ドラッグ中に簡易プレビューする場合
-    // if (sensorData.length > 0) {
-    //     const targetCsvTimestamp = sensorData[0].timestamp + seekTimeMs;
-    //     let tempIndex = 0;
-    //     for (let i = 0; i < sensorData.length; i++) {
-    //         if (sensorData[i].timestamp <= targetCsvTimestamp) tempIndex = i; else break;
-    //     }
-    //     if (sensorData[tempIndex]) updateVisuals(sensorData[tempIndex]);
-    //     if (isPlaying) { /* No immediate rendering to avoid lag, or a throttled one */ }
-    //     else { if (composer) composer.render(); else if (renderer) renderer.render(scene, camera); }
-    // }
 }
 
 function handleSeekBarChange() {
     isSeeking = false;
     if (sensorData.length === 0) return;
 
-    const seekTargetElapsedCsvTime = parseFloat(seekBar.value); //経過時間(ms)
-    
-    // 新しいcurrentIndexを探す
+    const seekTargetElapsedCsvTime = parseFloat(seekBar.value);
     const seekTargetAbsoluteCsvTime = sensorData[0].timestamp + seekTargetElapsedCsvTime;
     let newIndex = 0;
     for (let i = 0; i < sensorData.length; i++) {
@@ -579,20 +569,22 @@ function handleSeekBarChange() {
     
     if (sensorData[currentIndex]) {
       lastProcessedTimestamp = sensorData[currentIndex].timestamp;
-      updateVisuals(sensorData[currentIndex]); // シーク後のデータを即時反映
+      updateVisuals(sensorData[currentIndex]); // 即時反映
     }
 
-    // actualStartTimeを再計算して、次のanimateループから正しい位置で再生
     actualStartTime = performance.now() - (seekTargetElapsedCsvTime / playbackSpeed);
+    if (bgShaderMaterial) {
+        bgShaderMaterial.uniforms.uTime.lastTime = performance.now(); // シーク時もlastTimeを更新
+    }
 
     if (isPlaying) {
-        if (animationFrameId) cancelAnimationFrame(animationFrameId); // 現在のフレームをキャンセル
-        animate(); // 新しい位置からアニメーションを再開
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(animate);
     } else {
-        // 一時停止中の場合は、表示を更新して待機
-        renderer.clear(); 
-        renderer.render(backgroundScene, backgroundCamera); 
-        composer.render();
+        if (renderer && backgroundScene && backgroundCamera) {
+            renderer.clear();
+            renderer.render(backgroundScene, backgroundCamera);
+        }
     }
 }
 
@@ -604,15 +596,10 @@ function formatTime(ms) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-// アプリケーション開始
 init();
-// 初期状態では何も描画されないので、一度手動で描画する
-if (renderer && backgroundScene && backgroundCamera && scene && camera) {
+if (renderer && backgroundScene && backgroundCamera) {
     renderer.clear();
     renderer.render(backgroundScene, backgroundCamera);
-    // 初回はcomposerなしで良いか、あるいはcomposer.render()する
-    // ただし、sensorDataがまだないのでupdateVisualsは呼ばれない想定
-    if (composer) composer.render(); else renderer.render(scene, camera);
 } else {
-    console.warn("Initial render skipped, components not ready.");
+    console.warn("Initial render skipped.");
 }
