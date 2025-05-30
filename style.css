@@ -1,0 +1,221 @@
+:root {
+    /* Material Design 3 - Light Theme Base (Neutral) */
+    --md-sys-color-primary-light: #0061A4; /* Example Blue - can be overridden */
+    --md-sys-color-on-primary-light: #FFFFFF;
+    --md-sys-color-primary-container-light: #D1E4FF;
+    --md-sys-color-on-primary-container-light: #001D36;
+
+    --md-sys-color-secondary-light: #535F70;
+    --md-sys-color-on-secondary-light: #FFFFFF;
+    --md-sys-color-secondary-container-light: #D7E3F8;
+    --md-sys-color-on-secondary-container-light: #101C2B;
+
+    --md-sys-color-tertiary-light: #6B5778;
+    --md-sys-color-on-tertiary-light: #FFFFFF;
+    --md-sys-color-tertiary-container-light: #F2DAFF;
+    --md-sys-color-on-tertiary-container-light: #251432;
+
+    --md-sys-color-surface-light: #FCFDF7; /* Off-white for surface */
+    --md-sys-color-on-surface-light: #1A1C1A; /* Dark text on light surface */
+    --md-sys-color-surface-variant-light: #E0E3DA; /* Slightly darker variant for cards, etc. */
+    --md-sys-color-on-surface-variant-light: #434746;
+    --md-sys-color-background-light: #F4F6EF; /* Light gray background */
+    --md-sys-color-on-background-light: #1A1C1A;
+    --md-sys-color-outline-light: #737771;
+
+    /* Ugoki Theme (Light) - Based on the provided green image */
+    --ugoki-color-primary: #293d35; /* Darker Green from icon for text/accents */
+    --ugoki-color-surface-container: #A8E0B8; /* Main Green from image background */
+    --ugoki-color-on-surface-container: #102818; /* Dark Green for text on green bg */
+
+    /* Nagame Theme (Light) - Based on the provided blue image */
+    --nagame-color-primary: #1f2d3d; /* Darker Blue from icon for text/accents */
+    --nagame-color-surface-container: #90C8F0; /* Main Blue from image background */
+    --nagame-color-on-surface-container: #001f30; /* Dark Blue for text on blue bg */
+
+    /* Typography - MD3 scales (approximate) */
+    --md-sys-typescale-headline-large-font-family-name: 'Noto Sans JP';
+    --md-sys-typescale-headline-large-font-weight: 700;
+    --md-sys-typescale-headline-large-font-size: 32px;
+    --md-sys-typescale-headline-large-line-height: 40px;
+
+    --md-sys-typescale-title-large-font-family-name: 'Noto Sans JP';
+    --md-sys-typescale-title-large-font-weight: 500;
+    --md-sys-typescale-title-large-font-size: 22px;
+    --md-sys-typescale-title-large-line-height: 28px;
+
+    --md-sys-typescale-body-large-font-family-name: 'Noto Sans JP';
+    --md-sys-typescale-body-large-font-weight: 400;
+    --md-sys-typescale-body-large-font-size: 16px;
+    --md-sys-typescale-body-large-line-height: 24px;
+
+    --md-sys-typescale-body-medium-font-family-name: 'Noto Sans JP';
+    --md-sys-typescale-body-medium-font-weight: 400;
+    --md-sys-typescale-body-medium-font-size: 14px;
+    --md-sys-typescale-body-medium-line-height: 20px;
+
+    --md-sys-typescale-label-small-font-family-name: 'Noto Sans JP';
+    --md-sys-typescale-label-small-font-weight: 500;
+    --md-sys-typescale-label-small-font-size: 11px;
+    --md-sys-typescale-label-small-line-height: 16px;
+
+    /* Shape */
+    --md-sys-shape-corner-medium: 12px;
+    --md-sys-shape-corner-large: 16px;
+
+    /* Elevation (Shadows - simplified) */
+    --md-sys-elevation-level1: 0px 1px 3px 0px rgba(0,0,0,0.1), 0px 1px 2px 0px rgba(0,0,0,0.06);
+    --md-sys-elevation-level2: 0px 2px 6px 0px rgba(0,0,0,0.1), 0px 1px 2px 0px rgba(0,0,0,0.06);
+}
+
+body {
+    font-family: var(--md-sys-typescale-body-large-font-family-name), sans-serif;
+    margin: 0;
+    background-color: var(--md-sys-color-background-light);
+    color: var(--md-sys-color-on-background-light);
+    line-height: 1.5; /* Consistent line height */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+    box-sizing: border-box;
+}
+
+.container {
+    width: 100%;
+    max-width: 700px; /* Allow more space for two cards side-by-side */
+    text-align: center;
+}
+
+.hero-header {
+    margin-bottom: 40px;
+}
+
+.headline-large {
+    font-family: var(--md-sys-typescale-headline-large-font-family-name);
+    font-weight: var(--md-sys-typescale-headline-large-font-weight);
+    font-size: var(--md-sys-typescale-headline-large-font-size);
+    line-height: var(--md-sys-typescale-headline-large-line-height);
+    color: var(--md-sys-color-on-surface-light);
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+.body-large {
+    font-family: var(--md-sys-typescale-body-large-font-family-name);
+    font-weight: var(--md-sys-typescale-body-large-font-weight);
+    font-size: var(--md-sys-typescale-body-large-font-size);
+    line-height: var(--md-sys-typescale-body-large-line-height);
+    color: var(--md-sys-color-on-surface-variant-light);
+    margin-bottom: 0;
+}
+
+.project-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Responsive columns */
+    gap: 24px; /* Increased gap */
+}
+
+.project-link {
+    text-decoration: none;
+    color: inherit;
+    display: block; /* Ensure the link takes up the card space */
+    border-radius: var(--md-sys-shape-corner-large); /* Apply radius to link for click area */
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline-offset: 2px; /* For focus visibility */
+}
+
+.project-link:hover,
+.project-link:focus-visible {
+    transform: translateY(-4px);
+    box-shadow: var(--md-sys-elevation-level2);
+}
+.project-link:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary-light);
+}
+
+
+.project-card {
+    padding: 24px;
+    border-radius: var(--md-sys-shape-corner-large);
+    text-align: left;
+    box-shadow: var(--md-sys-elevation-level1);
+    min-height: 160px; /* Ensure cards have a decent height */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* Pushes content to top and bottom */
+}
+
+.card-icon {
+    font-size: 48px; /* Adjust as needed */
+    margin-bottom: 16px;
+    display: block; /* Make it a block to control margin */
+}
+
+.project-card .title-large {
+    font-family: var(--md-sys-typescale-title-large-font-family-name);
+    font-weight: var(--md-sys-typescale-title-large-font-weight);
+    font-size: var(--md-sys-typescale-title-large-font-size);
+    line-height: var(--md-sys-typescale-title-large-line-height);
+    margin-top: 0;
+    margin-bottom: 4px;
+}
+
+.project-card .body-medium {
+    font-family: var(--md-sys-typescale-body-medium-font-family-name);
+    font-weight: var(--md-sys-typescale-body-medium-font-weight);
+    font-size: var(--md-sys-typescale-body-medium-font-size);
+    line-height: var(--md-sys-typescale-body-medium-line-height);
+    margin-bottom: 0;
+    flex-grow: 1; /* Allows paragraph to take available space */
+}
+
+/* Ugoki Card Specific Colors */
+.project-card-ugoki {
+    background-color: var(--ugoki-color-surface-container);
+}
+.project-card-ugoki .title-large,
+.project-card-ugoki .card-icon { /* Icon color for Ugoki */
+    color: var(--ugoki-color-primary);
+}
+.project-card-ugoki .body-medium {
+    color: var(--ugoki-color-on-surface-container);
+}
+
+/* Nagame Card Specific Colors */
+.project-card-nagame {
+    background-color: var(--nagame-color-surface-container);
+}
+.project-card-nagame .title-large,
+.project-card-nagame .card-icon { /* Icon color for Nagame */
+    color: var(--nagame-color-primary);
+}
+.project-card-nagame .body-medium {
+    color: var(--nagame-color-on-surface-container);
+}
+
+
+.app-footer {
+    margin-top: 48px;
+}
+
+.app-footer .label-small {
+    font-family: var(--md-sys-typescale-label-small-font-family-name);
+    font-weight: var(--md-sys-typescale-label-small-font-weight);
+    font-size: var(--md-sys-typescale-label-small-font-size);
+    line-height: var(--md-sys-typescale-label-small-line-height);
+    color: var(--md-sys-color-on-surface-variant-light);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) { /* Adjust breakpoint if cards don't fit well */
+    .project-grid {
+        grid-template-columns: 1fr; /* Stack cards on smaller screens */
+    }
+    .headline-large {
+        font-size: 28px; /* Slightly smaller headline */
+        line-height: 36px;
+    }
+}
