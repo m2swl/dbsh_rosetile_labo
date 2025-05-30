@@ -727,49 +727,29 @@ async function fetchReverseGeocode(latitude, longitude) {
 }
 
 async function fetchWeatherData(latitude, longitude) {
-    const now = Date.now();
-    if (now - lastWeatherFetchTime < WEATHER_FETCH_INTERVAL_MS && currentSensorValues.temperature_celsius !== null) {
-        // Already have recent data, no need to spam
-        return;
-    }
-    if (latitude === null || longitude === null || typeof latitude !== 'number' || typeof longitude !== 'number') {
-        weatherStatusEl.textContent = "GPS座標不明";
-        console.warn("[Weather] Invalid coordinates for weather fetch:", latitude, longitude);
-        return;
-    }
-
-    weatherStatusEl.textContent = "天気情報取得中...";
-    const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}&current_weather=true`; // Fixed typo: ¤t_weather -> current_weather
-    console.log("[Weather] Fetching weather from:", apiUrl);
-
+    if (latitude === null || longitude === null) return;
+    updateSensorStatus(weatherStatusEl, "天気情報取得中...");
+    const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}¤t_weather=true&timezone=auto`;
     try {
         const response = await fetch(apiUrl);
-        console.log("[Weather] Response status:", response.status, response.statusText);
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("[Weather] API error response text:", errorText);
-            throw new Error(`API error: ${response.status} ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`Weather API error: ${response.status}`);
         const data = await response.json();
-        console.log("[Weather] Weather data received:", data);
-
         if (data && data.current_weather && typeof data.current_weather.temperature !== 'undefined') {
             currentSensorValues.temperature_celsius = data.current_weather.temperature;
-            weatherTempEl.textContent = data.current_weather.temperature.toFixed(1);
-            weatherStatusEl.textContent = `最終更新: ${new Date().toLocaleTimeString()}`;
-            lastWeatherFetchTime = now;
+            const tempStr = data.current_weather.temperature.toFixed(1);
+            if(weatherTempEl) weatherTempEl.textContent = tempStr;
+            if(weatherTempDetailEl) weatherTempDetailEl.textContent = tempStr;
+            lastWeatherFetchTime = Date.now();
+            updateSensorStatus(weatherStatusEl, `最終更新: ${new Date(lastWeatherFetchTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
         } else {
-            console.warn("[Weather] Temperature data not found in response:", data);
-            throw new Error("Temperature data not found in response.");
+            updateSensorStatus(weatherStatusEl, "天気データなし");
         }
     } catch (error) {
-        console.error("[Weather] Failed to fetch weather data:", error);
-        weatherStatusEl.textContent = "天気情報取得失敗";
-        weatherTempEl.textContent = "-";
-        // Do not clear currentSensorValues.temperature_celsius here, retain last known good value if any.
-        // It will be overwritten on next successful fetch.
+        console.error("Failed to fetch weather data:", error);
+        updateSensorStatus(weatherStatusEl, "天気情報取得失敗", "error");
     }
 }
+
 
 
 // --- Recording Logic (startRecording updates, others same) ---
