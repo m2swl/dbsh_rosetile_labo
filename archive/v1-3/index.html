@@ -37,7 +37,7 @@
         <div id="recordPage" class="page active-page">
             <div class="app-container">
                 <!-- Recording Controls -->
-                <div class="recording-controls-bar card-full-width">
+                <div class="recording-controls-bar">
                     <div class="recording-status-area">
                         <p class="status-text" id="recordingStatus">待機中...</p>
                     </div>
@@ -57,158 +57,150 @@
                     </div>
                 </div>
 
-                <div class="sensor-grid">
-                    <!-- Device Orientation Card -->
-                    <md-card class="card-full-width">
-                        <div class="card-header">
-                            <md-icon>screen_rotation</md-icon>
-                            <h2>デバイスの向き</h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="cube-container">
-                                <div class="cube" id="orientationCube">
-                                    <div class="cube__face cube__face--front">前</div>
-                                    <div class="cube__face cube__face--back">後</div>
-                                    <div class="cube__face cube__face--right">右</div>
-                                    <div class="cube__face cube__face--left">左</div>
-                                    <div class="cube__face cube__face--top">上</div>
-                                    <div class="cube__face cube__face--bottom">下</div>
-                                </div>
+                <!-- Device Orientation Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>screen_rotation</md-icon>
+                        <h2>デバイスの向き</h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="cube-container">
+                            <div class="cube" id="orientationCube">
+                                <div class="cube__face cube__face--front">前</div>
+                                <div class="cube__face cube__face--back">後</div>
+                                <div class="cube__face cube__face--right">右</div>
+                                <div class="cube__face cube__face--left">左</div>
+                                <div class="cube__face cube__face--top">上</div>
+                                <div class="cube__face cube__face--bottom">下</div>
                             </div>
-                            <div class="sensor-values-group">
-                                <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="orient-alpha">-</span> °</p>
-                                <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="orient-beta">-</span> °</p>
-                                <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="orient-gamma">-</span> °</p>
-                            </div>
-                            <p class="status-text" id="orient-status">待機中...</p>
                         </div>
-                    </md-card>
+                        <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="orient-alpha">-</span> °</p>
+                        <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="orient-beta">-</span> °</p>
+                        <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="orient-gamma">-</span> °</p>
+                        <p class="status-text" id="orient-status">待機中...</p>
+                    </div>
+                </md-card>
 
-                    <!-- Accelerometer Card -->
-                    <md-card class="card-full-width">
-                        <div class="card-header">
-                            <md-icon>vibration</md-icon>
-                            <h2>加速度 (重力含む)</h2>
+                <!-- Accelerometer Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>vibration</md-icon>
+                        <h2>加速度 (重力含む)</h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="bars-container">
+                            <div class="bar" id="accel-bar-x"><span class="bar-label">X</span></div>
+                            <div class="bar" id="accel-bar-y"><span class="bar-label">Y</span></div>
+                            <div class="bar" id="accel-bar-z"><span class="bar-label">Z</span></div>
                         </div>
-                        <div class="card-content">
-                            <div class="bars-container">
-                                <div class="bar" id="accel-bar-x"><span class="bar-label">X</span></div>
-                                <div class="bar" id="accel-bar-y"><span class="bar-label">Y</span></div>
-                                <div class="bar" id="accel-bar-z"><span class="bar-label">Z</span></div>
-                            </div>
-                            <div class="sensor-values-group">
-                                <p class="sensor-value"><strong>X:</strong> <span id="accel-x">-</span> m/s²</p>
-                                <p class="sensor-value"><strong>Y:</strong> <span id="accel-y">-</span> m/s²</p>
-                                <p class="sensor-value"><strong>Z:</strong> <span id="accel-z">-</span> m/s²</p>
-                            </div>
-                            <p class="status-text" id="accel-status">待機中...</p>
-                        </div>
-                    </md-card>
+                        <p class="sensor-value"><strong>X:</strong> <span id="accel-x">-</span> m/s²</p>
+                        <p class="sensor-value"><strong>Y:</strong> <span id="accel-y">-</span> m/s²</p>
+                        <p class="sensor-value"><strong>Z:</strong> <span id="accel-z">-</span> m/s²</p>
+                        <p class="status-text" id="accel-status">待機中...</p>
+                    </div>
+                </md-card>
 
-                    <!-- Gyroscope Card -->
-                    <md-card class="card-half-width">
-                         <div class="card-header">
-                            <md-icon>explore</md-icon>
-                            <h2>ジャイロスコープ</h2>
-                        </div>
-                        <div class="card-content">
-                            <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="gyro-alpha">-</span> °/s</p>
-                            <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta">-</span> °/s</p>
-                            <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="gyro-gamma">-</span> °/s</p>
-                            <p class="status-text" id="gyro-status">待機中...</p>
-                        </div>
-                    </md-card>
+                <!-- Gyroscope Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>explore</md-icon>
+                        <h2>ジャイロスコープ (回転速度)</h2>
+                    </div>
+                    <div class="card-content">
+                        <p class="sensor-value"><strong>Alpha (Z軸):</strong> <span id="gyro-alpha">-</span> °/s</p>
+                        <p class="sensor-value"><strong>Beta (X軸):</strong> <span id="gyro-beta">-</span> °/s</p>
+                        <p class="sensor-value"><strong>Gamma (Y軸):</strong> <span id="gyro-gamma">-</span> °/s</p>
+                        <p class="status-text" id="gyro-status">待機中...</p>
+                    </div>
+                </md-card>
 
-                    <!-- Pedometer Card -->
-                    <md-card class="card-half-width">
-                        <div class="card-header">
-                            <md-icon>directions_walk</md-icon>
-                            <h2>歩数計</h2>
-                        </div>
-                        <div class="card-content">
-                            <p class="sensor-value" style="font-size: 1.1em; margin-bottom: 4px;"><strong>記録中の歩数:</strong> <span id="pedometer-steps">0</span> 歩</p>
-                            <p class="status-text" id="pedometer-status">待機中...</p>
-                            <p style="font-size: 0.7em; color: var(--md-sys-color-on-surface-variant); margin-top: 8px;">※ 加速度センサーに基づく簡易推定です。</p>
-                        </div>
-                    </md-card>
+                <!-- Pedometer Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>directions_walk</md-icon>
+                        <h2>歩数計 (試作版)</h2>
+                    </div>
+                    <div class="card-content">
+                        <p class="sensor-value" style="font-size: 1.1em;"><strong>記録中の歩数:</strong> <span id="pedometer-steps">0</span> 歩</p>
+                        <p class="status-text" id="pedometer-status">待機中...</p>
+                        <p style="font-size: 0.7em; color: var(--md-sys-color-on-surface-variant);">※ 加速度センサーに基づく簡易的な推定です。</p>
+                    </div>
+                </md-card>
 
-                     <!-- Light Sensor Card -->
-                    <md-card class="card-half-width">
-                        <div class="card-header">
-                            <md-icon>lightbulb</md-icon>
-                            <h2>光センサー</h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="light-viz">
-                                <md-icon id="light-icon-sun" style="display:none;">wb_sunny</md-icon>
-                                <md-icon id="light-icon-moon" style="display:none;">nightlight_round</md-icon>
-                            </div>
-                            <p class="sensor-value" style="font-size: 1.1em; text-align: center;"><strong>明るさ:</strong> <span id="light-value">-</span> lux</p>
-                            <p class="status-text" id="light-status" style="text-align: center;">待機中...</p>
-                        </div>
-                    </md-card>
+                <!-- Geolocation & Weather Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>location_on</md-icon>
+                        <h2>位置情報 & 天気</h2>
+                    </div>
+                    <div class="card-content">
+                        <p class="sensor-value"><strong>緯度:</strong> <span id="geo-lat">-</span></p>
+                        <p class="sensor-value"><strong>経度:</strong> <span id="geo-lon">-</span></p>
+                        <p class="sensor-value"><strong>精度:</strong> <span id="geo-acc">-</span> m</p>
+                        <p class="sensor-value"><strong>高度:</strong> <span id="geo-alt">-</span> m</p>
+                        <p class="sensor-value"><strong>速度:</strong> <span id="geo-speed">-</span> m/s</p>
+                        <p class="sensor-value"><strong>方角:</strong> <span id="geo-head">-</span> °</p>
+                        <p class="sensor-value"><strong>場所:</strong> <span id="geo-address">-</span></p>
+                        <p class="status-text" id="geo-address-status"></p>
+                        <p class="status-text" id="geo-status">待機中...</p>
+                        <hr style="margin: 12px 0 8px; border: 0; border-top: 1px solid var(--md-sys-color-outline-variant);">
+                        <p class="sensor-value"><strong>現在地の気温:</strong> <span id="weather-temp">-</span> °C</p>
+                        <p class="status-text" id="weather-status">GPS位置情報取得後に更新</p>
+                    </div>
+                </md-card>
 
-                    <!-- Microphone Card -->
-                    <md-card class="card-half-width">
-                        <div class="card-header">
-                            <md-icon>mic</md-icon>
-                            <h2>マイク</h2>
+                <!-- Light Sensor Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>lightbulb</md-icon>
+                        <h2>光センサー</h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="light-viz">
+                            <md-icon id="light-icon-sun" style="display:none;">wb_sunny</md-icon>
+                            <md-icon id="light-icon-moon" style="display:none;">nightlight_round</md-icon>
                         </div>
-                        <div class="card-content">
-                            <p class="sensor-value" style="font-size: 1.1em; margin-bottom: 4px;"><strong>音量 (dBFS):</strong> <span id="mic-dbfs">-</span> dBFS</p>
-                            <div class="mic-level-bar-container">
-                                <div class="mic-level-bar" id="micLevelBar"></div>
-                            </div>
-                            <p class="status-text" id="mic-status">待機中...</p>
-                        </div>
-                    </md-card>
+                        <p class="sensor-value"><strong>明るさ:</strong> <span id="light-value">-</span> lux</p>
+                        <p class="status-text" id="light-status">待機中...</p>
+                    </div>
+                </md-card>
 
-                    <!-- Geolocation & Weather Card -->
-                    <md-card class="card-full-width">
-                        <div class="card-header">
-                            <md-icon>location_on</md-icon>
-                            <h2>位置情報 & 天気</h2>
+                <!-- Microphone Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>mic</md-icon>
+                        <h2>マイク (音量)</h2>
+                    </div>
+                    <div class="card-content">
+                        <p class="sensor-value"><strong>音量 (dBFS):</strong> <span id="mic-dbfs">-</span> dBFS</p>
+                        <div class="mic-level-bar-container">
+                            <div class="mic-level-bar" id="micLevelBar"></div>
                         </div>
-                        <div class="card-content">
-                             <div class="sensor-values-group">
-                                <p class="sensor-value"><strong>緯度:</strong> <span id="geo-lat">-</span></p>
-                                <p class="sensor-value"><strong>経度:</strong> <span id="geo-lon">-</span></p>
-                                <p class="sensor-value"><strong>精度:</strong> <span id="geo-acc">-</span> m</p>
-                                <p class="sensor-value"><strong>高度:</strong> <span id="geo-alt">-</span> m</p>
-                                <p class="sensor-value"><strong>速度:</strong> <span id="geo-speed">-</span> m/s</p>
-                                <p class="sensor-value"><strong>方角:</strong> <span id="geo-head">-</span> °</p>
-                                <p class="sensor-value"><strong>場所:</strong> <span id="geo-address">-</span></p>
-                            </div>
-                            <p class="status-text" id="geo-address-status"></p>
-                            <p class="status-text" id="geo-status">待機中...</p>
-                            <hr style="margin: 12px 0 8px; border: 0; border-top: 1px solid var(--md-sys-color-outline-variant);">
-                            <p class="sensor-value"><strong>現在地の気温:</strong> <span id="weather-temp">-</span> °C</p>
-                            <p class="status-text" id="weather-status">GPS位置情報取得後に更新</p>
-                        </div>
-                    </md-card>
+                        <p class="status-text" id="mic-status">待機中...</p>
+                    </div>
+                </md-card>
 
-                    <!-- Camera Card -->
-                    <md-card class="card-full-width">
-                        <div class="card-header">
-                            <md-icon>photo_camera</md-icon>
-                            <h2>写真撮影</h2>
-                        </div>
-                        <div class="card-content">
-                            <video id="cameraPreview" playsinline autoplay muted style="display:none; width: 100%; max-width:300px; border-radius: 8px; margin-bottom:10px;"></video>
-                            <canvas id="photoCanvas" style="display:none;"></canvas>
-                            <md-filled-button id="takePictureButton" disabled>
-                                <md-icon slot="icon">camera_alt</md-icon>
-                                写真を撮る
-                            </md-filled-button>
-                            <p class="status-text" id="camera-status">カメラ準備中...</p>
-                            <div id="lastPhotoPreviewContainer" style="margin-top: 10px;"></div>
-                        </div>
-                    </md-card>
+                <!-- Camera Card -->
+                <md-card>
+                    <div class="card-header">
+                        <md-icon>photo_camera</md-icon>
+                        <h2>写真撮影</h2>
+                    </div>
+                    <div class="card-content">
+                        <video id="cameraPreview" playsinline autoplay muted style="display:none; width: 100%; max-width:300px; border-radius: 8px; margin-bottom:10px;"></video>
+                        <canvas id="photoCanvas" style="display:none;"></canvas>
+                        <md-filled-button id="takePictureButton" disabled>
+                            <md-icon slot="icon">camera_alt</md-icon>
+                            写真を撮る
+                        </md-filled-button>
+                        <p class="status-text" id="camera-status">カメラ準備中...</p>
+                        <div id="lastPhotoPreviewContainer" style="margin-top: 10px;"></div>
+                    </div>
+                </md-card>
 
-                    <p style="font-size: 0.8em; text-align: center; margin-top: 20px; color: var(--md-sys-color-on-surface-variant);" class="card-full-width">
-                        注意: センサーの利用にはブラウザからの許可が必要な場合があります。
-                    </p>
-                </div>
+                <p style="font-size: 0.8em; text-align: center; margin-top: 20px; color: var(--md-sys-color-on-surface-variant);">
+                    注意: センサーの利用にはブラウザからの許可が必要な場合があります。
+                </p>
             </div>
         </div>
 
@@ -262,7 +254,7 @@
             <md-filled-tonal-button id="confirmDeleteButton" value="delete">削除</md-filled-tonal-button>
         </div>
     </md-dialog>
-
+    
 
     <script type="module">
         // MWC Components, DOM Elements, etc.
@@ -369,7 +361,7 @@
             photoTakenId: null
         };
 
-        let allRecordedSessions = [];
+        let allRecordedSessions = []; 
 
         // Audio Variables
         let audioContext = null;
@@ -396,8 +388,8 @@
         let pedometer_last_accel_mag = 0;
         let pedometer_trending_up = false;
         let pedometer_last_step_time = 0;
-        const PEDOMETER_MAGNITUDE_HIGH_THRESHOLD = 11.5;
-        const PEDOMETER_MIN_TIME_BETWEEN_STEPS_MS = 280;
+        const PEDOMETER_MAGNITUDE_HIGH_THRESHOLD = 11.5; 
+        const PEDOMETER_MIN_TIME_BETWEEN_STEPS_MS = 280; 
 
 
         // --- Theme Switch Logic (same as before) ---
@@ -445,13 +437,13 @@
 
         const needsExplicitPermission = (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') ||
                                     (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') ||
-                                    (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ||
-                                    (navigator.geolocation);
+                                    (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || 
+                                    (navigator.geolocation); 
 
-        function updateRecordingButtonState() { /* ... (same as before) ... */
+        function updateRecordingButtonState() { /* ... (same as before) ... */ 
             if (!startRecordingIconButton) return;
             const permissionIconEl = sensorPermissionIconButton ? sensorPermissionIconButton.querySelector('md-icon') : null;
-
+            
             const allCorePermissionsGranted = motionPermissionGranted && orientationPermissionGranted && micPermissionGranted && cameraPermissionGranted && geolocationPermissionGranted;
             const canRunWithoutExplicitRequestAPI = !needsExplicitPermission && anySensorSupported;
 
@@ -464,14 +456,14 @@
                 sensorPermissionIconButton.disabled = true;
                 if (permissionIconEl) permissionIconEl.textContent = (allCorePermissionsGranted || anySensorSupported || canRunWithoutExplicitRequestAPI) ? 'lock_open' : 'lock';
             }
-
-            const essentialSensorsReady = sensorsInitialized &&
+            
+            const essentialSensorsReady = sensorsInitialized && 
                                           (anySensorSupported || motionPermissionGranted || orientationPermissionGranted || micPermissionGranted || geolocationPermissionGranted);
 
             startRecordingIconButton.disabled = !essentialSensorsReady || isRecording;
             stopRecordingIconButton.disabled = !essentialSensorsReady || !isRecording;
             downloadCSVIconButton.disabled = !essentialSensorsReady || isRecording || currentRecordingData.length === 0;
-            takePictureButton.disabled = !cameraPermissionGranted || !cameraStream;
+            takePictureButton.disabled = !cameraPermissionGranted || !cameraStream; 
 
             if (isRecording) {
                 recordingStatusEl.textContent = `記録中... (${currentRecordingData.length}件)`;
@@ -498,7 +490,7 @@
             }
         }
 
-        async function initializeSensors() { /* ... (same as before) ... */
+        async function initializeSensors() { /* ... (same as before) ... */ 
             if (sensorsInitialized) return;
 
             if (motionPermissionGranted || (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function')) {
@@ -510,9 +502,6 @@
                 accelStatusEl.textContent = '加速度センサー非対応'; accelStatusEl.classList.add('not-supported');
                 gyroStatusEl.textContent = 'ジャイロスコープ非対応'; gyroStatusEl.classList.add('not-supported');
                 pedometerStatusEl.textContent = '加速度センサー非対応'; pedometerStatusEl.classList.add('not-supported');
-            } else { // Needs permission
-                 accelStatusEl.textContent = "アイコンから許可"; gyroStatusEl.textContent = "アイコンから許可";
-                 pedometerStatusEl.textContent = "アイコンから許可";
             }
 
             if (orientationPermissionGranted || (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function')) {
@@ -521,20 +510,18 @@
                 if(!orientationPermissionGranted) orientationPermissionGranted = true;
             } else if(!window.DeviceOrientationEvent) {
                 orientStatusEl.textContent = '向きセンサー非対応'; orientStatusEl.classList.add('not-supported');
-            } else { // Needs permission
-                 orientStatusEl.textContent = "アイコンから許可";
             }
 
             initializeLightSensor();
             initializeMicrophone();
             initializeCamera();
-            initializeGeolocation();
+            initializeGeolocation(); 
 
             sensorsInitialized = true;
             updateRecordingButtonState();
         }
 
-        async function requestAllPermissions() { /* ... (same as before) ... */
+        async function requestAllPermissions() { /* ... (same as before) ... */ 
             const promises = [];
             if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function' && !motionPermissionGranted) {
                 promises.push(
@@ -554,22 +541,22 @@
             }
 
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                // Initialize Mic & Camera will handle prompting if not granted
                 if (!micPermissionGranted) promises.push(initializeMicrophone(true));
                 if (!cameraPermissionGranted) promises.push(initializeCamera(true));
             }
-
+            
             if (navigator.geolocation && !geolocationPermissionGranted) {
-                 // Initialize Geolocation will handle prompting if not granted
-                promises.push(initializeGeolocation(true));
+                promises.push(new Promise((resolve) => { 
+                    initializeGeolocation(true).finally(resolve);
+                }));
             }
 
             if (promises.length > 0) {
                 await Promise.allSettled(promises);
             }
-            initializeSensors(); // Re-run initialization to start listeners for newly granted sensors
+            initializeSensors();
         }
-
+        
         if (needsExplicitPermission) {
             if (sensorPermissionIconButton) {
                 sensorPermissionIconButton.addEventListener('click', requestAllPermissions);
@@ -579,16 +566,16 @@
              cameraStatusEl.textContent = "アイコンから許可"; geoStatusEl.textContent = "アイコンから許可";
              pedometerStatusEl.textContent = "アイコンから許可";
              geoAddressStatusEl.textContent = "GPS許可後";
-        } else {
+        } else { 
             if(sensorPermissionIconButton) sensorPermissionIconButton.style.display = 'none';
             motionPermissionGranted = !!window.DeviceMotionEvent;
             orientationPermissionGranted = !!window.DeviceOrientationEvent;
-            initializeSensors(); // Initialize directly if no explicit permission needed or already granted
+            initializeSensors();
         }
 
 
         // --- Sensor Event Handlers (motion, orientation, light, mic, camera same as before) ---
-        function handleMotionEvent(event) { /* ... (same as before) ... */
+        function handleMotionEvent(event) { /* ... (same as before) ... */ 
             if (!motionPermissionGranted && !(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission !== 'function')) return;
             anySensorSupported = true;
             let currentAccelX = null, currentAccelY = null, currentAccelZ = null;
@@ -596,7 +583,7 @@
             if (event.accelerationIncludingGravity) {
                 const { x, y, z } = event.accelerationIncludingGravity;
                 currentSensorValues.accelX = x; currentSensorValues.accelY = y; currentSensorValues.accelZ = z;
-                currentAccelX = x; currentAccelY = y; currentAccelZ = z;
+                currentAccelX = x; currentAccelY = y; currentAccelZ = z; 
                 accelXEl.textContent = x ? x.toFixed(2) : '-'; accelYEl.textContent = y ? y.toFixed(2) : '-'; accelZEl.textContent = z ? z.toFixed(2) : '-';
                 requestAnimationFrame(() => {
                     accelBarX.style.height = `${Math.min(100, (Math.abs(x || 0) / BAR_MAX_ACCEL) * 100)}%`;
@@ -609,19 +596,18 @@
                 const { alpha, beta, gamma } = event.rotationRate;
                 currentSensorValues.gyroAlpha = alpha; currentSensorValues.gyroBeta = beta; currentSensorValues.gyroGamma = gamma;
                 gyroAlphaEl.textContent = alpha ? alpha.toFixed(2) : '-'; gyroBetaEl.textContent = beta ? beta.toFixed(2) : '-'; gyroGammaEl.textContent = gamma ? gamma.toFixed(2) : '-';
-                 if (gyroStatusEl.textContent !== "監視中...") gyroStatusEl.textContent = "監視中...";
+                if (gyroStatusEl.textContent !== "監視中...") gyroStatusEl.textContent = "監視中...";
             }
-
 
             if (currentAccelX !== null && currentAccelY !== null && currentAccelZ !== null) {
                 const mag = Math.sqrt(currentAccelX**2 + currentAccelY**2 + currentAccelZ**2);
-                currentSensorValues.steps_interval = 0;
+                currentSensorValues.steps_interval = 0; 
 
                 if (isRecording) {
                     const now = Date.now();
-                    if (mag > pedometer_last_accel_mag) {
+                    if (mag > pedometer_last_accel_mag) { 
                         pedometer_trending_up = true;
-                    } else if (mag < pedometer_last_accel_mag && pedometer_trending_up) {
+                    } else if (mag < pedometer_last_accel_mag && pedometer_trending_up) { 
                         if (pedometer_last_accel_mag > PEDOMETER_MAGNITUDE_HIGH_THRESHOLD &&
                             (now - pedometer_last_step_time) > PEDOMETER_MIN_TIME_BETWEEN_STEPS_MS) {
                             currentSessionTotalSteps++;
@@ -637,9 +623,9 @@
             } else if (motionPermissionGranted && pedometerStatusEl.textContent === "監視中..." && !event.accelerationIncludingGravity) {
                  pedometerStatusEl.textContent = "加速度データなし";
             }
-             updateRecordingButtonState(); // Update button state based on sensor readiness
+            if (sensorsInitialized) updateRecordingButtonState();
         }
-        function handleOrientationEvent(event) { /* ... (same as before) ... */
+        function handleOrientationEvent(event) { /* ... (same as before) ... */ 
             if (!orientationPermissionGranted && !(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission !== 'function')) return;
             anySensorSupported = true;
             const { alpha, beta, gamma } = event;
@@ -647,31 +633,23 @@
             orientAlphaEl.textContent = alpha ? alpha.toFixed(1) : '-'; orientBetaEl.textContent = beta ? beta.toFixed(1) : '-'; orientGammaEl.textContent = gamma ? gamma.toFixed(1) : '-';
             if (beta !== null && gamma !== null && alpha !== null) {
                 requestAnimationFrame(() => {
-                     // Adjust orientation values for more intuitive cube rotation relative to screen
-                     // Beta: pitch (X-axis) -> maps to rotateX
-                     // Gamma: roll (Y-axis) -> maps to rotateY
-                     // Alpha: yaw (Z-axis) -> maps to rotateZ (compensating for coordinate system differences)
-                     const zRot = alpha !== null ? 360 - alpha : 0; // Adjust Z-axis rotation direction if needed
-                     const xRot = beta !== null ? beta : 0;
-                     const yRot = gamma !== null ? -gamma : 0; // Adjust Y-axis rotation direction if needed
-
-                    orientationCube.style.transform = `rotateX(${xRot.toFixed(1)}deg) rotateY(${yRot.toFixed(1)}deg) rotateZ(${zRot.toFixed(1)}deg)`;
+                    orientationCube.style.transform = `rotateX(${beta.toFixed(1)}deg) rotateY(${gamma.toFixed(1)}deg) rotateZ(${alpha.toFixed(1)}deg)`;
                 });
             }
             if (orientStatusEl.textContent !== "監視中...") orientStatusEl.textContent = "監視中...";
-            updateRecordingButtonState(); // Update button state based on sensor readiness
+            if (sensorsInitialized) updateRecordingButtonState();
         }
-        function initializeLightSensor() { /* ... (same as before) ... */
+        function initializeLightSensor() { /* ... (same as before) ... */ 
             if (!('AmbientLightSensor' in window)) {
                 lightStatusEl.textContent = '光センサー API 非対応'; lightStatusEl.classList.add('not-supported');
-                currentSensorValues.illuminance = null; updateRecordingButtonState(); return;
+                currentSensorValues.illuminance = null; if (sensorsInitialized) updateRecordingButtonState(); return;
             }
             lightStatusEl.textContent = "アクセス許可待機中...";
             const startSensor = () => {
                 try {
                     const sensor = new AmbientLightSensor({ frequency: 1 });
                     sensor.addEventListener('reading', () => {
-                        anySensorSupported = true;
+                        anySensorSupported = true; 
                         const illuminance = sensor.illuminance;
                         currentSensorValues.illuminance = illuminance;
                         lightValueEl.textContent = illuminance ? illuminance.toFixed(0) : '-';
@@ -680,18 +658,18 @@
                         else if (illuminance > 100) { lightIconSun.style.display = 'inline-block'; lightIconMoon.style.display = 'none'; }
                         else if (illuminance < 10) { lightIconSun.style.display = 'none'; lightIconMoon.style.display = 'inline-block'; }
                         else { lightIconSun.style.display = 'none'; lightIconMoon.style.display = 'none'; }
-                        updateRecordingButtonState();
+                        if (sensorsInitialized) updateRecordingButtonState();
                     });
-                    sensor.addEventListener('error', event => {
+                    sensor.addEventListener('error', event => { 
                         console.error('Light sensor error:', event.error.name, event.error.message);
                         lightStatusEl.textContent = `光センサーエラー: ${event.error.name}`; lightStatusEl.classList.add('error');
-                        currentSensorValues.illuminance = null; updateRecordingButtonState();
+                        currentSensorValues.illuminance = null; if (sensorsInitialized) updateRecordingButtonState();
                     });
                     sensor.start();
                 } catch (error) {
                     console.error('Failed to start light sensor:', error);
                     lightStatusEl.textContent = `光センサー開始失敗: ${error.name}`; lightStatusEl.classList.add('error');
-                    currentSensorValues.illuminance = null; updateRecordingButtonState();
+                    currentSensorValues.illuminance = null; if (sensorsInitialized) updateRecordingButtonState();
                 }
             };
             if (navigator.permissions && navigator.permissions.query) {
@@ -700,13 +678,13 @@
                         if (permissionStatus.state === 'granted') startSensor();
                         else if (permissionStatus.state === 'prompt') lightStatusEl.textContent = '光センサー: ブラウザが許可を求めています。';
                         else { lightStatusEl.textContent = '光センサーアクセス拒否'; lightStatusEl.classList.add('error'); }
-                        permissionStatus.onchange = () => { if (permissionStatus.state === 'granted') startSensor(); else if (permissionStatus.state !== 'prompt') { lightStatusEl.textContent = '光センサーアクセス拒否'; lightStatusEl.classList.add('error');} updateRecordingButtonState(); };
-                        if (permissionStatus.state !== 'granted') updateRecordingButtonState();
+                        permissionStatus.onchange = () => { if (permissionStatus.state === 'granted') startSensor(); else if (permissionStatus.state !== 'prompt') { lightStatusEl.textContent = '光センサーアクセス拒否'; lightStatusEl.classList.add('error');} if (sensorsInitialized) updateRecordingButtonState(); };
+                        if (sensorsInitialized && permissionStatus.state !== 'granted') updateRecordingButtonState();
                     })
                     .catch(e => { console.warn("Ambient Light Sensor permission query failed, attempting to start directly.", e); startSensor(); });
             } else { startSensor(); }
         }
-        async function initializeMicrophone(forcePermissionRequest = false) { /* ... (same as before) ... */
+        async function initializeMicrophone(forcePermissionRequest = false) { /* ... (same as before) ... */ 
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 micStatusEl.textContent = 'マイク API 非対応'; micStatusEl.classList.add('not-supported');
                 micPermissionGranted = false; updateRecordingButtonState(); return Promise.resolve();
@@ -719,11 +697,11 @@
                 micPermissionGranted = true; anySensorSupported = true;
                 micStatusEl.textContent = "監視中..."; micStatusEl.classList.remove('error', 'not-supported');
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
+                
                 if (audioContext.state === 'suspended') {
                     await audioContext.resume().catch(e => console.error("[Mic] Error resuming AudioContext on init:", e));
                 }
-
+                
                 analyserNode = audioContext.createAnalyser();
                 const source = audioContext.createMediaStreamSource(microphoneStream);
                 source.connect(analyserNode);
@@ -732,44 +710,28 @@
                 const dataArray = new Uint8Array(bufferLength);
 
                 function getDecibels() {
-                    if (!micPermissionGranted || !analyserNode || !audioContext || audioContext.state === 'closed') { // Check closed state too
+                    if (!micPermissionGranted || !analyserNode || !audioContext) {
                         currentSensorValues.decibels = null; micDbfsEl.textContent = "-"; micLevelBar.style.width = `0%`; return;
                     }
                     if (audioContext.state === 'suspended') {
                         audioContext.resume().then(() => { if (audioContext.state === 'running') requestAnimationFrame(getDecibels); })
                                        .catch(e => console.error("[Mic] Error resuming AudioContext in getDecibels:", e));
-                        return;
+                        return; 
                     }
-
+                    
                     analyserNode.getByteFrequencyData(dataArray);
                     let sum = 0;
                     for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
                     let average = sum / bufferLength;
-                    // Convert average (0-255) to a pseudo dBFS scale (-60 to 0 or slightly above)
-                    // This is a simplification; true dBFS requires RMS calculation.
-                    // Using a logarithmic scale approximation might be better, but this linear one matches the bar.
-                    // Let's map 0-255 to roughly -60dB to 0dB or higher if clipping.
-                    let pseudoDbFs;
-                    if (average === 0) {
-                         pseudoDbFs = -Infinity;
-                    } else {
-                        // A simple power-law approximation or look-up table would be more accurate.
-                        // Let's use a log scale mapping roughly: 1 -> -40dB, 10 -> -20dB, 100 -> 0dB
-                        // This is still not accurate dBFS but better than linear for perception.
-                         const normalized = average / 255.0; // Normalize 0-1
-                         pseudoDbFs = 20 * Math.log10(normalized); // dB relative to max (approx 0 dBFS)
-                         pseudoDbFs = Math.max(-60, pseudoDbFs); // Clamp minimum displayed dBFS
-                    }
-
+                    let pseudoDbFs = (average / 128.0) * 60.0 - 60.0;
+                    if (average < 1) pseudoDbFs = -Infinity;
 
                     currentSensorValues.decibels = pseudoDbFs;
                     micDbfsEl.textContent = isFinite(pseudoDbFs) ? pseudoDbFs.toFixed(1) : '-∞';
-
-                     // Bar level based on the 0-255 average, but map it visually
-                    let levelPercent = Math.min(100, Math.max(0, (average / 150) * 100)); // Map 0-150 to 0-100% for bar
+                    
+                    let levelPercent = Math.min(100, Math.max(0, (average / 100) * 100));
                     micLevelBar.style.width = `${levelPercent}%`;
-                    micLevelBar.style.backgroundColor = (isFinite(pseudoDbFs) && pseudoDbFs > -20) ? 'var(--md-sys-color-error)' : ((isFinite(pseudoDbFs) && pseudoDbFs > -40) ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-secondary-container)');
-
+                    micLevelBar.style.backgroundColor = (isFinite(pseudoDbFs) && pseudoDbFs > -50) ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-secondary-container)';
 
                     if (audioContext.state === 'running') requestAnimationFrame(getDecibels);
                 }
@@ -778,43 +740,21 @@
                 return Promise.resolve();
             } catch (err) {
                 console.error("[Mic] Microphone access error:", err);
-                 // Check if the error is a permission denied error specifically
-                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                   micStatusEl.textContent = 'マイクアクセス拒否';
-                } else {
-                   micStatusEl.textContent = `マイクエラー: ${err.name}`;
-                }
-                micStatusEl.classList.add('error');
+                micStatusEl.textContent = `マイクエラー: ${err.name}`; micStatusEl.classList.add('error');
                 micPermissionGranted = false; updateRecordingButtonState(); return Promise.reject(err);
             }
         }
-        async function initializeCamera(forcePermissionRequest = false) { /* ... (same as before) ... */
+        async function initializeCamera(forcePermissionRequest = false) { /* ... (same as before) ... */ 
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 cameraStatusEl.textContent = 'カメラ API 非対応'; cameraStatusEl.classList.add('not-supported');
                 cameraPermissionGranted = false; updateRecordingButtonState(); return Promise.resolve();
             }
-            // If stream exists and no force request, return existing stream
-            if (cameraStream && !forcePermissionRequest) {
-                 cameraStatusEl.textContent = "カメラ準備完了。撮影できます。"; cameraStatusEl.classList.remove('error', 'not-supported');
-                 cameraPreview.srcObject = cameraStream;
-                 cameraPreview.style.display = 'block';
-                 updateRecordingButtonState();
-                 return Promise.resolve();
-            }
-             // Stop existing stream if forcing a new request
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => track.stop());
-                cameraStream = null;
-                cameraPreview.srcObject = null;
-                 cameraPreview.style.display = 'none';
-                 cameraPermissionGranted = false;
-            }
-
+            if (cameraStream && !forcePermissionRequest) return Promise.resolve();
 
             cameraStatusEl.textContent = "カメラアクセス許可待機中...";
             try {
                 cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-                cameraPermissionGranted = true; anySensorSupported = true;
+                cameraPermissionGranted = true; anySensorSupported = true; 
                 cameraStatusEl.textContent = "カメラ準備完了。撮影できます。"; cameraStatusEl.classList.remove('error', 'not-supported');
                 cameraPreview.srcObject = cameraStream;
                 cameraPreview.style.display = 'block';
@@ -822,42 +762,30 @@
                 return Promise.resolve();
             } catch (err) {
                 console.error("Camera access error:", err);
-                 // Check if the error is a permission denied error specifically
-                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                   cameraStatusEl.textContent = 'カメラアクセス拒否';
-                } else {
-                   cameraStatusEl.textContent = `カメラエラー: ${err.name}`;
-                }
-                cameraStatusEl.classList.add('error');
+                cameraStatusEl.textContent = `カメラエラー: ${err.name}`; cameraStatusEl.classList.add('error');
                 cameraPreview.style.display = 'none';
                 cameraPermissionGranted = false;
                 updateRecordingButtonState();
                 return Promise.reject(err);
             }
         }
-        takePictureButton.addEventListener('click', () => { /* ... (same as before) ... */
+        takePictureButton.addEventListener('click', () => { /* ... (same as before) ... */ 
             if (!cameraStream || !cameraPermissionGranted) {
                 alert("カメラが利用できません。"); return;
             }
             const videoTracks = cameraStream.getVideoTracks();
-            if (videoTracks.length === 0 || !videoTracks[0].enabled) {
-                 alert("有効なビデオトラックがありません。カメラがオフになっているか、エラーが発生しています。");
-                 console.error("No enabled video tracks found.");
-                 return;
-            }
+            if (videoTracks.length === 0) { alert("有効なビデオトラックがありません。"); return; }
             const trackSettings = videoTracks[0].getSettings();
-            // Ensure canvas dimensions match video feed for correct aspect ratio
             photoCanvas.width = trackSettings.width || cameraPreview.videoWidth;
             photoCanvas.height = trackSettings.height || cameraPreview.videoHeight;
 
             const context = photoCanvas.getContext('2d');
-            // Draw the current frame from the video element
             context.drawImage(cameraPreview, 0, 0, photoCanvas.width, photoCanvas.height);
             const dataUrl = photoCanvas.toDataURL('image/jpeg', 0.8);
-
+            
             const photoTimestamp = Date.now();
             currentRecordingPhotos.push({ timestamp: photoTimestamp, dataUrl: dataUrl });
-
+            
             lastPhotoPreviewContainer.innerHTML = `<img src="${dataUrl}" alt="撮影した写真" style="max-width:100px; max-height:100px; border:1px solid var(--md-sys-color-outline); border-radius:4px;"> <p style="font-size:0.7em; color: var(--md-sys-color-secondary);">${new Date(photoTimestamp).toLocaleTimeString()}に撮影</p>`;
 
             if (isRecording) currentSensorValues.photoTakenId = photoTimestamp;
@@ -876,7 +804,7 @@
             const handlePosition = (position) => {
                 geolocationPermissionGranted = true; anySensorSupported = true;
                 geoStatusEl.textContent = "監視中..."; geoStatusEl.classList.remove('error', 'not-supported');
-
+                
                 const { latitude, longitude, accuracy, altitude, speed, heading } = position.coords;
                 currentSensorValues.latitude = latitude;
                 currentSensorValues.longitude = longitude;
@@ -891,14 +819,14 @@
                 geoAltEl.textContent = altitude !== null ? altitude.toFixed(1) : '-';
                 geoSpeedEl.textContent = speed !== null ? speed.toFixed(1) : '-';
                 geoHeadEl.textContent = heading !== null ? heading.toFixed(1) : '-';
-
+                
                 // Fetch reverse geocode and weather if new significant position
                 const now = Date.now();
                 const ScoordLatChanged = Math.abs(latitude - (lastFetchedAddressCoords.lat || 0)) > REVERSE_GEOCODE_MIN_COORD_CHANGE;
                 const ScoordLonChanged = Math.abs(longitude - (lastFetchedAddressCoords.lon || 0)) > REVERSE_GEOCODE_MIN_COORD_CHANGE;
 
                 if (latitude !== null && longitude !== null) {
-                    if ((ScoordLatChanged || ScoordLonChanged || currentSensorValues.address === null) && // Also refetch if address was previously null
+                    if ((ScoordLatChanged || ScoordLonChanged || !currentSensorValues.address) && 
                         (now - lastReverseGeocodeFetchTime > REVERSE_GEOCODE_INTERVAL_MS)) {
                         fetchReverseGeocode(latitude, longitude);
                         lastFetchedAddressCoords = { lat: latitude, lon: longitude };
@@ -916,57 +844,43 @@
                 else if (error.code === 2) message = 'GPS位置取得不能';
                 else if (error.code === 3) message = 'GPSタイムアウト';
                 geoStatusEl.textContent = message; geoStatusEl.classList.add('error');
-                 // Keep previous address/weather if available, just update status
                 geoAddressStatusEl.textContent = message;
                 geolocationPermissionGranted = false;
-                 // Do NOT clear lat/lon in currentSensorValues on error, keep last known good.
-                 // Only clear if it was null before the error.
-                 if(currentSensorValues.latitude === null) geoLatEl.textContent = '-';
-                 if(currentSensorValues.longitude === null) geoLonEl.textContent = '-';
-                 geoAccEl.textContent = '-';
-                 geoAltEl.textContent = '-';
-                 geoSpeedEl.textContent = '-';
-                 geoHeadEl.textContent = '-';
-
+                currentSensorValues.latitude = null; /* reset other geo values */
+                currentSensorValues.longitude = null;
+                currentSensorValues.address = null;
+                geoAddressEl.textContent = "-";
                 updateRecordingButtonState();
             };
 
             if (forcePermissionRequest || !geolocationPermissionGranted) {
-                 // Request permission via getCurrentPosition first as it often triggers the OS prompt
-                 geoStatusEl.textContent = "GPSアクセス許可待機中...";
-                 geoAddressStatusEl.textContent = "GPSアクセス許可待機中...";
-                 return new Promise((resolve, reject) => {
-                     navigator.geolocation.getCurrentPosition(
-                         (position) => {
-                             // Got permission, now start watching
-                             handlePosition(position);
-                             if (geoWatchId) navigator.geolocation.clearWatch(geoWatchId); // Clear any old watches
-                             geoWatchId = navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-                             resolve();
-                         },
-                         (error) => {
-                             // Permission denied or other error
-                             handleError(error);
-                             reject(error);
-                         },
-                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } // Use longer timeout for initial get
-                     );
-                 });
+                geoStatusEl.textContent = "GPSアクセス許可待機中...";
+                geoAddressStatusEl.textContent = "GPSアクセス許可待機中...";
+                return new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => { 
+                            handlePosition(position);
+                            if (geoWatchId) navigator.geolocation.clearWatch(geoWatchId);
+                            geoWatchId = navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                            resolve();
+                        },
+                        (error) => { 
+                            handleError(error);
+                            reject(error); // Reject promise if initial permission fails
+                        },
+                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                    );
+                });
             } else if (geolocationPermissionGranted && !geoWatchId) {
-                 // Permission already granted, just start watching if not already
+                 if (geoWatchId) navigator.geolocation.clearWatch(geoWatchId);
                  geoWatchId = navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-                 // Also fetch current position immediately if watch takes time
-                 navigator.geolocation.getCurrentPosition(handlePosition, handleError, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
             }
-            return Promise.resolve(); // Return resolved promise if already watching
+            return Promise.resolve();
         }
-
 
         async function fetchReverseGeocode(latitude, longitude) {
             if (latitude === null || longitude === null) return;
             geoAddressStatusEl.textContent = "住所情報取得中...";
-            geoAddressEl.textContent = "-"; // Clear previous address while fetching
-            currentSensorValues.address = null;
             try {
                 const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=ja,en`;
                 console.log("Requesting RevGeo:", url);
@@ -1004,9 +918,9 @@
                 console.warn("[Weather] Invalid coordinates for weather fetch:", latitude, longitude);
                 return;
             }
-
+            
             weatherStatusEl.textContent = "天気情報取得中...";
-            const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}&current_weather=true`; // Fixed typo: ¤t_weather -> current_weather
+            const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}¤t_weather=true`;
             console.log("[Weather] Fetching weather from:", apiUrl);
 
             try {
@@ -1040,60 +954,28 @@
 
 
         // --- Recording Logic (startRecording updates, others same) ---
-        function recordCurrentData() { /* ... (same as before) ... */
+        function recordCurrentData() { /* ... (same as before) ... */ 
             if (!isRecording) return;
             const now = Date.now();
-            // Create a clean snapshot, not referencing the global mutable object directly
-            let dataToRecord = {
-                timestamp: now,
-                accelX: currentSensorValues.accelX,
-                accelY: currentSensorValues.accelY,
-                accelZ: currentSensorValues.accelZ,
-                orientAlpha: currentSensorValues.orientAlpha,
-                orientBeta: currentSensorValues.orientBeta,
-                orientGamma: currentSensorValues.orientGamma,
-                gyroAlpha: currentSensorValues.gyroAlpha,
-                gyroBeta: currentSensorValues.gyroBeta,
-                gyroGamma: currentSensorValues.gyroGamma,
-                illuminance: currentSensorValues.illuminance,
-                decibels: currentSensorValues.decibels,
-                latitude: currentSensorValues.latitude,
-                longitude: currentSensorValues.longitude,
-                gpsAccuracy: currentSensorValues.gpsAccuracy,
-                altitude: currentSensorValues.altitude,
-                speed: currentSensorValues.speed,
-                heading: currentSensorValues.heading,
-                 // Address is not typically recorded per interval, but temperature is
-                temperature_celsius: currentSensorValues.temperature_celsius,
-                steps_interval: currentSensorValues.steps_interval, // This resets after recording
-                photoTakenId: currentSensorValues.photoTakenId // This resets after recording
-            };
-
+            let dataToRecord = { ...currentSensorValues, timestamp: now };
             currentRecordingData.push(dataToRecord);
-
-            // Reset interval-specific values after recording them
-            currentSensorValues.photoTakenId = null;
-            currentSensorValues.steps_interval = 0;
-
-            if (currentRecordingData.length % 10 === 0) {
+            
+            currentSensorValues.photoTakenId = null; 
+            currentSensorValues.steps_interval = 0; 
+            if (currentRecordingData.length % 10 === 0) { 
                 recordingStatusEl.textContent = `記録中... (${currentRecordingData.length}件)`;
             }
         }
 
-        function startRecording() { /* ... (updated for address reset) ... */
+        function startRecording() { /* ... (updated for address reset) ... */ 
             if (!sensorsInitialized || (!anySensorSupported && !motionPermissionGranted && !orientationPermissionGranted && !micPermissionGranted && !geolocationPermissionGranted)) {
-                 // Check if the sensorPermissionIconButton is visible and enabled, suggesting permissions are needed
-                 if (sensorPermissionIconButton && !sensorPermissionIconButton.disabled) {
-                      alert("センサー利用の許可が必要です。左のアイコンをタップして許可してください。");
-                 } else {
-                     alert("利用可能なセンサーがないか、センサーの初期化に失敗しました。");
-                 }
+                alert("利用可能なセンサーがないか、センサーへのアクセスが許可されていません。");
                 return;
             }
             isRecording = true;
-            currentRecordingData = [];
-            currentRecordingPhotos = [];
-            lastPhotoPreviewContainer.innerHTML = "";
+            currentRecordingData = []; 
+            currentRecordingPhotos = []; 
+            lastPhotoPreviewContainer.innerHTML = ""; 
 
             currentSessionTotalSteps = 0;
             pedometerStepsEl.textContent = '0';
@@ -1102,47 +984,38 @@
             pedometer_last_step_time = 0;
 
             // Weather and address are fetched/updated by their respective mechanisms if GPS is available
-            // No need to explicitly reset currentSensorValues.address or temperature here,
+            // No need to explicitly reset currentSensorValues.address or temperature here, 
             // as they reflect the latest fetched values.
             lastWeatherFetchTime = 0; // Allow immediate weather fetch if GPS is good
             if (currentSensorValues.latitude !== null && currentSensorValues.longitude !== null) {
                 fetchWeatherData(currentSensorValues.latitude, currentSensorValues.longitude);
                 // Reverse geocode might also be triggered by handlePosition if conditions met
-            } else if(geolocationPermissionGranted) {
-                 weatherStatusEl.textContent = "GPS位置情報取得後に更新";
-                 geoAddressStatusEl.textContent = "GPS位置情報取得後に更新";
-                 weatherTempEl.textContent = "-";
-                 geoAddressEl.textContent = "-";
             } else {
-                 weatherStatusEl.textContent = "GPSアクセスが必要です";
-                 geoAddressStatusEl.textContent = "GPSアクセスが必要です";
-                 weatherTempEl.textContent = "-";
-                 geoAddressEl.textContent = "-";
+                 weatherStatusEl.textContent = geolocationPermissionGranted ? "GPS位置情報取得後に更新" : "GPSアクセスが必要です";
+                 geoAddressStatusEl.textContent = geolocationPermissionGranted ? "GPS位置情報取得後に更新" : "GPSアクセスが必要です";
             }
-
 
             if (recordingIntervalId) clearInterval(recordingIntervalId);
             recordingIntervalId = setInterval(recordCurrentData, RECORDING_INTERVAL_MS);
             updateRecordingButtonState();
-            // downloadCSVIconButton.disabled is handled by updateRecordingButtonState
+            downloadCSVIconButton.disabled = true; 
         }
 
-        function stopRecording() { /* ... (same as before) ... */
+        function stopRecording() { /* ... (same as before) ... */ 
             isRecording = false;
             if (recordingIntervalId) {
                 clearInterval(recordingIntervalId);
                 recordingIntervalId = null;
             }
-
+            
             if (currentRecordingData.length > 0) {
-                 // Filter out initial null/zero values if needed before saving, but probably better to keep raw data
                 const session = {
                     id: Date.now(),
                     startTime: currentRecordingData[0].timestamp,
                     endTime: currentRecordingData[currentRecordingData.length - 1].timestamp,
-                    data: [...currentRecordingData], // Store a copy
-                    photos: [...currentRecordingPhotos], // Store a copy
-                    totalSteps: currentSessionTotalSteps
+                    data: [...currentRecordingData],
+                    photos: [...currentRecordingPhotos],
+                    totalSteps: currentSessionTotalSteps 
                 };
                 allRecordedSessions.push(session);
                 saveHistoryToLocalStorage();
@@ -1152,8 +1025,8 @@
             }
             updateRecordingButtonState();
         }
-
-        function downloadCSV(dataToExport, filenamePrefix = "sensor_data_current") { /* ... (same as before) ... */
+        
+        function downloadCSV(dataToExport, filenamePrefix = "sensor_data_current") { /* ... (same as before) ... */ 
             if (!dataToExport || dataToExport.length === 0) {
                 alert("記録データがありません。");
                 return;
@@ -1161,9 +1034,6 @@
             // CSV Header now includes temperature and steps_in_interval. Address is not included in CSV.
             const header = "timestamp,accelX,accelY,accelZ,orientAlpha,orientBeta,orientGamma,gyroAlpha,gyroBeta,gyroGamma,illuminance,decibels,latitude,longitude,gpsAccuracy,altitude,speed,heading,temperature_celsius,steps_in_interval,photoTakenId";
             const rows = dataToExport.map(row => {
-                // Ensure photoTakenId is only included if it was actually set for that timestamp interval
-                 const photoId = row.photoTakenId ? row.photoTakenId : ''; // Output empty string if null/undefined
-
                 return [
                     row.timestamp,
                     row.accelX !== null ? row.accelX.toFixed(3) : '',
@@ -1184,8 +1054,8 @@
                     row.speed !== null ? row.speed.toFixed(2) : '',
                     row.heading !== null ? row.heading.toFixed(1) : '',
                     row.temperature_celsius !== null ? row.temperature_celsius.toFixed(1) : '',
-                    row.steps_interval !== null ? row.steps_interval : '0', // Ensure 0 if null
-                    photoId
+                    row.steps_interval !== null ? row.steps_interval : '0',
+                    row.photoTakenId || ''
                 ].join(',');
             });
 
@@ -1213,54 +1083,32 @@
         // --- History Logic (same as before for save/load/delete, display updated) ---
         const HISTORY_STORAGE_KEY = 'sensorDemoProHistory_v2';
 
-        function saveHistoryToLocalStorage() { /* ... (same as before) ... */
+        function saveHistoryToLocalStorage() { /* ... (same as before) ... */ 
             try {
-                 // Only save essential data to avoid bloating storage with Data URLs if not needed on history page
-                 const simplifiedSessions = allRecordedSessions.map(session => ({
-                      id: session.id,
-                      startTime: session.startTime,
-                      endTime: session.endTime,
-                      data: session.data, // Keep sensor data
-                      photos: session.photos.map(photo => ({ // Keep photo data URLs
-                           timestamp: photo.timestamp,
-                           dataUrl: photo.dataUrl
-                      })),
-                      totalSteps: session.totalSteps
-                 }));
-                localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(simplifiedSessions));
+                localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(allRecordedSessions));
             } catch (e) {
                 console.error("Error saving history to localStorage:", e);
-                // Check if error is due to QuotaExceededError
-                if (e.name === 'QuotaExceededError') {
-                     alert("履歴の保存に失敗しました。ストレージ容量が不足しています。古い履歴を削除してください。");
-                } else {
-                     alert("履歴の保存に失敗しました。");
-                }
+                alert("履歴の保存に失敗しました。ストレージ容量が不足している可能性があります。");
             }
         }
-        function loadHistoryFromLocalStorage() { /* ... (same as before) ... */
+        function loadHistoryFromLocalStorage() { /* ... (same as before) ... */ 
             const storedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
             if (storedHistory) {
                 try {
                     allRecordedSessions = JSON.parse(storedHistory);
-                    // Ensure photos array exists and totalSteps exists for older data
                     allRecordedSessions.forEach(session => {
-                        if (!session.photos) session.photos = [];
                         if (typeof session.totalSteps === 'undefined') session.totalSteps = 0;
-                         // Ensure data array exists
-                        if (!session.data) session.data = [];
                     });
                 } catch (e) {
                     console.error("Error parsing history from localStorage:", e);
-                    allRecordedSessions = []; // Clear history on parse error
-                     alert("履歴データの読み込みに失敗しました。履歴をクリアします。"); // Notify user
+                    allRecordedSessions = [];
                 }
             } else {
                 allRecordedSessions = [];
             }
         }
 
-        function displayHistoryList() { /* ... (updated to show first recorded temperature if available) ... */
+        function displayHistoryList() { /* ... (updated to show first recorded temperature if available) ... */ 
             historyListContainer.innerHTML = '';
             historyDetailView.style.display = 'none';
             historyListContainer.style.display = 'block';
@@ -1274,110 +1122,95 @@
             allRecordedSessions.forEach(session => {
                 const sessionCard = document.createElement('md-elevated-card');
                 sessionCard.style.marginBottom = '12px';
-                 // Add a class for styling the card itself in history
-                 sessionCard.classList.add('history-card');
                 const startTime = new Date(session.startTime);
                 const durationMs = session.endTime - session.startTime;
                 const durationSec = Math.floor(durationMs / 1000);
                 const durationMin = Math.floor(durationSec / 60);
                 const formattedStartTime = startTime.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-                // Find the first recorded temperature value that is not null
-                let firstTempEntry = session.data.find(d => d.temperature_celsius !== null && typeof d.temperature_celsius === 'number');
-                let tempString = firstTempEntry ? `${firstTempEntry.temperature_celsius.toFixed(1)}°C` : "記録なし";
+                let firstTemp = session.data.find(d => d.temperature_celsius !== null && typeof d.temperature_celsius === 'number');
+                let tempString = firstTemp ? `${firstTemp.temperature_celsius.toFixed(1)}°C` : "記録なし";
 
 
                 let content = `
                     <div style="padding: 16px;">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                            <h4 style="margin-top:0; margin-bottom: 8px; font-size: 1.1em; flex-grow: 1;">記録: ${formattedStartTime}</h4>
+                            <h4 style="margin-top:0; margin-bottom: 8px; font-size: 1.1em;">記録: ${formattedStartTime}</h4>
                             <md-icon-button class="delete-session-button" data-session-id="${session.id}" aria-label="この記録を削除">
                                 <md-icon>delete</md-icon>
                             </md-icon-button>
                         </div>
                         <p style="font-size: 0.9em; margin: 4px 0;">
-                            <md-icon style="font-size: 1.1em; vertical-align: middle; margin-right: 4px;">timer</md-icon>
+                            <md-icon style="font-size: 1.1em; vertical-align: bottom;">timer</md-icon>
                             記録時間: ${durationMin}分 ${durationSec % 60}秒
                         </p>
                         <p style="font-size: 0.9em; margin: 4px 0;">
-                            <md-icon style="font-size: 1.1em; vertical-align: middle; margin-right: 4px;">list_alt</md-icon>
+                            <md-icon style="font-size: 1.1em; vertical-align: bottom;">list_alt</md-icon>
                             データ点数: ${session.data.length}件
                         </p>
                         <p style="font-size: 0.9em; margin: 4px 0;">
-                            <md-icon style="font-size: 1.1em; vertical-align: middle; margin-right: 4px;">photo_library</md-icon>
+                            <md-icon style="font-size: 1.1em; vertical-align: bottom;">photo_library</md-icon>
                             写真枚数: ${session.photos ? session.photos.length : 0}枚
                         </p>
                         <p style="font-size: 0.9em; margin: 4px 0;">
-                            <md-icon style="font-size: 1.1em; vertical-align: middle; margin-right: 4px;">directions_walk</md-icon>
+                            <md-icon style="font-size: 1.1em; vertical-align: bottom;">directions_walk</md-icon>
                             推定歩数: ${session.totalSteps || 0} 歩
                         </p>
                          <p style="font-size: 0.9em; margin: 4px 0;">
-                            <md-icon style="font-size: 1.1em; vertical-align: middle; margin-right: 4px;">thermostat</md-icon>
+                            <md-icon style="font-size: 1.1em; vertical-align: bottom;">thermostat</md-icon>
                             開始時気温 (目安): ${tempString}
                         </p>
                     </div>
                 `;
                 sessionCard.innerHTML = content;
                 sessionCard.addEventListener('click', (event) => {
-                     // Only navigate if click is not on the delete button
                     if (!event.target.closest('.delete-session-button')) displayHistoryDetail(session.id);
                 });
                 const deleteButton = sessionCard.querySelector('.delete-session-button');
                 deleteButton.addEventListener('click', (event) => {
-                    event.stopPropagation(); // Prevent card click event
+                    event.stopPropagation();
                     promptDeleteSession(session.id, formattedStartTime);
                 });
                 historyListContainer.appendChild(sessionCard);
             });
         }
 
-        function promptDeleteSession(sessionId, sessionStartTimeFormatted) { /* ... (same as before) ... */
+        function promptDeleteSession(sessionId, sessionStartTimeFormatted) { /* ... (same as before) ... */ 
             sessionIdToDelete = sessionId;
             deleteDialogSessionInfo.textContent = `記録日時: ${sessionStartTimeFormatted}`;
             deleteConfirmDialog.show();
         }
-        async function deleteSession(sessionId) { /* ... (same as before) ... */
+        async function deleteSession(sessionId) { /* ... (same as before) ... */ 
             allRecordedSessions = allRecordedSessions.filter(session => session.id !== sessionId);
             saveHistoryToLocalStorage();
-            displayHistoryList(); // Re-render the list
-             // If currently viewing the deleted session detail, go back to list view
-            if (historyDetailView.style.display === 'block' && sessionIdToDelete === sessionId) {
-                 historyDetailView.style.display = 'none';
-                 historyListContainer.style.display = 'block';
+            displayHistoryList();
+            if (historyDetailView.style.display === 'block' && !allRecordedSessions.some(s => s.id === sessionIdToDelete) ) {
+                displayHistoryList();
             }
-            sessionIdToDelete = null; // Reset delete state
+            sessionIdToDelete = null;
         }
-        confirmDeleteButton.addEventListener('click', () => { /* ... (same as before) ... */
-             // Dialog closes automatically when button with form="dialog" is clicked
-            if (sessionIdToDelete !== null) {
-                // Give dialog a moment to potentially close before deleting? No, just delete directly.
-                deleteSession(sessionIdToDelete);
-            }
-             // The closed event listener will handle resetting sessionIdToDelete
+        confirmDeleteButton.addEventListener('click', () => { /* ... (same as before) ... */ 
+            if (sessionIdToDelete !== null) deleteSession(sessionIdToDelete);
+            if (deleteConfirmDialog.close) deleteConfirmDialog.close('delete');
         });
-        deleteConfirmDialog.addEventListener('closed', (event) => { /* ... (same as before) ... */
-             // The deleteSession function already handles resetting sessionIdToDelete after deletion
-             // Only reset here if dialog was cancelled or closed in some other way without deleting
-            if (event.detail.action === 'cancel' || event.detail.action === 'close') {
+        deleteConfirmDialog.addEventListener('closed', (event) => { /* ... (same as before) ... */ 
+            if(event.detail.action !== 'delete' && event.detail.action !== 'cancel') { // md-dialog might return other values
+                sessionIdToDelete = null;
+            } else if (event.detail.action === 'cancel'){
                  sessionIdToDelete = null;
             }
-             // If action was 'delete', sessionIdToDelete is already handled by deleteSession
         });
 
-        function displayHistoryDetail(sessionId) { /* ... (same chart logic as before) ... */
+        function displayHistoryDetail(sessionId) { /* ... (same chart logic as before) ... */ 
             const session = allRecordedSessions.find(s => s.id === sessionId);
-            if (!session) {
-                console.error("Session not found:", sessionId);
-                displayHistoryList(); // Fallback to list if session not found
-                return;
-            }
+            if (!session) { displayHistoryList(); return; }
 
             historyListContainer.style.display = 'none';
             historyDetailView.style.display = 'block';
             const startTime = new Date(session.startTime);
             const formattedStartTime = startTime.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
             historyDetailTitle.textContent = `記録詳細: ${formattedStartTime} (歩数: ${session.totalSteps || 0}歩)`;
-
+            
             historyPhotosContainer.innerHTML = '';
             if (session.photos && session.photos.length > 0) {
                 session.photos.forEach(photo => {
@@ -1386,108 +1219,47 @@
                     img.alt = `Photo from ${new Date(photo.timestamp).toLocaleTimeString()}`;
                     img.style.maxWidth = '100px'; img.style.maxHeight = '100px';
                     img.style.borderRadius = '4px'; img.style.border = '1px solid var(--md-sys-color-outline)';
-                    // Optional: Add click handler to view full image
-                    img.style.cursor = 'pointer';
-                    img.onclick = () => { window.open(photo.dataUrl, '_blank'); };
                     historyPhotosContainer.appendChild(img);
                 });
             } else {
-                historyPhotosContainer.innerHTML = '<p style="font-size:0.9em; color:var(--md-sys-color-on-surface-variant);">この記録中に撮影された写真はありません。</p>';
+                historyPhotosContainer.innerHTML = '<p>この記録中に撮影された写真はありません。</p>';
             }
 
             exportHistoryCSVButton.onclick = () => downloadCSV(session.data, `sensor_data_history_${session.id}`);
-
+            
             if (historyChartInstance) historyChartInstance.destroy();
-             // Ensure canvas exists and is in the DOM
-            if (!historyChartCanvas) {
-                console.error("History chart canvas element not found!");
-                return;
-            }
             const ctx = historyChartCanvas.getContext('2d');
-             if (!ctx) {
-                console.error("Could not get 2D context for history chart canvas!");
-                return;
-            }
-
-            // Filter data to include only rows with actual sensor readings
-            const dataPointsWithReadings = session.data.filter(d =>
-                 d.accelX !== null || d.accelY !== null || d.accelZ !== null ||
-                 d.orientAlpha !== null || d.orientBeta !== null || d.orientGamma !== null ||
-                 d.gyroAlpha !== null || d.gyroBeta !== null || d.gyroGamma !== null ||
-                 d.illuminance !== null || d.decibels !== null ||
-                 d.latitude !== null || d.longitude !== null || d.altitude !== null || d.speed !== null || d.heading !== null ||
-                 d.temperature_celsius !== null || d.steps_interval !== null || d.photoTakenId !== null
-            );
-
-            if (dataPointsWithReadings.length < 2) { // Chart needs at least 2 points to draw a line
-                 historyChartCanvas.style.display = 'none';
-                 // Display a message instead
-                 const noDataMessage = document.createElement('p');
-                 noDataMessage.textContent = "グラフ表示に必要なセンサーデータが不足しています。";
-                 noDataMessage.style.textAlign = 'center';
-                 noDataMessage.style.color = 'var(--md-sys-color-on-surface-variant)';
-                 historyChartCanvas.parentNode.insertBefore(noDataMessage, historyChartCanvas);
-                 return;
-            } else {
-                 historyChartCanvas.style.display = 'block'; // Ensure canvas is visible if data exists
-                 // Remove any previous "no data" message
-                 const previousMessage = historyChartCanvas.previousElementSibling;
-                 if(previousMessage && previousMessage.textContent.includes("グラフ表示に必要なセンサーデータ")) {
-                     previousMessage.remove();
-                 }
-            }
-
-
-            const labels = dataPointsWithReadings.map(d => new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 1 }));
-
+            const labels = session.data.map(d => new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 1 }));
+            
             const datasets = [];
-            // Add datasets only if there's at least one non-null value for that sensor type in the filtered data
-            if (dataPointsWithReadings.some(d => d.accelX !== null)) datasets.push({ label: 'Accel X', data: dataPointsWithReadings.map(d => d.accelX), borderColor: 'red', fill: false, tension: 0.1, hidden: true });
-            if (dataPointsWithReadings.some(d => d.accelY !== null)) datasets.push({ label: 'Accel Y', data: dataPointsWithReadings.map(d => d.accelY), borderColor: 'green', fill: false, tension: 0.1, hidden: true });
-            if (dataPointsWithReadings.some(d => d.accelZ !== null)) datasets.push({ label: 'Accel Z', data: dataPointsWithReadings.map(d => d.accelZ), borderColor: 'blue', fill: false, tension: 0.1 });
-            if (dataPointsWithReadings.some(d => d.gyroAlpha !== null)) datasets.push({ label: 'Gyro Alpha (Z)', data: dataPointsWithReadings.map(d => d.gyroAlpha), borderColor: 'purple', fill: false, tension: 0.1, hidden: true });
-             if (dataPointsWithReadings.some(d => d.gyroBeta !== null)) datasets.push({ label: 'Gyro Beta (X)', data: dataPointsWithReadings.map(d => d.gyroBeta), borderColor: 'orange', fill: false, tension: 0.1, hidden: true });
-            if (dataPointsWithReadings.some(d => d.gyroGamma !== null)) datasets.push({ label: 'Gyro Gamma (Y)', data: dataPointsWithReadings.map(d => d.gyroGamma), borderColor: 'cyan', fill: false, tension: 0.1, hidden: true });
-            if (dataPointsWithReadings.some(d => d.illuminance !== null)) datasets.push({ label: 'Illuminance (lux)', data: dataPointsWithReadings.map(d => d.illuminance), borderColor: 'teal', fill: false, tension: 0.1, yAxisID: 'yLux', hidden: true });
-            if (dataPointsWithReadings.some(d => d.decibels !== null && isFinite(d.decibels))) datasets.push({ label: 'Decibels (dBFS)', data: dataPointsWithReadings.map(d => isFinite(d.decibels) ? d.decibels : null), borderColor: 'magenta', fill: false, tension: 0.1, yAxisID: 'yDb', hidden: false });
-             if (dataPointsWithReadings.some(d => d.latitude !== null)) datasets.push({ label: 'Latitude', data: dataPointsWithReadings.map(d => d.latitude), borderColor: 'darkgreen', fill: false, tension: 0.1, yAxisID: 'yGeo', hidden: true });
-             if (dataPointsWithReadings.some(d => d.longitude !== null)) datasets.push({ label: 'Longitude', data: dataPointsWithReadings.map(d => d.longitude), borderColor: 'darkblue', fill: false, tension: 0.1, yAxisID: 'yGeo', hidden: true });
-             if (dataPointsWithReadings.some(d => d.gpsAccuracy !== null)) datasets.push({ label: 'GPS Accuracy (m)', data: dataPointsWithReadings.map(d => d.gpsAccuracy), borderColor: 'grey', fill: false, tension: 0.1, yAxisID: 'yAcc', hidden: true }); // Use different axis for accuracy
-            if (dataPointsWithReadings.some(d => d.altitude !== null)) datasets.push({ label: 'Altitude (m)', data: dataPointsWithReadings.map(d => d.altitude), borderColor: 'brown', fill: false, tension: 0.1, yAxisID: 'yAlt', hidden: false });
-             if (dataPointsWithReadings.some(d => d.speed !== null)) datasets.push({ label: 'Speed (m/s)', data: dataPointsWithReadings.map(d => d.speed), borderColor: 'navy', fill: false, tension: 0.1, yAxisID: 'ySpeed', hidden: true });
-             if (dataPointsWithReadings.some(d => d.heading !== null)) datasets.push({ label: 'Heading (°)', data: dataPointsWithReadings.map(d => d.heading), borderColor: 'olive', fill: false, tension: 0.1, yAxisID: 'yHeading', hidden: true });
-            if (dataPointsWithReadings.some(d => d.temperature_celsius !== null)) datasets.push({ label: 'Temperature (°C)', data: dataPointsWithReadings.map(d => d.temperature_celsius), borderColor: 'coral', fill: false, tension: 0.1, yAxisID: 'yTemp', hidden: false });
-            if (dataPointsWithReadings.some(d => d.steps_interval > 0)) datasets.push({ label: 'Steps (Interval)', data: dataPointsWithReadings.map(d => d.steps_interval), borderColor: 'lime', fill: false, stepped: true, tension: 0, yAxisID: 'ySteps', hidden: true, pointRadius: 0 }); // Stepped line for events
-
-            const axes = {
-                x: { title: { display: true, text: 'Time' } },
-                y: { title: { display: true, text: 'Motion/Orientation (°/s, m/s², °)' } }, // Default Y axis
-            };
-
-            // Add Y-axes only if corresponding data exists
-            if (datasets.some(d => d.yAxisID === 'yLux')) axes.yLux = { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Lux'}, grid: { drawOnChartArea: false, } };
-            if (datasets.some(d => d.yAxisID === 'yDb')) axes.yDb = { type: 'linear', display: true, position: 'right', title: {display: true, text: 'dBFS'}, grid: { drawOnChartArea: false, } };
-            if (datasets.some(d => d.yAxisID === 'yAlt')) axes.yAlt = { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Altitude (m)'}, grid: { drawOnChartArea: false, } };
-            if (datasets.some(d => d.yAxisID === 'yTemp')) axes.yTemp = { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Temp (°C)'}, grid: { drawOnChartArea: false, } };
-            if (datasets.some(d => d.yAxisID === 'yGeo')) axes.yGeo = { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Geo (Lat/Lon)'}, grid: { drawOnChartArea: false, } };
-             if (datasets.some(d => d.yAxisID === 'yAcc')) axes.yAcc = { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Accuracy (m)'}, grid: { drawOnChartArea: false, } };
-             if (datasets.some(d => d.yAxisID === 'ySpeed')) axes.ySpeed = { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Speed (m/s)'}, grid: { drawOnChartArea: false, } };
-             if (datasets.some(d => d.yAxisID === 'yHeading')) axes.yHeading = { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Heading (°)'}, grid: { drawOnChartArea: false, } };
-             if (datasets.some(d => d.yAxisID === 'ySteps')) axes.ySteps = { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Steps (Interval)'}, beginAtZero: true, grid: { drawOnChartArea: false, }, ticks: { stepSize: 1 } };
-
+            if (session.data.some(d => d.accelX !== null)) datasets.push({ label: 'Accel X', data: session.data.map(d => d.accelX), borderColor: 'red', fill: false, tension: 0.1, hidden: true });
+            if (session.data.some(d => d.accelY !== null)) datasets.push({ label: 'Accel Y', data: session.data.map(d => d.accelY), borderColor: 'green', fill: false, tension: 0.1, hidden: true });
+            if (session.data.some(d => d.accelZ !== null)) datasets.push({ label: 'Accel Z', data: session.data.map(d => d.accelZ), borderColor: 'blue', fill: false, tension: 0.1 }); 
+            if (session.data.some(d => d.gyroAlpha !== null)) datasets.push({ label: 'Gyro Alpha', data: session.data.map(d => d.gyroAlpha), borderColor: 'purple', fill: false, tension: 0.1, hidden: true });
+            if (session.data.some(d => d.orientBeta !== null)) datasets.push({ label: 'Orient Beta (X)', data: session.data.map(d => d.orientBeta), borderColor: 'orange', fill: false, tension: 0.1, hidden: true });
+            if (session.data.some(d => d.illuminance !== null)) datasets.push({ label: 'Illuminance (lux)', data: session.data.map(d => d.illuminance), borderColor: 'teal', fill: false, tension: 0.1, yAxisID: 'yLux', hidden: true });
+            if (session.data.some(d => d.decibels !== null && isFinite(d.decibels))) datasets.push({ label: 'Decibels (dBFS)', data: session.data.map(d => isFinite(d.decibels) ? d.decibels : null), borderColor: 'magenta', fill: false, tension: 0.1, yAxisID: 'yDb', hidden: false });
+            if (session.data.some(d => d.altitude !== null)) datasets.push({ label: 'Altitude (m)', data: session.data.map(d => d.altitude), borderColor: 'brown', fill: false, tension: 0.1, yAxisID: 'yAlt', hidden: false });
+            if (session.data.some(d => d.temperature_celsius !== null)) datasets.push({ label: 'Temperature (°C)', data: session.data.map(d => d.temperature_celsius), borderColor: 'coral', fill: false, tension: 0.1, yAxisID: 'yTemp', hidden: false });
 
             historyChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: { labels: labels, datasets: datasets },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    scales: axes,
-                    plugins: { legend: { position: 'top' } },
-                     animation: false, // Disable animation for faster rendering
+                    scales: {
+                        x: { title: { display: true, text: 'Time' } },
+                        y: { title: { display: true, text: 'Sensor Values (m/s², °/s, °)' } },
+                        yLux: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Lux'}, grid: { drawOnChartArea: false, } },
+                        yDb: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'dBFS'}, grid: { drawOnChartArea: false, } },
+                        yAlt: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Altitude (m)'}, grid: { drawOnChartArea: false, } },
+                        yTemp: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Temp (°C)'}, grid: { drawOnChartArea: false, } }
+                    },
+                    plugins: { legend: { position: 'top' } }
                 }
             });
         }
-
+        
         backToHistoryListButton.addEventListener('click', displayHistoryList);
         function loadAndDisplayHistory() {
             loadHistoryFromLocalStorage();
@@ -1495,8 +1267,8 @@
         }
 
         // --- Initial Setup ---
-        loadHistoryFromLocalStorage();
-        updateRecordingButtonState();
+        loadHistoryFromLocalStorage(); 
+        updateRecordingButtonState(); 
         showPage('recordPage');
 
     </script>

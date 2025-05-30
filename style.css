@@ -28,11 +28,17 @@
     --md-sys-color-inverse-surface: #2F312E;
     --md-sys-color-inverse-on-surface: #F0F1EC;
     --md-sys-color-inverse-primary: #83D599; /* Light Green for Dark Theme Primary */
+    --md-sys-color-surface-container-lowest: #FFFFFF; /* Match image */
+    --md-sys-color-surface-container-low: #F7F9F3; /* Match image */
+    --md-sys-color-surface-container: #F1F3ED;
+    --md-sys-color-surface-container-high: #EBEFE9;
+    --md-sys-color-surface-container-highest: #E5E9E3;
 
     /* Custom properties */
     --app-font-family: 'Noto Sans JP', sans-serif;
     --app-bar-height: 56px;
     --nav-bar-height: 80px; /* For md-navigation-bar */
+    --card-gap: 12px; /* Gap between cards */
     --cube-size: 100px;
     --bar-max-height: 50px;
 }
@@ -63,6 +69,11 @@
     --md-sys-color-on-surface-variant: #C1C9BF;
     --md-sys-color-outline: #8B938A;
     --md-sys-color-outline-variant: #414941; /* Added for things like <hr> */
+    --md-sys-color-surface-container-lowest: #0F1411; /* Slightly darker than background */
+    --md-sys-color-surface-container-low: #1A1C1A; /* Match background */
+    --md-sys-color-surface-container: #1E201D;
+    --md-sys-color-surface-container-high: #282B26;
+    --md-sys-color-surface-container-highest: #333631;
 }
 
 body {
@@ -72,8 +83,8 @@ body {
     color: var(--md-sys-color-on-background);
     transition: background-color 0.3s ease, color 0.3s ease;
     overscroll-behavior-y: contain;
-    padding-top: var(--app-bar-height); 
-    padding-bottom: var(--nav-bar-height); 
+    padding-top: var(--app-bar-height);
+    padding-bottom: var(--nav-bar-height);
     box-sizing: border-box;
 }
 
@@ -81,12 +92,17 @@ body {
     width: 100%;
     height: calc(100vh - var(--app-bar-height) - var(--nav-bar-height));
     overflow-y: auto;
+    padding: 16px; /* Add padding to main content area */
+    box-sizing: border-box;
 }
 
 .page { display: none; }
 .page.active-page { display: block; }
 
-.app-container { padding: 16px; }
+/* Removed app-container padding as main-content now has it */
+.app-container {
+    /* No padding needed here */
+}
 
 .app-bar {
     position: fixed; top: 0; left: 0; right: 0;
@@ -101,91 +117,197 @@ body {
 .theme-switch-container { display: flex; align-items: center; }
 .theme-switch-container md-icon { color: var(--md-sys-color-on-surface-variant); }
 
-md-card {
-    margin-bottom: 16px;
-    background-color: var(--md-sys-color-surface);
-    --md-card-container-color: var(--md-sys-color-surface);
-    border-radius: 12px;
+/* Sensor Grid Layout */
+.sensor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* Responsive columns */
+    gap: var(--card-gap);
+}
+
+/* Style for md-card within the grid */
+.sensor-grid md-card {
+    margin: 0; /* Remove card margin as grid gap handles spacing */
+    border-radius: 20px; /* More rounded corners like image */
     overflow: hidden;
-}
-md-elevated-card {
-    --md-elevated-card-container-color: var(--md-sys-color-surface-container-low, var(--md-sys-color-surface));
+    /* Use different surface colors for cards like in image */
+    --md-card-container-color: var(--md-sys-color-surface-container-low);
+    box-shadow: none; /* Cards in image don't have shadow */
+    border: 1px solid transparent; /* Add subtle border */
 }
 
-.card-header { display: flex; align-items: center; padding: 16px; }
-.card-header md-icon { margin-right: 12px; color: var(--md-sys-color-primary); }
-.card-header h2 { margin: 0; font-size: 1rem; color: var(--md-sys-color-on-surface-variant); font-weight: 500; }
-
-.card-content { padding: 16px; padding-top: 0; }
-.sensor-value { font-size: 0.9rem; margin-bottom: 8px; color: var(--md-sys-color-on-surface-variant); }
-.sensor-value strong { color: var(--md-sys-color-on-surface); min-width: 80px; display: inline-block; font-weight: 500; }
-
-/* For Geolocation card, ensure strong tags align better, especially '場所' */
-#recordPage md-card:nth-of-type(5) .sensor-value strong { /* Adjust if Geolocation card order changes */
-    min-width: 95px; 
+/* Specific card spanning */
+.card-full-width {
+    grid-column: span 2; /* Span two columns in a 2-column layout */
 }
-#recordPage md-card:nth-of-type(5) #geo-address {
-    display: inline; /* Keep address on same line as strong tag if possible */
-    word-break: break-all; /* Allow long addresses to wrap */
+.card-half-width {
+    grid-column: span 1; /* Span one column */
+     /* Allow half-width cards to take full width on smaller screens */
+     @media (max-width: 400px) {
+        grid-column: span 2;
+     }
 }
 
 
-.status-text { font-size: 0.8rem; color: var(--md-sys-color-secondary); margin-top: 4px; margin-bottom: 4px; }
-/* Specific for geo-address-status to be less prominent initially */
+/* Recording Controls Bar styling within the grid */
+.recording-controls-bar {
+    background-color: var(--md-sys-color-surface-container-low); /* Match card background */
+    padding: 8px 16px;
+    margin: 0; /* Remove negative margin */
+    border-radius: 20px; /* Match card border radius */
+    border-bottom: none; /* Remove border bottom */
+    box-shadow: none; /* Remove shadow */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Card Content Styling */
+.card-header {
+     display: flex;
+     align-items: center;
+     padding: 12px 16px; /* Smaller padding */
+     padding-bottom: 0; /* No bottom padding in header */
+}
+.card-header md-icon {
+     margin-right: 8px; /* Smaller margin */
+     color: var(--md-sys-color-on-surface); /* Icon color - match text or primary? Image varies. Let's use on-surface. */
+     font-size: 24px; /* Icon size */
+}
+.card-header h2 {
+    margin: 0;
+    font-size: 0.9rem; /* Slightly smaller title */
+    color: var(--md-sys-color-on-surface); /* Title color */
+    font-weight: 500;
+    flex-grow: 1; /* Allow title to take space */
+}
+
+.card-content {
+    padding: 12px 16px; /* Smaller padding */
+    padding-top: 8px; /* Keep some top padding */
+}
+.sensor-values-group {
+    margin-bottom: 12px; /* Space below a group of values */
+}
+
+.sensor-value {
+    font-size: 0.9rem;
+    margin-bottom: 4px; /* Smaller margin between values */
+    color: var(--md-sys-color-on-surface-variant); /* Value text color */
+    display: flex; /* Use flex to align key/value */
+     align-items: baseline;
+}
+.sensor-value:last-child {
+    margin-bottom: 0; /* No bottom margin for last value in group */
+}
+.sensor-value strong {
+    color: var(--md-sys-color-on-surface);
+    min-width: 90px; /* Increase min-width for labels */
+    display: inline-block;
+    font-weight: 500;
+    margin-right: 4px; /* Space between strong and value */
+}
+
+/* Adjust min-width for specific labels if needed */
+#recordPage .sensor-grid md-card .card-content .sensor-value strong {
+     min-width: 90px; /* Default min-width for labels */
+}
+/* Geolocation card specific label width */
+#recordPage .sensor-grid md-card:nth-of-type(7) .card-content .sensor-value strong { /* Target the Geolocation card */
+     min-width: 60px; /* Geolocation labels are shorter */
+}
+/* Pedometer steps label */
+#pedometer-steps {
+    font-size: 1.2em; /* Make the step count larger */
+    font-weight: bold;
+    color: var(--md-sys-color-primary); /* Highlight step count */
+}
+#recordPage .sensor-grid md-card:nth-of-type(4) .card-content .sensor-value { /* Target Pedometer card's first value */
+    justify-content: center; /* Center the step count */
+    margin-bottom: 0;
+}
+
+
+.status-text {
+    font-size: 0.75rem; /* Smaller status text */
+    color: var(--md-sys-color-on-surface-variant); /* Status text color */
+    margin-top: 8px; /* Space above status */
+    margin-bottom: 0; /* No bottom margin */
+}
+/* Specific for geo-address-status */
 #geo-address-status {
-    margin-top: 0;
-    font-size: 0.75rem;
+    margin-top: 4px; /* Less margin above address status */
+    font-size: 0.7rem; /* Even smaller */
 }
+
 
 .error { color: var(--md-sys-color-error) !important; font-weight: 500; }
 .not-supported { color: var(--md-sys-color-outline) !important; }
 
 /* Sensor Visualizations */
-.cube-container { width: var(--cube-size); height: var(--cube-size); margin: 20px auto; perspective: 600px; }
+.cube-container { width: var(--cube-size); height: var(--cube-size); margin: 10px auto 20px auto; perspective: 600px; }
 .cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.1s linear; }
-.cube__face { position: absolute; width: var(--cube-size); height: var(--cube-size); border: 1px solid var(--md-sys-color-outline); background-color: color-mix(in srgb, var(--md-sys-color-primary-container) 70%, transparent); color: var(--md-sys-color-on-primary-container); font-size: calc(var(--cube-size) / 3); font-weight: bold; display: flex; justify-content: center; align-items: center; opacity: 0.9; }
+.cube__face { position: absolute; width: var(--cube-size); height: var(--cube-size); border: 1px solid var(--md-sys-color-outline-variant); background-color: color-mix(in srgb, var(--md-sys-color-primary-container) 70%, transparent); color: var(--md-sys-color-on-primary-container); font-size: calc(var(--cube-size) / 3); font-weight: bold; display: flex; justify-content: center; align-items: center; opacity: 0.9; }
 .cube__face--front  { transform: rotateY(  0deg) translateZ(calc(var(--cube-size) / 2)); }
 .cube__face--right  { transform: rotateY( 90deg) translateZ(calc(var(--cube-size) / 2)); }
 .cube__face--back   { transform: rotateY(180deg) translateZ(calc(var(--cube-size) / 2)); }
 .cube__face--left   { transform: rotateY(-90deg) translateZ(calc(var(--cube-size) / 2)); }
 .cube__face--top    { transform: rotateX( 90deg) translateZ(calc(var(--cube-size) / 2)); }
 .cube__face--bottom { transform: rotateX(-90deg) translateZ(calc(var(--cube-size) / 2)); }
-.bars-container { display: flex; justify-content: space-around; align-items: flex-end; height: var(--bar-max-height); margin-top: 10px; margin-bottom: 25px; }
-.bar { width: 25%; background-color: var(--md-sys-color-secondary-container); transition: height 0.1s ease-out; text-align: center; position: relative; border-radius: 4px 4px 0 0; }
+
+.bars-container { display: flex; justify-content: space-around; align-items: flex-end; height: var(--bar-max-height); margin-top: 10px; margin-bottom: 16px; /* Space below bars */ }
+.bar {
+    width: 25%;
+    background-color: var(--md-sys-color-secondary-container);
+    transition: height 0.1s ease-out;
+    text-align: center;
+    position: relative;
+    border-radius: 4px 4px 0 0;
+    /* Add colors based on value magnitude? */
+}
 .bar-label { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 0.8em; color: var(--md-sys-color-on-surface-variant); }
-.light-viz { text-align: center; margin-top: 10px; }
-.light-viz md-icon { font-size: 48px; transition: color 0.3s ease; }
-#light-icon-sun { color: #FFC107; }
+
+.light-viz { text-align: center; margin-top: 0; margin-bottom: 12px; /* Space below icon */ }
+.light-viz md-icon { font-size: 48px; transition: color 0.3s ease; color: var(--md-sys-color-on-surface-variant); /* Default icon color */ }
+#light-icon-sun { color: #FFC107; /* Keep specific colors for sun/moon */ }
 #light-icon-moon { color: #90A4AE; }
 
-/* Microphone Level Bar */
-.mic-level-bar-container { width: 100%; height: 10px; background-color: var(--md-sys-color-surface-variant); border-radius: 5px; overflow: hidden; margin-top: 8px; }
-.mic-level-bar { height: 100%; width: 0%; background-color: var(--md-sys-color-primary); border-radius: 5px; transition: width 0.1s linear, background-color 0.2s linear; }
 
-/* Recording Controls Bar */
-.recording-controls-bar {
-    background-color: var(--md-sys-color-surface-container-lowest, var(--md-sys-color-surface-variant));
-    padding: 8px 16px; margin: -16px -16px 16px -16px; 
-    border-bottom: 1px solid var(--md-sys-color-outline-variant, var(--md-sys-color-outline));
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
+/* Microphone Level Bar */
+.mic-level-bar-container { width: 100%; height: 8px; background-color: var(--md-sys-color-surface-variant); border-radius: 4px; overflow: hidden; margin-top: 8px; margin-bottom: 8px; /* Space below bar */ }
+.mic-level-bar { height: 100%; width: 0%; background-color: var(--md-sys-color-primary); border-radius: 4px; transition: width 0.1s linear, background-color 0.2s linear; }
+
+/* Camera Preview */
+#cameraPreview {
+    display: block; /* Ensure video preview is block */
+    width: 100%; max-width: 300px;
+    margin: 0 auto 10px auto; /* Center preview */
+    border-radius: 8px;
+    border: 1px solid var(--md-sys-color-outline-variant);
 }
-.recording-status-area { width: 100%; text-align: center; }
-.recording-controls-bar #recordingStatus { font-size: 0.8em; color: var(--md-sys-color-on-surface-variant); margin: 0; }
-.recording-buttons-area { display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 300px; }
-.recording-buttons-area md-icon-button {
-    --md-icon-button-icon-color: var(--md-sys-color-primary); 
-    --md-icon-button-disabled-icon-color: var(--md-sys-color-outline); 
-    --md-icon-button-hover-state-layer-color: var(--md-sys-color-primary);
-    --md-icon-button-focus-state-layer-color: var(--md-sys-color-primary);
-    --md-icon-button-pressed-state-layer-color: var(--md-sys-color-primary);
+#takePictureButton {
+    display: block; /* Make button block for better layout */
+    margin: 0 auto; /* Center button */
 }
-#sensorPermissionIconButton { --md-icon-button-icon-color: var(--md-sys-color-tertiary); }
+#lastPhotoPreviewContainer {
+    margin-top: 16px; /* Space above preview */
+    text-align: center; /* Center preview image and text */
+}
+#lastPhotoPreviewContainer img {
+     display: inline-block; /* Ensure image doesn't take full width */
+     vertical-align: top; /* Align image with text */
+}
+#lastPhotoPreviewContainer p {
+     margin-top: 4px;
+     margin-bottom: 0;
+}
+
 
 /* Bottom Navigation Bar */
 md-navigation-bar {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
     height: var(--nav-bar-height);
-    --md-navigation-bar-container-color: var(--md-sys-color-surface-container, var(--md-sys-color-surface));
+    --md-navigation-bar-container-color: var(--md-sys-color-surface-container); /* Use surface-container */
     display: flex; justify-content: space-around; align-items: center;
     padding: 0 8px; box-sizing: border-box;
 }
@@ -196,7 +318,7 @@ md-navigation-tab {
     --md-navigation-tab-inactive-label-text-color: var(--md-sys-color-on-surface-variant);
     --md-navigation-tab-active-indicator-color: var(--md-sys-color-secondary-container);
     --md-navigation-tab-active-indicator-height: 32px;
-    --md-navigation-tab-active-indicator-shape: 16px;  
+    --md-navigation-tab-active-indicator-shape: 16px;
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
     padding-top: 12px; padding-bottom: 16px; min-height: var(--nav-bar-height); box-sizing: border-box;
 }
@@ -206,10 +328,25 @@ md-navigation-tab[active] md-icon[slot="inactiveIcon"] { display: none !importan
 md-navigation-tab[active] md-icon[slot="activeIcon"] { display: inline-flex !important; }
 
 /* History Page Specifics */
-#historyListContainer md-elevated-card:hover {
-    --md-elevated-card-container-color: var(--md-sys-color-surface-container-low, var(--md-sys-color-surface-variant));
+#historyListContainer md-elevated-card {
+     border-radius: 12px; /* Keep history card less rounded */
+     --md-elevated-card-container-color: var(--md-sys-color-surface); /* Use standard surface color */
+     box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Add a subtle shadow */
 }
-#historyChart { max-height: 300px; width: 100%; }
+#historyListContainer md-elevated-card:hover {
+     --md-elevated-card-container-color: var(--md-sys-color-surface-container-low); /* Slightly different hover color */
+}
+
+#historyChart {
+     max-height: 300px;
+     width: 100%;
+     margin-bottom: 16px; /* Space below chart */
+}
+#historyPhotosContainer {
+     margin-top: 10px;
+     margin-bottom: 16px; /* Space below photos */
+}
+
 .delete-session-button { --md-icon-button-icon-color: var(--md-sys-color-error); margin-left: auto; }
 #deleteDialogSessionInfo { margin-top: 8px; margin-bottom: 0; }
 
@@ -225,7 +362,7 @@ md-switch {
     --md-switch-unselected-handle-color: var(--md-sys-color-outline);
     --md-switch-unselected-hover-handle-color: var(--md-sys-color-outline);
 }
-md-filled-button { 
+md-filled-button {
     --md-filled-button-container-color: var(--md-sys-color-primary);
     --md-filled-button-label-text-color: var(--md-sys-color-on-primary);
 }
@@ -235,8 +372,8 @@ md-outlined-button {
 }
 
 /* Ensure icons in history list items are vertically centered with text */
-#historyListContainer md-icon { 
-    vertical-align: middle; 
+#historyListContainer md-icon {
+    vertical-align: middle;
     margin-right: 4px; /* Add a little space after icon */
     font-size: 1.1em; /* Match font-size of surrounding text or adjust */
 }
