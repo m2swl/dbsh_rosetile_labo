@@ -41,14 +41,16 @@ const backgroundVertexShader = `
 `;
 
 // このシェーダーはユニフォーム名 uEmotionSpeed, uEmotionIntensity, uColorVariety を使用します
+// ... (main.js の他の部分は変更なし) ...
+
 const backgroundFragmentShader = `
     varying vec2 vUv;
     uniform float uTime;
-    uniform vec3 uBaseColor; 
-    uniform float uHighlightIntensity; 
-    uniform float uEmotionSpeed;      // 感情による速度係数
-    uniform float uEmotionIntensity;  // 感情による変化の強さ係数
-    uniform float uColorVariety;      // 感情による色の多様性
+    uniform vec3 uBaseColor;         // CSVのsessionColorから派生 (RGB)
+    uniform float uHighlightIntensity;
+    uniform float uEmotionSpeed;
+    uniform float uEmotionIntensity;
+    uniform float uColorVariety;
 
     float random(vec2 st) {
         return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
@@ -67,12 +69,31 @@ const backgroundFragmentShader = `
         float value = 0.0;
         float amplitude = 0.6; 
         float frequency = 1.0; 
-        for (int i = 0; i < 4; i++) { // オクターブ数を増やしても良い (例: 5 or 6)
+        for (int i = 0; i < 4; i++) {
             value += amplitude * noise(st * frequency);
-            frequency *= 1.8; // 周波数増加率を少し下げる (滑らかに)
-            amplitude *= 0.5; // 振幅減衰率
+            frequency *= 1.8; 
+            amplitude *= 0.5; 
         }
         return value;
+    }
+
+    // HSL to RGB and RGB to HSL functions (GLSL ES 3.0 compatible)
+    // These might be useful for subtle adjustments but avoid large hue shifts if base color is primary
+    vec3 rgbToHsl(vec3 color) {
+        float maxC = max(max(color.r, color.g), color.b);
+        float minC = min(min(color.r, color.g), color.b);
+        float h = 0.0, s = 0.0, l = (maxC + minC) / 2.0;
+        if (maxC == minC) {
+            h = s = 0.0; // achromatic
+        } else {
+            float d = maxC - minC;
+            s = l > 0.5 ? d / (2.0 - maxC - minC) : d / (maxC + minC);
+            if (maxC == color.r) h = (color.g - color.b) / d + (color.g < color.b ? 6.0 : 0.0);
+            else if (maxC == color.g) h = (color.b - color.r) / d + 2.0;
+            else if (maxC == color.b) h = (color.r - color.g) / d + 4.0;
+            h /= 6.0;
+        }
+        return vec3(h, s, l);
     }
 
     vec3 hslToRgb(vec3 hsl) {
@@ -83,78 +104,90 @@ const backgroundFragmentShader = `
         if (s == 0.0) {
             rgb = vec3(l); 
         } else {
-            auto q = l < 0.5 ? l * (1.0 + s) : l + s - l * s;
-            auto p = 2.0 * l - q;
-            auto hueToRgb = [&](float t){
-                if (t < 0.0) t += 1.0;
-                if (t > 1.0) t -= 1.0;
-                if (t < 1.0/6.0) return p + (q - p) * 6.0 * t;
-                if (t < 1.0/2.0) return q;
-                if (t < 2.0/3.0) return p + (q - p) * (2.0/3.0 - t) * 6.0;
-                return p;
-            };
-            rgb.r = hueToRgb(h + 1.0/3.0);
-            rgb.g = hueToRgb(h);
-            rgb.b = hueToRgb(h - 1.0/3.0);
+            float q = l < 0.5 ? l * (1.0 + s) : l + s - l * s;
+            float p = 2.0 * l - q;
+            float r_temp, g_temp, b_temp;
+            float t_r = h + 1.0/3.0;
+            if (t_r < 0.0) t_r += 1.0; if (t_r > 1.0) t_r -= 1.0;
+            if (t_r < 1.0/6.0) r_temp = p + (q - p) * 6.0 * t_r;
+            else if (t_r < 1.0/2.0) r_temp = q;
+            else if (t_r < 2.0/3.0) r_temp = p + (q - p) * (2.0/3.0 - t_r) * 6.0;
+            else r_temp = p;
+            float t_g = h;
+            if (t_g < 0.0) t_g += 1.0; if (t_g > 1.0) t_g -= 1.0;
+            if (t_g < 1.0/6.0) g_temp = p + (q - p) * 6.0 * t_g;
+            else if (t_g < 1.0/2.0) g_temp = q;
+            else if (t_g < 2.0/3.0) g_temp = p + (q - p) * (2.0/3.0 - t_g) * 6.0;
+            else g_temp = p;
+            float t_b = h - 1.0/3.0;
+            if (t_b < 0.0) t_b += 1.0; if (t_b > 1.0) t_b -= 1.0;
+            if (t_b < 1.0/6.0) b_temp = p + (q - p) * 6.0 * t_b;
+            else if (t_b < 1.0/2.0) b_temp = q;
+            else if (t_b < 2.0/3.0) b_temp = p + (q - p) * (2.0/3.0 - t_b) * 6.0;
+            else b_temp = p;
+            rgb = vec3(r_temp, g_temp, b_temp);
         }
         return rgb;
     }
 
+
     void main() {
         vec2 uv = vUv;
-        // uEmotionSpeed の影響を時間に大きくかける
-        float time = uTime * (0.05 + uEmotionSpeed * 0.25); 
+        float time = uTime * (0.05 + uEmotionSpeed * 0.1); // 時間進行を少し抑え、感情速度の影響を調整
 
-        // ベースのHSL値を計算 uBaseColor (RGB) から変換的に
-        float baseHue = mod( (uBaseColor.r + uBaseColor.g + uBaseColor.b) / 3.0 + uTime * 0.003 * (0.5 + uEmotionSpeed), 1.0);
-        float baseSat = 0.6 + uColorVariety * 0.3; // 色の多様性で彩度も変化
-        float baseLight = 0.5 + (uBaseColor.g - 0.5) * 0.2; // 緑成分で明るさを少し
-        vec3 baseHsl = vec3(baseHue, clamp(baseSat, 0.4, 0.9), clamp(baseLight, 0.3, 0.7));
-        
-        // 2つの派生色を生成
-        vec3 color1Hsl = baseHsl + 
-            vec3( (noise(uv * 0.8 + time * 0.15) - 0.5) * (0.2 + uColorVariety * 0.3) * (0.5 + uEmotionIntensity), // Hueの揺れを大きく
-                  (noise(uv * 1.0 - time * 0.1) - 0.5) * 0.2 * uEmotionIntensity,
-                  (noise(uv * 1.2 + time * 0.08) - 0.5) * 0.15 * uEmotionIntensity);
-        color1Hsl.x = mod(color1Hsl.x, 1.0);
-        color1Hsl.y = clamp(color1Hsl.y, 0.3, 0.95);
-        color1Hsl.z = clamp(color1Hsl.z, 0.2, 0.8);
-        vec3 color1 = hslToRgb(color1Hsl);
+        // uBaseColor (RGB) を基本とする
+        vec3 baseRgb = uBaseColor;
 
-        vec3 color2Hsl = baseHsl + 
-            vec3( (noise(uv * 0.7 - time * 0.18) - 0.5) * (0.25 + uColorVariety * 0.35) * (0.5 + uEmotionIntensity) + 0.05,
-                  (noise(uv * 0.9 + time * 0.11) - 0.5) * 0.25 * uEmotionIntensity + 0.05,
-                  (noise(uv * 1.1 - time * 0.09) - 0.5) * 0.2 * uEmotionIntensity - 0.05);
-        color2Hsl.x = mod(color2Hsl.x, 1.0);
-        color2Hsl.y = clamp(color2Hsl.y, 0.3, 0.95);
-        color2Hsl.z = clamp(color2Hsl.z, 0.2, 0.8);
-        vec3 color2 = hslToRgb(color2Hsl);
-        
-        // FBMパターンのスケールと時間進行を調整
-        float patternScale = 0.6 + uEmotionIntensity * 1.5; // スケールの変化幅を大きく
-        float fbmTimeX = time * (0.15 + uEmotionSpeed * 0.15);
-        float fbmTimeY = time * (0.1 + uEmotionSpeed * 0.12);
+        // color1: uBaseColor を少し暗く、または彩度を落とすなどのバリエーション
+        // uColorVariety で uBaseColor からのオフセットを調整
+        float offset1 = (noise(uv * 1.2 + time * 0.08) - 0.5) * (0.1 + uColorVariety * 0.2) * uEmotionIntensity;
+        vec3 color1 = clamp(baseRgb + vec3(offset1), 0.0, 1.0);
+        // さらに彩度や明度を微調整するなら HSL 変換も使える
+        // vec3 hsl1 = rgbToHsl(color1);
+        // hsl1.y *= (0.8 + uEmotionIntensity * 0.1); // 彩度調整
+        // hsl1.z *= (0.9 + (noise(uv * 1.0 - time * 0.05) - 0.5) * 0.1); // 明度調整
+        // color1 = hslToRgb(clamp(hsl1, vec3(0.0), vec3(1.0)));
+
+
+        // color2: uBaseColor を少し明るく、または別の方向にオフセット
+        float offset2 = (noise(uv * 1.1 - time * 0.07) - 0.5) * (0.15 + uColorVariety * 0.25) * uEmotionIntensity;
+        vec3 color2 = clamp(baseRgb + vec3(offset2, -offset2 * 0.5, offset1 * 0.3), 0.0, 1.0); // 各チャンネルに異なるオフセット
+        // vec3 hsl2 = rgbToHsl(color2);
+        // hsl2.y *= (1.0 - uEmotionIntensity * 0.1);
+        // hsl2.z = min(1.0, hsl2.z + 0.1 + (noise(uv * 0.9 + time * 0.06) - 0.5) * 0.1);
+        // color2 = hslToRgb(clamp(hsl2, vec3(0.0), vec3(1.0)));
+
+
+        // FBMパターンとミキシング
+        float patternScale = 0.7 + uEmotionIntensity * 1.0; 
+        float fbmTimeX = time * (0.1 + uEmotionSpeed * 0.1);
+        float fbmTimeY = time * (0.08 + uEmotionSpeed * 0.08);
         float fbmPattern = fbm(uv * patternScale + vec2(fbmTimeX, fbmTimeY));
         
-        vec3 blendedColor = mix(color1, color2, smoothstep(0.15, 0.85, fbmPattern)); // mixの範囲を広く
+        vec3 blendedColor = mix(color1, color2, smoothstep(0.3, 0.7, fbmPattern)); // mix範囲を標準的に
 
-        // ハイライトの動きと影響をさらに強調
-        vec2 highlightOffset = vec2(sin(time * (0.3 + uEmotionSpeed * 0.1) + uEmotionIntensity * 0.5) * 0.4, 
-                                    cos(time * (0.22 + uEmotionSpeed * 0.08) - uEmotionIntensity * 0.4) * 0.4);
+        // ハイライト
+        vec2 highlightOffset = vec2(sin(time * (0.25 + uEmotionSpeed * 0.08) + uEmotionIntensity * 0.3) * 0.3, 
+                                    cos(time * (0.18 + uEmotionSpeed * 0.06) - uEmotionIntensity * 0.25) * 0.3);
         float distToHighlight = length(uv - (vec2(0.5, 0.5) + highlightOffset));
-        float highlightEffect = smoothstep(0.8, 0.01, distToHighlight) * uHighlightIntensity * 2.5; // よりシャープで強いハイライト
+        float highlightEffect = smoothstep(0.7, 0.05, distToHighlight) * uHighlightIntensity * 2.0; 
         
-        vec3 finalColor = mix(blendedColor, vec3(1.0, 1.0, 1.0), highlightEffect); 
+        vec3 finalColor = mix(blendedColor, vec3(0.95, 0.95, 0.98), highlightEffect); // ハイライト色を白に近い色に
 
-        float vigStrength = 0.4 + uEmotionIntensity * 0.3; // Vignetteの強さも感情で少し変える
+        // Vignette
+        float vigStrength = 0.3 + uEmotionIntensity * 0.2; 
         float vig = smoothstep(1.0, vigStrength, length(uv - vec2(0.5)));
         finalColor *= vig;
         
-        finalColor = pow(finalColor, vec3(0.8)); // 全体のコントラストを少し上げる
+        // 全体のコントラストと明るさを微調整
+        finalColor = pow(finalColor, vec3(0.9)); 
+        finalColor = clamp(finalColor + uHighlightIntensity * 0.05, 0.0, 1.0); // ハイライト強度で全体も少し明るく
 
         gl_FragColor = vec4(finalColor, 1.0);
     }
 `;
+
+// ... (main.js の他の部分は前回のままでOK) ...
 
 
 // 初期化処理
