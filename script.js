@@ -403,7 +403,7 @@ function updateRecordingButtonState() {
     if (!allPermissionsAttempted && canRequestAnyPermission) {
         sensorPermissionIconButton.disabled = false;
         permissionIconEl.textContent = 'lock';
-        recordingStatusEl.textContent = "左の🔒アイコンからセンサーアクセスを許可してください。";
+        recordingStatusEl.textContent = "左のアイコンからセンサーアクセスを許可してください。";
     } else {
         sensorPermissionIconButton.disabled = true;
         permissionIconEl.textContent = 'lock_open';
