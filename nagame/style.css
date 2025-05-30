@@ -2,7 +2,7 @@ body {
     margin: 0;
     overflow: hidden;
     font-family: Arial, sans-serif;
-    background-color: #111;
+    background-color: #111; /* フォールバック、シェーダー背景が優先される */
     color: #fff;
 }
 
@@ -14,14 +14,67 @@ body {
     background-color: rgba(0,0,0,0.7);
     border-radius: 5px;
     z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    max-width: calc(100vw - 40px); /* 画面幅に収まるように */
 }
 
-#controls label, #controls span {
+#controls label, #controls span, #controls button, #controls input {
     margin-left: 10px;
     margin-right: 5px;
+    margin-bottom: 5px; /* 折り返し時のため */
 }
+#controls input[type="file"] {
+    margin-left: 0;
+}
+
 
 #visualizationContainer {
     width: 100vw;
     height: 100vh;
+}
+
+#dataDisplayContainer {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    padding: 10px;
+    background-color: rgba(0,0,0,0.7);
+    border-radius: 5px;
+    z-index: 10;
+    font-size: 0.8em;
+    max-width: 300px; 
+    max-height: 200px;
+    overflow-y: auto;
+}
+#dataDisplayContainer p {
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+#currentData pre {
+    margin: 0;
+    font-family: monospace;
+    white-space: pre-wrap; /* 折り返し */
+    word-break: break-all;
+}
+
+#seekBarContainer {
+    /* flex-basis: 100%;  #controls が flex-wrap: wrap なので幅を取れば自動で改行される */
+    width: 100%;
+    margin-top: 5px; /* 上のコントロールとの間隔 */
+    display: flex;
+    align-items: center;
+    padding: 5px 0; /* 内部の余白 */
+}
+#seekBarContainer input[type="range"] {
+    flex-grow: 1;
+    margin-left: 0;
+    margin-right: 10px;
+}
+#seekBarContainer span {
+    margin-left: 0px;
+    margin-right: 0px;
+    min-width: 35px; /* MM:SS 形式で幅を確保 */
+    text-align: center;
 }
