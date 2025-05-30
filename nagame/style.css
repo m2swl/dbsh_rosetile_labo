@@ -1,0 +1,508 @@
+:root {
+    /* --- Green Light Theme --- */
+    --md-sys-color-primary: #006D3A; /* Primary Green */
+    --md-sys-color-on-primary: #FFFFFF;
+    --md-sys-color-primary-container: #9EF2B3; /* Light Green */
+    --md-sys-color-on-primary-container: #00210C;
+    --md-sys-color-secondary: #4F6353; /* Desaturated Green/Gray */
+    --md-sys-color-on-secondary: #FFFFFF;
+    --md-sys-color-secondary-container: #D2E8D3;
+    --md-sys-color-on-secondary-container: #0C1F13;
+    --md-sys-color-tertiary: #3E6374; /* Bluish Green/Gray */
+    --md-sys-color-on-tertiary: #FFFFFF;
+    --md-sys-color-tertiary-container: #C1E8FA;
+    --md-sys-color-on-tertiary-container: #001F2A;
+    --md-sys-color-error: #BA1A1A;
+    --md-sys-color-on-error: #FFFFFF;
+    --md-sys-color-error-container: #FFDAD6;
+    --md-sys-color-on-error-container: #410002;
+    --md-sys-color-background: #FCFDF7;
+    --md-sys-color-on-background: #1A1C1A;
+    --md-sys-color-surface: #FCFDF7;
+    --md-sys-color-on-surface: #1A1C1A;
+    --md-sys-color-surface-variant: #DDE5DA; /* Light Grayish Green */
+    --md-sys-color-on-surface-variant: #414941;
+    --md-sys-color-outline: #717971;
+    --md-sys-color-outline-variant: #C1C9BF; /* Added for things like <hr> */
+    --md-sys-color-shadow: #000000;
+    --md-sys-color-inverse-surface: #2F312E;
+    --md-sys-color-inverse-on-surface: #F0F1EC;
+    --md-sys-color-inverse-primary: #83D599; /* Light Green for Dark Theme Primary */
+    --md-sys-color-surface-container-lowest: #FFFFFF; /* Match image */
+    --md-sys-color-surface-container-low: #F7F9F3; /* Match image */
+    --md-sys-color-surface-container: #F1F3ED;
+    --md-sys-color-surface-container-high: #EBEFE9;
+    --md-sys-color-surface-container-highest: #E5E9E3;
+
+    /* Custom properties */
+    --app-font-family: 'Noto Sans JP', sans-serif;
+    --app-bar-height: 56px;
+    --nav-bar-height: 80px; /* For md-navigation-bar */
+    --card-gap: 12px; /* Gap between cards */
+    --cube-size: 100px;
+    --bar-max-height: 50px;
+}
+
+[data-theme="dark"] {
+    /* --- Green Dark Theme --- */
+    --md-sys-color-primary: #83D599;
+    --md-sys-color-on-primary: #00391A;
+    --md-sys-color-primary-container: #005229;
+    --md-sys-color-on-primary-container: #9EF2B3;
+    --md-sys-color-secondary: #B6CCB8;
+    --md-sys-color-on-secondary: #223527;
+    --md-sys-color-secondary-container: #384B3C;
+    --md-sys-color-on-secondary-container: #D2E8D3;
+    --md-sys-color-tertiary: #A6CDDE;
+    --md-sys-color-on-tertiary: #093544;
+    --md-sys-color-tertiary-container: #254C5B;
+    --md-sys-color-on-tertiary-container: #C1E8FA;
+    --md-sys-color-error: #FFB4AB;
+    --md-sys-color-on-error: #690005;
+    --md-sys-color-error-container: #93000A;
+    --md-sys-color-on-error-container: #FFDAD6;
+    --md-sys-color-background: #1A1C1A;
+    --md-sys-color-on-background: #E2E3DE;
+    --md-sys-color-surface: #1A1C1A;
+    --md-sys-color-on-surface: #E2E3DE;
+    --md-sys-color-surface-variant: #414941;
+    --md-sys-color-on-surface-variant: #C1C9BF;
+    --md-sys-color-outline: #8B938A;
+    --md-sys-color-outline-variant: #414941; /* Added for things like <hr> */
+    --md-sys-color-surface-container-lowest: #0F1411; /* Slightly darker than background */
+    --md-sys-color-surface-container-low: #1A1C1A; /* Match background */
+    --md-sys-color-surface-container: #1E201D;
+    --md-sys-color-surface-container-high: #282B26;
+    --md-sys-color-surface-container-highest: #333631;
+}
+
+body {
+    font-family: var(--app-font-family);
+    margin: 0;
+    background-color: var(--md-sys-color-background);
+    color: var(--md-sys-color-on-background);
+    transition: background-color 0.3s ease, color 0.3s ease;
+    overscroll-behavior-y: contain;
+    padding-top: var(--app-bar-height);
+    padding-bottom: var(--nav-bar-height);
+    box-sizing: border-box;
+    overflow: hidden; /* Prevent body scroll when content scrolls */
+}
+
+.main-content {
+    width: 100%;
+    height: calc(100vh - var(--app-bar-height) - var(--nav-bar-height));
+    overflow-y: auto;
+    padding: 16px; /* Add padding to main content area */
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch; /* Improve scrolling on iOS */
+}
+
+.page { display: none; }
+.page.active-page { display: block; height: 100%; overflow-y: auto; } /* Make active page fill height and scroll */
+
+/* Removed app-container padding as main-content now has it */
+.app-container {
+    /* No padding needed here */
+}
+
+.app-bar {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: var(--app-bar-height);
+    background-color: var(--md-sys-color-surface-variant);
+    color: var(--md-sys-color-on-surface-variant);
+    display: flex; align-items: center; padding: 0 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+.app-bar h1 { font-size: 1.25rem; margin: 0; flex-grow: 1; font-weight: 500; }
+.theme-switch-container { display: flex; align-items: center; }
+.theme-switch-container md-icon { color: var(--md-sys-color-on-surface-variant); margin: 0 4px; font-size: 20px; } /* Smaller icons */
+
+
+/* Sensor Grid Layout */
+.sensor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* Responsive columns */
+    gap: var(--card-gap);
+}
+
+/* Style for md-card within the grid */
+.sensor-grid md-card {
+    margin: 0;
+    border-radius: 20px;
+    overflow: hidden;
+    --md-card-container-color: var(--md-sys-color-surface-container-low);
+    box-shadow: none;
+    border: 1px solid var(--md-sys-color-outline-variant); /* Added subtle border */
+}
+
+/* Specific card spanning */
+.card-full-width {
+    grid-column: 1 / -1; /* Span across all columns */
+}
+.card-half-width {
+    grid-column: span 1; /* Span one column */
+     /* Allow half-width cards to take full width on smaller screens */
+     @media (max-width: 480px) { /* Adjusted breakpoint slightly */
+        grid-column: 1 / -1; /* Full width below breakpoint */
+     }
+}
+
+/* Recording Controls Bar styling within the grid */
+.recording-controls-bar {
+    background-color: var(--md-sys-color-surface-container-low);
+    padding: 8px 16px;
+    margin: 0;
+    border-radius: 20px;
+    border-bottom: none;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+     /* Ensure it takes full width in the grid */
+    grid-column: 1 / -1;
+}
+.recording-status-area {
+    width: 100%; /* Allow status text to take full width */
+    text-align: center;
+}
+.recording-buttons-area {
+    width: 100%; /* Allow buttons to take full width */
+    display: flex;
+    justify-content: center; /* Center buttons */
+    gap: 8px; /* Gap between buttons */
+}
+.recording-buttons-area md-icon-button {
+    --md-icon-button-icon-color: var(--md-sys-color-on-surface);
+    --md-icon-button-state-layer-color: var(--md-sys-color-on-surface);
+}
+.recording-buttons-area md-icon-button:disabled {
+     --md-icon-button-icon-color: var(--md-sys-color-on-surface-variant);
+     --md-icon-button-state-layer-color: transparent;
+     opacity: 0.5;
+     cursor: default;
+}
+
+
+/* Card Content Styling */
+.card-header {
+     display: flex;
+     align-items: center;
+     padding: 12px 16px;
+     padding-bottom: 0;
+     /* Added cursor and transition for toggle cards */
+     cursor: default;
+}
+.sensor-card-toggle .card-header {
+     cursor: pointer;
+     transition: background-color 0.2s ease;
+}
+.sensor-card-toggle .card-header:hover {
+    background-color: color-mix(in srgb, var(--md-sys-color-surface-container-low) 90%, var(--md-sys-color-on-surface-variant) 5%);
+}
+
+.card-header md-icon {
+     margin-right: 8px;
+     color: var(--md-sys-color-primary); /* Use primary color for icons */
+     font-size: 24px;
+}
+/* Style for the toggle icon */
+.card-header .toggle-icon {
+    margin-left: auto; /* Push to the right */
+    color: var(--md-sys-color-on-surface-variant);
+    transition: transform 0.3s ease;
+}
+.card-expanded .card-header .toggle-icon {
+    transform: rotate(180deg);
+}
+
+
+.card-header h2 {
+    margin: 0;
+    font-size: 1rem; /* Adjusted title size */
+    color: var(--md-sys-color-on-surface);
+    font-weight: 500;
+    flex-grow: 1;
+}
+
+.card-content {
+    padding: 12px 16px;
+    padding-top: 8px;
+}
+.sensor-values-group {
+    margin-bottom: 12px;
+}
+
+.sensor-value {
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    color: var(--md-sys-color-on-surface-variant);
+    display: flex;
+     align-items: baseline;
+}
+.sensor-value:last-child {
+    margin-bottom: 0;
+}
+.sensor-value strong {
+    color: var(--md-sys-color-on-surface);
+    min-width: 90px;
+    display: inline-block;
+    font-weight: 500;
+    margin-right: 4px;
+    flex-shrink: 0; /* Prevent strong from shrinking */
+}
+
+/* Adjust min-width for specific labels if needed */
+/* Geolocation card specific label width */
+#recordPage .sensor-grid md-card:nth-of-type(7) .card-content .sensor-value strong { /* Target the Geolocation card */
+     min-width: 60px; /* Geolocation labels are shorter */
+}
+/* Pedometer steps label */
+#pedometer-steps {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--md-sys-color-primary);
+}
+#recordPage .sensor-grid md-card:nth-of-type(4) .card-content .sensor-value { /* Target Pedometer card's first value */
+    justify-content: center;
+    margin-bottom: 0;
+}
+
+
+.status-text {
+    font-size: 0.75rem;
+    color: var(--md-sys-color-on-surface-variant);
+    margin-top: 8px;
+    margin-bottom: 0;
+}
+/* Specific for geo-address-status */
+#geo-address-status {
+    margin-top: 4px;
+    font-size: 0.7rem;
+}
+
+
+.error { color: var(--md-sys-color-error) !important; font-weight: 500; }
+.not-supported { color: var(--md-sys-color-outline) !important; }
+
+/* Sensor Card Toggle Views */
+.sensor-detail {
+    display: none; /* Hidden by default */
+    /* Add padding/margin if needed to separate from summary */
+}
+.card-expanded .sensor-detail {
+    display: block; /* Show when card is expanded */
+}
+.card-expanded .sensor-summary {
+    display: none; /* Hide summary when card is expanded */
+}
+
+
+/* Sensor Visualizations */
+.cube-container { width: var(--cube-size); height: var(--cube-size); margin: 10px auto 20px auto; perspective: 600px; }
+.cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.1s linear; }
+.cube__face { position: absolute; width: var(--cube-size); height: var(--cube-size); border: 1px solid var(--md-sys-color-outline-variant); background-color: color-mix(in srgb, var(--md-sys-color-primary-container) 70%, transparent); color: var(--md-sys-color-on-primary-container); font-size: calc(var(--cube-size) / 3); font-weight: bold; display: flex; justify-content: center; align-items: center; opacity: 0.9; }
+.cube__face--front  { transform: rotateY(  0deg) translateZ(calc(var(--cube-size) / 2)); }
+.cube__face--right  { transform: rotateY( 90deg) translateZ(calc(var(--cube-size) / 2)); }
+.cube__face--back   { transform: rotateY(180deg) translateZ(calc(var(--cube-size) / 2)); }
+.cube__face--left   { transform: rotateY(-90deg) translateZ(calc(var(--cube-size) / 2)); }
+.cube__face--top    { transform: rotateX( 90deg) translateZ(calc(var(--cube-size) / 2)); }
+.cube__face--bottom { transform: rotateX(-90deg) translateZ(calc(var(--cube-size) / 2)); }
+
+.bars-container { display: flex; justify-content: space-around; align-items: flex-end; height: var(--bar-max-height); margin-top: 10px; margin-bottom: 16px; }
+.bar {
+    width: 25%;
+    background-color: var(--md-sys-color-secondary-container);
+    transition: height 0.1s ease-out;
+    text-align: center;
+    position: relative;
+    border-radius: 4px 4px 0 0;
+    overflow: hidden; /* Hide label if bar is very short */
+}
+.bar-label { position: absolute; bottom: 2px; left: 0; right: 0; font-size: 0.8em; color: var(--md-sys-color-on-secondary-container); font-weight: bold; }
+
+
+.light-viz { text-align: center; margin-top: 0; margin-bottom: 12px; }
+.light-viz md-icon { font-size: 48px; transition: color 0.3s ease; color: var(--md-sys-color-on-surface-variant); }
+#light-icon-sun { color: #FFC107; }
+#light-icon-moon { color: #90A4AE; }
+
+
+/* Microphone Level Bar */
+.mic-level-bar-container { width: 100%; height: 8px; background-color: var(--md-sys-color-surface-variant); border-radius: 4px; overflow: hidden; margin-top: 8px; margin-bottom: 8px; }
+.mic-level-bar { height: 100%; width: 0%; background-color: var(--md-sys-color-primary); border-radius: 4px; transition: width 0.1s linear, background-color 0.2s linear; }
+
+/* Camera Preview */
+#cameraPreview {
+    display: block;
+    width: 100%; max-width: 300px;
+    margin: 0 auto 10px auto;
+    border-radius: 8px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+}
+#takePictureButton {
+    display: block;
+    margin: 0 auto;
+}
+#lastPhotoPreviewContainer {
+    margin-top: 16px;
+    text-align: center;
+}
+#lastPhotoPreviewContainer img {
+     display: inline-block;
+     vertical-align: top;
+}
+#lastPhotoPreviewContainer p {
+     margin-top: 4px;
+     margin-bottom: 0;
+}
+
+
+/* Bottom Navigation Bar */
+md-navigation-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
+    height: var(--nav-bar-height);
+    --md-navigation-bar-container-color: var(--md-sys-color-surface-container);
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 0 8px; box-sizing: border-box;
+}
+md-navigation-tab {
+    --md-navigation-tab-active-icon-color: var(--md-sys-color-on-secondary-container);
+    --md-navigation-tab-active-label-text-color: var(--md-sys-color-on-secondary-container);
+    --md-navigation-tab-inactive-icon-color: var(--md-sys-color-on-surface-variant);
+    --md-navigation-tab-inactive-label-text-color: var(--md-sys-color-on-surface-variant);
+    --md-navigation-tab-active-indicator-color: var(--md-sys-color-secondary-container);
+    --md-navigation-tab-active-indicator-height: 32px;
+    --md-navigation-tab-active-indicator-shape: 16px;
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding-top: 12px; padding-bottom: 16px; min-height: var(--nav-bar-height); box-sizing: border-box;
+}
+md-navigation-tab:not([active]) md-icon[slot="activeIcon"] { display: none !important; }
+md-navigation-tab:not([active]) md-icon[slot="inactiveIcon"] { display: inline-flex !important; }
+md-navigation-tab[active] md-icon[slot="inactiveIcon"] { display: none !important; }
+md-navigation-tab[active] md-icon[slot="activeIcon"] { display: inline-flex !important; }
+
+/* History Page Specifics */
+#historyListContainer md-elevated-card {
+     border-radius: 12px;
+     --md-elevated-card-container-color: var(--md-sys-color-surface);
+     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+     cursor: pointer; /* Indicate cards are clickable */
+     transition: background-color 0.2s ease;
+     position: relative; /* Needed for absolute positioning of indicator */
+}
+#historyListContainer md-elevated-card:hover {
+     --md-elevated-card-container-color: var(--md-sys-color-surface-container-low);
+}
+
+.history-tag-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 6px; /* Width of the color bar */
+    background-color: var(--md-sys-color-outline-variant); /* Default color */
+    border-radius: 12px 0 0 12px; /* Match card corner */
+}
+/* Tag Color Classes */
+.history-tag-indicator.tag-color-赤 { background-color: var(--md-sys-color-error); }
+.history-tag-indicator.tag-color-青 { background-color: var(--md-sys-color-primary); } /* Using primary color for blue */
+.history-tag-indicator.tag-color-緑 { background-color: var(--md-sys-color-secondary); } /* Using secondary color for green */
+.history-tag-indicator.tag-color-黄 { background-color: #FFD700; } /* Gold */
+.history-tag-indicator.tag-color-その他 { background-color: var(--md-sys-color-tertiary); } /* Using tertiary color for other */
+.history-tag-indicator.tag-color-未選択 { background-color: var(--md-sys-color-outline-variant); } /* Default gray */
+
+
+#historyChart {
+     max-height: 300px; /* Limit chart height */
+     width: 100%;
+     margin-bottom: 16px;
+}
+#historyPhotosContainer {
+     margin-top: 10px;
+     margin-bottom: 16px;
+}
+
+.delete-session-button { --md-icon-button-icon-color: var(--md-sys-color-error); margin-left: auto; }
+#deleteDialogSessionInfo { margin-top: 8px; margin-bottom: 0; }
+
+/* MWC component theming */
+md-switch {
+    --md-switch-selected-handle-color: var(--md-sys-color-on-primary);
+    --md-switch-selected-hover-handle-color: var(--md-sys-color-on-primary);
+    --md-switch-selected-pressed-handle-color: var(--md-sys-color-on-primary);
+    --md-switch-selected-track-color: var(--md-sys-color-primary);
+    --md-switch-selected-hover-track-color: var(--md-sys-color-primary);
+    --md-switch-selected-pressed-track-color: var(--md-sys-color-primary);
+    --md-switch-selected-focus-track-color: var(--md-sys-color-primary);
+    --md-switch-unselected-handle-color: var(--md-sys-color-outline);
+    --md-switch-unselected-hover-handle-color: var(--md-sys-color-outline);
+}
+md-filled-button {
+    --md-filled-button-container-color: var(--md-sys-color-primary);
+    --md-filled-button-label-text-color: var(--md-sys-color-on-primary);
+     /* Disable styling for disabled state */
+    &:disabled {
+        --md-filled-button-container-color: var(--md-sys-color-surface-variant);
+        --md-filled-button-label-text-color: var(--md-sys-color-on-surface-variant);
+        opacity: 0.5;
+        cursor: default;
+    }
+}
+md-outlined-button {
+    --md-outlined-button-label-text-color: var(--md-sys-color-primary);
+    --md-outlined-button-outline-color: var(--md-sys-color-outline);
+}
+md-text-button {
+     /* Default text button */
+}
+md-filled-tonal-button {
+    --md-filled-tonal-button-container-color: var(--md-sys-color-error-container);
+    --md-filled-tonal-button-label-text-color: var(--md-sys-color-on-error-container);
+     /* Disable styling for disabled state */
+     &:disabled {
+        --md-filled-tonal-button-container-color: var(--md-sys-color-surface-variant);
+        --md-filled-tonal-button-label-text-color: var(--md-sys-color-on-surface-variant);
+        opacity: 0.5;
+        cursor: default;
+    }
+}
+
+
+/* Ensure icons in history list items are vertically centered with text */
+#historyListContainer md-icon {
+    vertical-align: middle;
+    margin-right: 4px;
+    font-size: 1.1em;
+}
+
+/* Style for Select elements in dialog */
+#recordingTagsDialog select {
+     font-family: var(--app-font-family);
+     font-size: 1rem;
+     padding: 8px;
+     border-radius: 4px;
+     border: 1px solid var(--md-sys-color-outline);
+     width: 100%;
+     box-sizing: border-box; /* Include padding and border in the element's total width and height */
+     background-color: var(--md-sys-color-surface);
+     color: var(--md-sys-color-on-surface);
+     cursor: pointer;
+     /* Add arrow styling for consistency */
+     -webkit-appearance: none;
+     -moz-appearance: none;
+     appearance: none;
+     background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23414941%22%20d%3D%22M287%2C114.5L153.4%2C252.1c-2.7%2C2.7-6.8%2C2.7-9.6%2C0L5.4%2C114.5c-3.1-3.1-0.9-9.6%2C4.8-9.6h276.3C287.9%2C104.9%2C290.1%2C111.4%2C287%2C114.5z%22%2F%3E%3C%2Fsvg%3E');
+     background-repeat: no-repeat;
+     background-position: right 8px top 50%;
+     background-size: 12px auto;
+}
+[data-theme="dark"] #recordingTagsDialog select {
+     background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23C1C9BF%22%20d%3D%22M287%2C114.5L153.4%2C252.1c-2.7%2C2.7-6.8%2C2.7-9.6%2C0L5.4%2C114.5c-3.1-3.1-0.9-9.6%2C4.8-9.6h276.3C287.9%2C104.9%2C290.1%2C111.4%2C287%2C114.5z%22%2F%3E%3C%2Fsvg%3E');
+}
+#recordingTagsDialog select option {
+     background-color: var(--md-sys-color-surface);
+     color: var(--md-sys-color-on-surface);
+}

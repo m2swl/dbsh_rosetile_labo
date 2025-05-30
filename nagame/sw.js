@@ -1,6 +1,6 @@
 // sw.js
 
-const CACHE_NAME = 'ugoki';
+const CACHE_NAME = 'nagame';
 const urlsToCache = [
   './',
   './index.html',
