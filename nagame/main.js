@@ -8,7 +8,7 @@ let playbackSpeed = 1.0;
 let isPlaying = false;
 let animationFrameId;
 
-let bgShaderMaterial, backgroundScene, backgroundCamera; // 背景用 (Shader)
+let bgShaderMaterial, backgroundScene, backgroundCamera, bgMesh; // 背景用 (Shader)
 // Graph specific variables
 let graphLine, graphPoint, graphGeometry, graphMaterial, pointMesh; // Graph line and point
 let graphShadedAreaMesh, graphShadedAreaGeometry, graphShadedAreaMaterial; // Graph shaded area
@@ -59,6 +59,7 @@ const highlightMultiplierSlider = document.getElementById('highlightMultiplier')
 const highlightValueDisplay = document.getElementById('highlightValue');
 // Visualization mode toggle button
 const toggleVizModeButton = document.getElementById('toggleVizModeButton');
+const currentVizTextElement = document.getElementById('currentVizMode');
 
 
 // 状態変数
@@ -256,15 +257,19 @@ const particleFragmentShader = `
 function handleFileLoad(event) {
     const file = event.target.files[0];
     if (!file) {
+        console.log("handleFileLoad: No file selected.");
         return;
     }
 
+    console.log("handleFileLoad: File selected:", file.name);
     csvFileNameDisplay.textContent = file.name;
 
     const reader = new FileReader();
     reader.onload = (e) => {
         const text = e.target.result;
-        parseCSV(text);
+        parseCSV(text); // This updates sensorData
+        console.log("handleFileLoad: CSV parsed. sensorData.length:", sensorData.length);
+
         if (sensorData.length > 0) {
             const firstTimestamp = sensorData[0].timestamp;
             const lastTimestamp = sensorData[sensorData.length - 1].timestamp;
@@ -275,6 +280,7 @@ function handleFileLoad(event) {
             seekBar.value = 0;
             currentTimeDisplay.textContent = formatTime(0);
             seekBar.disabled = false;
+             console.log(`handleFileLoad: Data loaded. Total duration: ${totalDurationMs} ms.`);
 
             // Reset state for new data
             currentIndex = 0;
@@ -291,8 +297,7 @@ function handleFileLoad(event) {
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
             }
-            pauseAnimation(); // Ensure UI reflects paused state
-            resetButton.disabled = false;
+            pauseAnimation(); // Ensure UI reflects paused state - THIS ENABLES PLAY BUTTON
 
 
             // Initialize visuals and audio with the first data point (which has relative timestamp 0)
@@ -300,6 +305,7 @@ function handleFileLoad(event) {
 
             // Rebuild graph history for the very start
             rebuildGraphHistory(firstRow.timestamp); // timestamp is 0 here
+             console.log("handleFileLoad: Graph history rebuilt for start.");
 
             // Update visuals based on the current mode
              if (vizMode === 'shader') {
@@ -309,8 +315,10 @@ function handleFileLoad(event) {
                       bgShaderMaterial.uniforms.uTime.value = 0.0;
                       delete bgShaderMaterial.uniforms.uTime.lastFrameTime; // Clear lastFrameTime
                  }
+                  console.log("handleFileLoad: Shader visuals updated.");
              } else if (vizMode === 'graph') { // vizMode === 'graph'
                  updateGraphVisuals(firstRow);
+                  console.log("handleFileLoad: Graph visuals updated.");
              } else { // vizMode === 'particles'
                   clearParticles(); // Start with no particles
                   updateParticleVisuals(firstRow, 0); // Update uniforms based on first row (no emission)
@@ -318,14 +326,39 @@ function handleFileLoad(event) {
                   if (particleMaterial && particleMaterial.uniforms.uTime) {
                        particleMaterial.uniforms.uTime.value = 0.0;
                   }
+                  console.log("handleFileLoad: Particle visuals updated.");
              }
 
              // Update audio state based on the first frame (gain should be 0 as not playing)
             if (!isAudioInitialized) {
                  initAudio(); // Initialize audio context if not already
             }
+             // Ensure audio is reset to initial silent state on new file load
+             if (isAudioInitialized && audioContext && audioContext.state !== 'closed') {
+                 // Smoothly fade out gain if audio was active
+                 if (gainNode) {
+                     gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+                     gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.1);
+                     currentAudioParams.gain = 0;
+                 }
+                  // Reset audio parameters to defaults
+                  const currentTime = audioContext.currentTime;
+                  const smoothTime = 0.1;
+                  if (oscillator) oscillator.frequency.setTargetAtTime(440, currentTime, smoothTime);
+                  if (filterNode) {
+                      filterNode.frequency.setTargetAtTime(2500, currentTime, smoothTime);
+                      filterNode.Q.setTargetAtTime(1, currentTime, smoothTime);
+                  }
+                  // Also reset particle and photo time trackers in updateAudio
+                  updateAudio.lastStepTime = 0;
+                  updateAudio.lastPhotoTime = 0;
+                 currentAudioParams.frequency = 440;
+                 currentAudioParams.filterFreq = 2500;
+                 currentAudioParams.filterQ = 1;
+             }
+             // Audio parameters for the first frame (gain is 0 due to pause)
             const emotionFactor = getEmotionFactor(firstRow.sessionEmotion);
-            updateAudio(firstRow, emotionFactor);
+            updateAudio(firstRow, emotionFactor); // This will set the *target* parameters based on data, but gain will be 0
 
             // Initial render
             renderer.clear();
@@ -334,16 +367,18 @@ function handleFileLoad(event) {
             } else {
                  renderer.render(scene, camera);
             }
+             console.log("handleFileLoad: Initial render complete.");
 
 
         } else {
+            console.warn("handleFileLoad: No valid data rows found after parsing.");
             // Handle empty data case
             totalTimeDisplay.textContent = formatTime(0);
             seekBar.max = 0;
             seekBar.value = 0;
             currentTimeDisplay.textContent = formatTime(0);
             seekBar.disabled = true;
-            currentDataDisplay.textContent = 'No data loaded.';
+            currentDataDisplay.textContent = 'No data loaded or data invalid.';
             sensorData = [];
             currentIndex = 0;
             lastProcessedTimestamp = 0; // Reset timestamp
@@ -383,16 +418,29 @@ function handleFileLoad(event) {
             // Reset audio
              if (isAudioInitialized && audioContext && audioContext.state !== 'closed') {
                   // Stop sound, reset params
-                  gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.1);
-                  currentAudioParams.gain = 0;
+                  if (gainNode) {
+                      gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.1);
+                      currentAudioParams.gain = 0;
+                  }
                   // Optionally reset frequency/filter to defaults
-                  oscillator.frequency.setTargetAtTime(440, audioContext.currentTime, 0.1);
-                  filterNode.frequency.setTargetAtTime(2500, audioContext.currentTime, 0.1);
-                  filterNode.Q.setTargetAtTime(1, audioContext.currentTime, 0.1);
+                  const currentTime = audioContext.currentTime;
+                  const smoothTime = 0.1;
+                  if (oscillator) oscillator.frequency.setTargetAtTime(440, currentTime, smoothTime);
+                  if (filterNode) {
+                      filterNode.frequency.setTargetAtTime(2500, currentTime, smoothTime);
+                      filterNode.Q.setTargetAtTime(1, currentTime, smoothTime);
+                  }
                    currentAudioParams.frequency = 440;
                   currentAudioParams.filterFreq = 2500;
                   currentAudioParams.filterQ = 1;
+                  // Also reset particle and photo time trackers in updateAudio
+                  updateAudio.lastStepTime = 0;
+                  updateAudio.lastPhotoTime = 0;
              }
+
+             // Ensure pause button is disabled and play/reset are enabled if they shouldn't be clickable without data.
+             // But pauseAnimation handles this correctly if called. Let's ensure it's called here too.
+             pauseAnimation(); // This will set play/pause/reset button states correctly based on isPlaying=false
 
 
              renderer.clear();
@@ -401,6 +449,7 @@ function handleFileLoad(event) {
              } else {
                   renderer.render(scene, camera);
              }
+              console.log("handleFileLoad: No data loaded, reset visuals.");
         }
     };
     reader.readAsText(file);
@@ -411,7 +460,7 @@ function parseCSV(text) {
     const lines = text.split('\n').filter(line => line.trim() !== '');
     if (lines.length <= 1) {
         sensorData = [];
-        console.warn("CSV contains no data rows.");
+        console.warn("parseCSV: CSV contains no data rows.");
         return;
     }
 
@@ -432,12 +481,14 @@ function parseCSV(text) {
     });
 
      if (results.errors.length > 0) {
-         console.error("CSV parsing errors:", results.errors);
+         console.error("parseCSV: parsing errors:", results.errors);
          // Decide how to handle errors: proceed with valid rows or abort?
          // Let's proceed with valid rows
      }
 
-     sensorData = results.data.filter(data => data.timestamp != null && !isNaN(data.timestamp)); // Filter out rows without a valid timestamp
+     // Filter out rows without a valid timestamp OR if timestamp is not a finite number after dynamicTyping
+     sensorData = results.data.filter(data => data.timestamp != null && typeof data.timestamp === 'number' && isFinite(data.timestamp)); // Filter out rows without a valid timestamp
+
 
     // Ensure timestamps are relative to the first timestamp for easier calculation later
     if (sensorData.length > 0) {
@@ -449,22 +500,316 @@ function parseCSV(text) {
              // Otherwise, assume it's already relative or 0-based.
              // Given the context, it's likely Unix epoch ms or similar.
              // Let's always make it relative to the first timestamp found.
-             if (data.timestamp != null) {
+             if (data.timestamp != null && typeof data.timestamp === 'number' && isFinite(data.timestamp)) {
                 data.timestamp -= firstTimestamp;
              }
         });
          // Store the original first timestamp if needed elsewhere? Not currently used, but good practice maybe.
          // Let's adjust the logic to work with the adjusted timestamps (relative to the first)
          lastProcessedTimestamp = sensorData[0].timestamp; // This is now 0 after making relative
+         console.log(`parseCSV: Adjusted timestamps relative to first entry (${firstTimestamp}). First relative: ${sensorData[0].timestamp}`);
     } else {
          lastProcessedTimestamp = 0;
+         console.warn("parseCSV: No valid data points remaining after filtering.");
     }
 
-    console.log(`Loaded ${sensorData.length} data points.`);
+    console.log(`parseCSV: Loaded ${sensorData.length} data points.`);
      if (sensorData.length > 0) {
-         console.log("First data point:", sensorData[0]);
-         console.log("Last data point:", sensorData[sensorData.length - 1]);
+         console.log("parseCSV: First data point:", sensorData[0]);
+         console.log("parseCSV: Last data point:", sensorData[sensorData.length - 1]);
      }
+}
+
+
+// Helper function to toggle play/pause state
+function playAnimation() {
+    console.log("playAnimation called. sensorData.length:", sensorData.length);
+    if (sensorData.length === 0) {
+        console.warn("playAnimation: No data loaded, returning.");
+        // Optionally, provide user feedback here if needed
+        // currentDataDisplay.textContent = 'Cannot play: No data loaded.';
+        return;
+    }
+
+    isPlaying = true;
+    playButton.disabled = true;
+    pauseButton.disabled = false;
+    resetButton.disabled = true; // Disable reset while playing
+
+    // Resume AudioContext if suspended
+    if (isAudioInitialized && audioContext && audioContext.state === 'suspended') {
+         audioContext.resume().then(() => {
+              console.log("AudioContext resumed successfully.");
+               // Smoothly fade in gain after resume
+              if (gainNode) {
+                  // Use last calculated audio params which includes gain based on data BEFORE pause/seek
+                  // Let's use currentAudioParams.gain which reflects the last *intended* non-zero gain
+                  const targetGain = Math.min(0.15, Math.max(0, currentAudioParams.gain || 0.02)); // Default to small gain if state was 0
+                  gainNode.gain.cancelScheduledValues(audioContext.currentTime); // Clear any pending fades
+                  gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime); // Start ramp from current value
+                  gainNode.gain.linearRampToValueAtTime(targetGain, audioContext.currentTime + 0.2); // Fade in over 0.2s
+                  currentAudioParams.gain = targetGain; // Update state to the new target
+              }
+         }).catch(e => console.error("Error resuming AudioContext:", e));
+    } else if (isAudioInitialized && audioContext && audioContext.state === 'running') {
+         // If already running (e.g. after seek change when already playing), ensure gain is correct
+          if (gainNode) {
+               // Use last calculated audio params state
+              const targetGain = Math.min(0.15, Math.max(0, currentAudioParams.gain || 0.02));
+              gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+              gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+              gainNode.gain.linearRampToValueAtTime(targetGain, audioContext.currentTime + 0.2);
+              currentAudioParams.gain = targetGain;
+          }
+    }
+
+
+    // Determine the elapsed time based on the current index's timestamp
+    // This should be the timestamp of the current point relative to the CSV start.
+    const elapsedCsvTime = sensorData[currentIndex].timestamp; // This is relative to the CSV start (time 0)
+
+    // Calculate actualStartTime: performance.now() - (elapsed_csv_time / playback_speed)
+    // This sets the reference point for the animation timer.
+    actualStartTime = performance.now() - (elapsedCsvTime / playbackSpeed);
+     console.log(`playAnimation: Starting from CSV timestamp ${elapsedCsvTime} ms. actualStartTime set to ${actualStartTime}. Playback speed: ${playbackSpeed}`);
+
+
+    // Start the animation loop if it's not already running
+    if (animationFrameId === null) {
+        console.log("playAnimation: Starting animation loop.");
+        animate.lastFrameTime = performance.now(); // Reset lastFrameTime for delta calculation
+        animate();
+    } else {
+         console.log("playAnimation: Animation loop already running.");
+    }
+}
+
+function pauseAnimation() {
+    console.log("pauseAnimation called.");
+    isPlaying = false;
+    playButton.disabled = false;
+    pauseButton.disabled = true;
+    resetButton.disabled = false; // Enable reset when paused
+
+    // Pause AudioContext or just fade gain out
+     if (isAudioInitialized && audioContext && audioContext.state === 'running') {
+          if (gainNode) {
+              gainNode.gain.cancelScheduledValues(audioContext.currentTime); // Clear any pending ramps
+              gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime); // Start ramp from current value
+              gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2); // Fade out over 0.2s
+               currentAudioParams.gain = 0; // Update state
+          }
+     }
+
+    // The animate function will stop requesting frames when isPlaying is false
+    // cancelAnimationFrame(animationFrameId); // This is handled inside animate loop now
+    // animationFrameId = null; // Don't null it here, let animate loop handle it
+
+    // Render the current paused state (e.g., if user paused midway)
+    // This is implicitly handled by the next frame request (or lack thereof) and multiplier updates if done while paused.
+    // Explicitly render if needed after state change:
+     if (!isSeeking && sensorData.length > 0 && currentIndex >= 0) { // Only render if not seeking
+          console.log("pauseAnimation: Rendering current frame.");
+          const currentRow = sensorData[currentIndex];
+          if (vizMode === 'shader') {
+              updateShaderVisuals(currentRow);
+          } else if (vizMode === 'graph') {
+              updateGraphVisuals(currentRow);
+          } else { // vizMode === 'particles'
+               updateParticleVisuals(currentRow, 0);
+          }
+         renderer.clear();
+         if (vizMode === 'shader') {
+              renderer.render(backgroundScene, backgroundCamera);
+         } else {
+              renderer.render(scene, camera);
+         }
+     }
+}
+
+
+function resetAnimation() {
+    console.log("resetAnimation called.");
+    if (sensorData.length === 0) {
+        console.warn("resetAnimation: No data loaded, returning.");
+        return;
+    }
+
+    pauseAnimation(); // Ensure playback is stopped and UI is in paused state
+
+    currentIndex = 0;
+    lastProcessedTimestamp = 0; // Relative elapsed time
+    seekBar.value = 0;
+    currentTimeDisplay.textContent = formatTime(0);
+
+    // Reset actualStartTime
+    actualStartTime = performance.now(); // Reset relative to 'now' as if starting from 0
+    console.log(`resetAnimation: Reset playback to timestamp 0. actualStartTime set to ${actualStartTime}.`);
+
+
+    // Reset shader uTime
+    if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
+        bgShaderMaterial.uniforms.uTime.value = 0.0;
+        delete bgShaderMaterial.uniforms.uTime.lastFrameTime; // Ensure next animate frame starts fresh delta calculation
+    }
+
+    // Clear particle system and reset particle uTime
+    clearParticles();
+    if (particleMaterial && particleMaterial.uniforms.uTime) {
+        particleMaterial.uniforms.uTime.value = 0.0;
+    }
+
+
+    // Rebuild graph history from the beginning (timestamp 0)
+    rebuildGraphHistory(0);
+
+    // Update visuals and audio for the very first data point (timestamp 0)
+    const firstRow = sensorData[0];
+     if (firstRow) {
+          if (vizMode === 'shader') {
+               updateShaderVisuals(firstRow);
+          } else if (vizMode === 'graph') {
+               updateGraphVisuals(firstRow); // Update graph geometry for the start state
+          } else { // vizMode === 'particles'
+               updateParticleVisuals(firstRow, 0); // Update uniforms, no emission yet
+          }
+          const emotionFactor = getEmotionFactor(firstRow.sessionEmotion);
+          updateAudio(firstRow, emotionFactor); // Update audio state (gain will be 0 due to pause)
+     }
+
+
+    // Render the reset state
+     renderer.clear();
+     if (vizMode === 'shader') {
+         renderer.render(backgroundScene, backgroundCamera);
+     } else {
+         renderer.render(scene, camera);
+     }
+
+     resetButton.disabled = false; // Keep reset button enabled
+}
+
+// Function to switch visualization modes
+function setVisualizationMode(mode) {
+     if (vizMode === mode) {
+          console.log(`Already in mode: ${mode}`);
+          return; // Do nothing if already in this mode
+     }
+
+     console.log(`Switching visualization mode to: ${mode}`);
+
+     // Hide all visualization elements first
+     if (bgMesh) bgMesh.visible = false;
+     if (graphLine) graphLine.visible = false;
+     if (graphShadedAreaMesh) graphShadedAreaMesh.visible = false;
+     if (pointMesh) pointMesh.visible = false;
+     if (particleSystem) particleSystem.visible = false;
+
+     // Update vizMode state
+     const oldVizMode = vizMode;
+     vizMode = mode;
+
+     // Show elements for the new mode
+     switch (vizMode) {
+         case 'shader':
+             if (bgMesh) bgMesh.visible = true;
+             // If data is loaded, reset shader time and update visuals
+             if (sensorData.length > 0 && currentIndex >= 0) {
+                  const currentRow = sensorData[currentIndex];
+                  if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
+                       // Align shader time with current playback position
+                       const elapsedCsvTime = sensorData[currentIndex].timestamp;
+                       bgShaderMaterial.uniforms.uTime.value = elapsedCsvTime / 1000.0; // Convert ms to seconds
+                        delete bgShaderMaterial.uniforms.uTime.lastFrameTime; // Reset delta time calculation
+                  }
+                  updateShaderVisuals(currentRow);
+             } else {
+                  // No data loaded, reset shader to default empty state
+                   if (bgShaderMaterial && bgShaderMaterial.uniforms) {
+                       bgShaderMaterial.uniforms.uBaseColor.value.setRGB(0.2, 0.3, 0.7);
+                       bgShaderMaterial.uniforms.uHighlightIntensity.value = 0.1;
+                       bgShaderMaterial.uniforms.uEmotionSpeed.value = 0.5;
+                       bgShaderMaterial.uniforms.uEmotionIntensity.value = 0.3;
+                       bgShaderMaterial.uniforms.uColorVariety.value = 0.2;
+                       if (bgShaderMaterial.uniforms.uTime) bgShaderMaterial.uniforms.uTime.value = 0.0;
+                   }
+             }
+             break;
+         case 'graph':
+             if (graphLine) graphLine.visible = true;
+             if (graphShadedAreaMesh) graphShadedAreaMesh.visible = true;
+              // pointMesh visibility is handled by updateGraphVisuals
+             // If data is loaded, rebuild graph history up to current point and update visuals
+             if (sensorData.length > 0 && currentIndex >= 0) {
+                 const currentRow = sensorData[currentIndex];
+                  rebuildGraphHistory(currentRow.timestamp); // Rebuild history up to current time
+                 updateGraphVisuals(currentRow); // Update geometry based on history and current point
+             } else {
+                  // No data loaded, clear graph geometry
+                  if (graphGeometry) graphGeometry.setDrawRange(0, 0);
+                  if (graphShadedAreaGeometry) graphShadedAreaGeometry.setDrawRange(0, 0);
+                  if (pointMesh) pointMesh.visible = false;
+             }
+             break;
+         case 'particles':
+              if (particleSystem) particleSystem.visible = true;
+              // Clear existing particles when switching to particle mode
+              clearParticles();
+              // If data is loaded, reset particle time and update visuals
+              if (sensorData.length > 0 && currentIndex >= 0) {
+                   const currentRow = sensorData[currentIndex];
+                  if (particleMaterial && particleMaterial.uniforms.uTime) {
+                      // Align particle time with current playback position
+                      const elapsedCsvTime = sensorData[currentIndex].timestamp;
+                      particleMaterial.uniforms.uTime.value = elapsedCsvTime / 1000.0; // Convert ms to seconds
+                   }
+                   updateParticleVisuals(currentRow, 0); // Update uniforms for current state (no emission on mode switch)
+              } else {
+                   // No data loaded, ensure particle system is empty and time is 0
+                   if (particleMaterial && particleMaterial.uniforms.uTime) particleMaterial.uniforms.uTime.value = 0.0;
+                   clearParticles(); // Already called above, but safe
+              }
+              break;
+     }
+
+     // Update button icon and title
+     const iconElement = toggleVizModeButton.querySelector('.material-symbols-outlined');
+     if (mode === 'shader') {
+         iconElement.textContent = 'scatter_plot'; // Icon for Graph
+         toggleVizModeButton.title = 'Switch to Graph Visualization';
+          if (currentVizTextElement) currentVizTextElement.textContent = 'Shader';
+     } else if (mode === 'graph') {
+         iconElement.textContent = 'auto_awesome'; // Icon for Particles
+         toggleVizModeButton.title = 'Switch to Particle Visualization';
+          if (currentVizTextElement) currentVizTextElement.textContent = 'Graph';
+     } else { // Currently 'particles'
+         iconElement.textContent = 'palette'; // Icon for Shader
+         toggleVizModeButton.title = 'Switch to Shader Visualization';
+          if (currentVizTextElement) currentVizTextElement.textContent = 'Particles';
+     }
+
+
+    // Re-render the scene immediately after switching modes if not playing/seeking
+     if (!isPlaying && !isSeeking) {
+          console.log("Rendering after viz mode switch.");
+          renderer.clear();
+          if (vizMode === 'shader') {
+              renderer.render(backgroundScene, backgroundCamera);
+          } else {
+              renderer.render(scene, camera);
+          }
+     }
+}
+
+// Function to handle the visualization mode toggle button click
+function toggleVisualizationMode() {
+    if (vizMode === 'shader') {
+        setVisualizationMode('graph');
+    } else if (vizMode === 'graph') {
+        setVisualizationMode('particles');
+    } else { // Currently 'particles'
+        setVisualizationMode('shader');
+    }
 }
 
 
@@ -501,7 +846,7 @@ function init() {
         depthTest: false,
         depthWrite: false
     });
-    const bgMesh = new THREE.Mesh(bgPlaneGeo, bgShaderMaterial);
+    bgMesh = new THREE.Mesh(bgPlaneGeo, bgShaderMaterial); // Declare bgMesh globally
     backgroundScene.add(bgMesh);
 
     // Initialize graph visualization elements
@@ -699,6 +1044,7 @@ function initParticles() {
 
 // Helper to clear all active particles
 function clearParticles() {
+     console.log("clearParticles called.");
      particleCount = 0; // Reset logical active count
      // Mark all particles in the buffer as inactive by setting emission time
      // Set emission time far in the past
@@ -706,12 +1052,12 @@ function clearParticles() {
           pEmissionTimes[i] = -1000;
      }
      // Mark emissionTime attribute as needing update
-     if (particleGeometry) {
+     if (particleGeometry && particleGeometry.attributes.emissionTime) {
           particleGeometry.attributes.emissionTime.needsUpdate = true;
            // No need to reset draw range if shader discards based on age
            // particleGeometry.setDrawRange(0, 0); // Could set draw range to 0 if not using shader discard
      }
-      console.log("Cleared particles.");
+      console.log("Particles cleared.");
 }
 
 
@@ -727,8 +1073,8 @@ function emitParticles(data, emotionFactor) {
         emissionRatePerSec += (emotionFactor.particleMovement * 0.5 + emotionFactor.speedFactor * 0.3) * 50; // Base rate + emotion influence
     }
      // Add sensor influence
-     if (data.illuminance != null) emissionRatePerSec += Math.min(100, data.illuminance / 20); // More light, more particles (cap effect)
-     if (data.decibels != null) emissionRatePerSec += Math.min(100, (data.decibels + 40) / 5); // More noise, more particles (cap effect)
+     if (data.illuminance != null && typeof data.illuminance === 'number' && isFinite(data.illuminance)) emissionRatePerSec += Math.min(100, data.illuminance / 20); // More light, more particles (cap effect)
+     if (data.decibels != null && typeof data.decibels === 'number' && isFinite(data.decibels)) emissionRatePerSec += Math.min(100, (data.decibels + 40) / 5); // More noise, more particles (cap effect)
 
      // Apply manual multipliers to emission rate
      emissionRatePerSec *= manualIntensityMultiplier; // Use intensity multiplier for rate
@@ -744,6 +1090,7 @@ function emitParticles(data, emotionFactor) {
 
     if (frameEmissionCount <= 0) return;
 
+     // console.log(`Emitting ${frameEmissionCount} particles. Emission rate: ${emissionRatePerSec.toFixed(1)}/s`);
 
     // Determine particle parameters based on data/emotion/multipliers
     const baseLifespan = 3.0; // seconds
@@ -766,7 +1113,7 @@ function emitParticles(data, emotionFactor) {
      // Add highlight influence to color? Or just make it brighter?
      // Let's blend towards white based on calculated highlight value
      let dataHighlightValue = 0.05; // Recalculate data highlight
-     if (data.illuminance != null && typeof data.illuminance === 'number') {
+     if (data.illuminance != null && typeof data.illuminance === 'number' && isFinite(data.illuminance)) {
           // Log scale for illuminance mapping
          const minLogLux = Math.log(1);
          const maxLogLux = Math.log(10001); // Max + 1 to handle 0 lux
@@ -774,7 +1121,7 @@ function emitParticles(data, emotionFactor) {
          const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
          dataHighlightValue += luxNorm * 1.0; // Add up to 1.0
      }
-     if (data.decibels != null && typeof data.decibels === 'number') {
+     if (data.decibels != null && typeof data.decibels === 'number' && isFinite(data.decibels)) {
          // Simple linear mapping for decibels
          const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0)); // -40dB to 30dB -> 0 to 1
          dataHighlightValue += decibelNorm * 0.5; // Add up to 0.5
@@ -852,7 +1199,8 @@ function emitParticles(data, emotionFactor) {
      particleGeometry.attributes.color.needsUpdate = true;
 
      // Ensure the draw range covers all possible particles, shader hides inactive
-     // particleGeometry.setDrawRange(0, MAX_PARTICLES); // This is already set in initParticles
+     // This is already set in initParticles and should not need repeating per frame unless MAX_PARTICLES changes (it doesn't)
+     // particleGeometry.setDrawRange(0, MAX_PARTICLES);
 }
 
 
@@ -872,13 +1220,15 @@ function updateParticleVisuals(data, deltaTime) {
     for(const key of keysToShow){
         if(data[key] !== undefined && data[key] !== null){
             let value = data[key];
-             if (typeof value === 'number') {
+             if (typeof value === 'number' && isFinite(value)) {
                 if (!Number.isInteger(value)) {
                     value = value.toFixed(2);
                 }
                 if(key === 'temperature_celsius') value += ' °C';
                 if(key === 'decibels') value += ' dB';
                  if(key === 'timestamp') value = formatTime(value); // Format timestamp for display
+            } else if (typeof value === 'string') {
+                 value = value.trim(); // Clean up string values
             }
             dataStr += `${key}: ${value}\n`;
         }
@@ -911,7 +1261,7 @@ function updateParticleVisuals(data, deltaTime) {
         emitParticles(data, emotionFactor);
     }
 
-     // Ensure draw range is always MAX_PARTICLES, shader handles hiding
+     // Ensure draw range is always MAX_PARTICLES, shader hides inactive
      // This is already set in initParticles and should not need repeating per frame unless MAX_PARTICLES changes (it doesn't)
      // particleGeometry.setDrawRange(0, MAX_PARTICLES);
 }
@@ -925,13 +1275,15 @@ function updateShaderVisuals(data) {
     for(const key of keysToShow){
         if(data[key] !== undefined && data[key] !== null){
             let value = data[key];
-             if (typeof value === 'number') {
+             if (typeof value === 'number' && isFinite(value)) {
                 if (!Number.isInteger(value)) {
                     value = value.toFixed(2);
                 }
                 if(key === 'temperature_celsius') value += ' °C';
                 if(key === 'decibels') value += ' dB';
                 if(key === 'timestamp') value = formatTime(value); // Format timestamp for display
+            } else if (typeof value === 'string') {
+                 value = value.trim(); // Clean up string values
             }
             dataStr += `${key}: ${value}\n`;
         }
@@ -954,14 +1306,14 @@ function updateShaderVisuals(data) {
     bgShaderMaterial.uniforms.uBaseColor.value.lerp(targetBaseColor, lerpFactor);
 
     let dataHighlight = 0.05;
-    if (data.illuminance != null && typeof data.illuminance === 'number') {
+    if (data.illuminance != null && typeof data.illuminance === 'number' && isFinite(data.illuminance)) {
          const minLogLux = Math.log(1);
          const maxLogLux = Math.log(10001);
          const logLux = Math.log(Math.max(1, data.illuminance + 1));
          const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
          dataHighlight += luxNorm * 1.5;
     }
-    if (data.decibels != null && typeof data.decibels === 'number') {
+    if (data.decibels != null && typeof data.decibels === 'number' && isFinite(data.decibels)) {
         const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
         dataHighlight += decibelNorm * 0.6;
     }
@@ -1009,7 +1361,7 @@ function updateShaderVisuals(data) {
      // Photo flash effect - still applies in shader mode regardless of playback state
      // Only trigger flash if this is a new photo event at a timestamp > the last triggered flash timestamp
      // Use data.timestamp (relative to CSV start) for comparison
-     if (data.photoTakenId === 1 && typeof data.photoTakenId === 'number' && data.timestamp > (updateShaderVisuals.lastPhotoFlashTimestamp || 0)) {
+     if (data.photoTakenId === 1 && typeof data.photoTakenId === 'number' && isFinite(data.photoTakenId) && data.timestamp > (updateShaderVisuals.lastPhotoFlashTimestamp || 0)) {
          if (bgShaderMaterial) {
              const flashDurationMs = 150; // ms
              const flashAmount = 1.5; // How much to boost highlight intensity
@@ -1070,13 +1422,15 @@ function updateGraphVisuals(data) {
      for(const key of keysToShow){
          if(data[key] !== undefined && data[key] !== null){
              let value = data[key];
-              if (typeof value === 'number') {
+              if (typeof value === 'number' && isFinite(value)) {
                  if (!Number.isInteger(value)) {
                      value = value.toFixed(2);
                  }
                  if(key === 'temperature_celsius') value += ' °C';
                  if(key === 'decibels') value += ' dB';
                   if(key === 'timestamp') value = formatTime(value); // Format timestamp for display
+             } else if (typeof value === 'string') {
+                  value = value.trim(); // Clean up string values
              }
              dataStr += `${key}: ${value}\n`;
          }
@@ -1159,6 +1513,7 @@ function updateGraphVisuals(data) {
 
              // Get scaled X positions for p1 and p2 (using the same xRange and window mapping)
             const elapsedInWindow1 = p1.timestamp - windowStartTime;
+            const windowDuration = HISTORY_WINDOW_MS; // Fixed window duration
             const xNorm1 = (windowDuration > 0) ? (elapsedInWindow1 / windowDuration) : 0;
             const xPos1 = xNorm1 * xRange - xRange / 2;
 
@@ -1275,14 +1630,14 @@ function updateGraphVisualsHelper(data) {
 
     }
      let sensorBoostRaw = 0;
-     if (data.illuminance != null && typeof data.illuminance === 'number') {
+     if (data.illuminance != null && typeof data.illuminance === 'number' && isFinite(data.illuminance)) {
         const minLogLux = Math.log(1);
         const maxLogLux = Math.log(10001);
         const logLux = Math.log(Math.max(1, data.illuminance + 1));
         const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
         sensorBoostRaw += luxNorm * 0.5;
      }
-     if (data.decibels != null && typeof data.decibels === 'number') {
+     if (data.decibels != null && typeof data.decibels === 'number' && isFinite(data.decibels)) {
          const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
          sensorBoostRaw += decibelNorm * 0.3;
      }
@@ -1303,13 +1658,16 @@ function updateGraphVisualsHelper(data) {
 
 // Helper function to rebuild graph history upon seeking/reset/mode switch to graph
 function rebuildGraphHistory(seekAbsoluteTimestamp) {
+     console.log(`rebuildGraphHistory called for timestamp: ${seekAbsoluteTimestamp}`);
     if (sensorData.length === 0) {
         dataHistory = [];
+         console.log("rebuildGraphHistory: sensorData is empty, history cleared.");
         return;
     }
 
     // seekAbsoluteTimestamp is already relative to the start of the data (timestamp 0)
     const windowStartTime = seekAbsoluteTimestamp - HISTORY_WINDOW_MS;
+     console.log(`rebuildGraphHistory: Window start time: ${windowStartTime}`);
 
     dataHistory = [];
     // Find the index to start searching from. Efficiently jump close to windowStartTime.
@@ -1328,6 +1686,7 @@ function rebuildGraphHistory(seekAbsoluteTimestamp) {
     startIndex = Math.min(startIndex, sensorData.length - 1);
      // If data is empty after filtering, startIndex could be -1 or sensorData.length. Ensure it's valid.
      if (sensorData.length === 0) startIndex = 0;
+     console.log(`rebuildGraphHistory: Starting search from index: ${startIndex}`);
 
 
     // Add points within the history window up to the seek target timestamp
@@ -1350,7 +1709,7 @@ function rebuildGraphHistory(seekAbsoluteTimestamp) {
      // Ensure dataHistory is sorted by timestamp (should be if sensorData is sorted and logic is correct)
      dataHistory.sort((a, b) => a.timestamp - b.timestamp);
 
-     // console.log(`Rebuilt graph history for time ${seekAbsoluteTimestamp} ms. Found ${dataHistory.length} points.`);
+     console.log(`rebuildGraphHistory: Rebuilt graph history for time ${seekAbsoluteTimestamp} ms. Found ${dataHistory.length} points.`);
 }
 
 // Modify handleSeekBarInput
@@ -1358,6 +1717,7 @@ function handleSeekBarInput() {
     isSeeking = true;
     const seekTimeMs = parseFloat(seekBar.value);
     currentTimeDisplay.textContent = formatTime(seekTimeMs);
+     console.log(`handleSeekBarInput: Seeking to ${seekTimeMs} ms`);
 
     if (sensorData.length > 0) {
          // Find the data index closest to the seeked time (last index <= target time)
@@ -1373,6 +1733,8 @@ function handleSeekBarInput() {
              }
          }
         tempIndex = Math.max(0, Math.min(sensorData.length - 1, tempIndex));
+        console.log(`handleSeekBarInput: Found index ${tempIndex} for time ${seekTargetElapsedCsvTime} ms`);
+
 
         const currentRow = sensorData[tempIndex];
         if (currentRow) {
@@ -1382,13 +1744,15 @@ function handleSeekBarInput() {
              for(const key of keysToShow){
                  if(currentRow[key] !== undefined && currentRow[key] !== null){
                      let value = currentRow[key];
-                      if (typeof value === 'number') {
+                      if (typeof value === 'number' && isFinite(value)) {
                          if (!Number.isInteger(value)) {
                              value = value.toFixed(2);
                          }
                          if(key === 'temperature_celsius') value += ' °C';
                          if(key === 'decibels') value += ' dB';
                          if(key === 'timestamp') value = formatTime(value); // Format timestamp for display
+                     } else if (typeof value === 'string') {
+                          value = value.trim(); // Clean up string values
                      }
                      dataStr += `${key}: ${value}\n`;
                  }
@@ -1406,6 +1770,7 @@ function handleSeekBarInput() {
                        // Don't update lastFrameTime here, only in animate
                   }
                   if (!isPlaying) { // Render immediately if paused
+                      console.log("handleSeekBarInput: Rendering shader scene (paused/seeking).");
                       renderer.clear();
                       renderer.render(backgroundScene, backgroundCamera);
                   }
@@ -1416,6 +1781,7 @@ function handleSeekBarInput() {
                  // Update graph geometry based on the history and the data point at the seeked time (for pointMesh)
                  updateGraphVisuals(currentRow);
                   if (!isPlaying) { // Render immediately if paused
+                       console.log("handleSeekBarInput: Rendering graph scene (paused/seeking).");
                        renderer.clear();
                        renderer.render(scene, camera);
                   }
@@ -1428,6 +1794,7 @@ function handleSeekBarInput() {
                       particleMaterial.uniforms.uTime.value = seekTargetElapsedCsvTime / 1000.0; // Set based on elapsed time in seconds
                  }
                   if (!isPlaying) { // Render immediately if paused
+                       console.log("handleSeekBarInput: Rendering particle scene (paused/seeking).");
                        renderer.clear();
                        renderer.render(scene, camera);
                   }
@@ -1442,8 +1809,12 @@ function handleSeekBarInput() {
 
 // Modify handleSeekBarChange
 function handleSeekBarChange() {
+     console.log("handleSeekBarChange called.");
     isSeeking = false; // End seeking
-    if (sensorData.length === 0) return;
+    if (sensorData.length === 0) {
+        console.warn("handleSeekBarChange: No data loaded, returning.");
+        return;
+    }
 
     const seekTargetElapsedCsvTime = parseFloat(seekBar.value); // This is relative to start (0)
 
@@ -1458,6 +1829,7 @@ function handleSeekBarChange() {
      }
     newIndex = Math.max(0, Math.min(sensorData.length - 1, newIndex));
     currentIndex = newIndex;
+     console.log(`handleSeekBarChange: Seeked to index ${currentIndex} at timestamp ${sensorData[currentIndex].timestamp} ms`);
 
 
     // Reset actual start time based on the new currentIndex's timestamp
@@ -1465,6 +1837,7 @@ function handleSeekBarChange() {
     // Correction: actualStartTime should be calculated relative to the *start* of the CSV data (timestamp 0).
     // So, performance.now() - (elapsed_time_in_csv / playbackSpeed)
     actualStartTime = performance.now() - (seekTargetElapsedCsvTime / playbackSpeed);
+     console.log(`handleSeekBarChange: actualStartTime recalculated to ${actualStartTime}.`);
 
 
     // Rebuild graph history for the new seek point regardless of mode
@@ -1483,6 +1856,8 @@ function handleSeekBarChange() {
     if (sensorData[currentIndex]) {
       lastProcessedTimestamp = sensorData[currentIndex].timestamp; // Update last processed timestamp (relative elapsed time)
       const currentRow = sensorData[currentIndex];
+      console.log(`handleSeekBarChange: Updating visuals/audio for data point at index ${currentIndex}.`);
+
 
       if (vizMode === 'shader') {
         updateShaderVisuals(currentRow);
@@ -1503,47 +1878,47 @@ function handleSeekBarChange() {
     }
 
     if (isPlaying) {
+         console.log("handleSeekBarChange: Resuming playback.");
         // Restart animation loop if it was paused for seeking (shouldn't happen with current logic)
         if (animationFrameId === null) { // If animation was stopped (e.g., by seeking at the end)
              // Reset lastFrameTime for animate delta calculation upon resuming
             animate.lastFrameTime = performance.now();
-             animate();
+             animate(); // Request next frame to restart the loop
         }
 
          // Audio resume/fade in logic remains the same as playAnimation, triggered if isPlaying is true after seek
         if (isAudioInitialized && audioContext && audioContext.state === 'suspended') {
              audioContext.resume().then(() => {
+                  console.log("AudioContext resumed successfully after seek.");
                   if (gainNode) {
                       // Ensure target gain is correct for the current state (isPlaying, not seeking)
-                      const emotionFactor = sensorData[currentIndex] ? getEmotionFactor(sensorData[currentIndex].sessionEmotion) : getEmotionFactor(null);
-                      let targetGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, (getAudioTargetGain(sensorData[currentIndex], emotionFactor)))) : 0; // Recalculate intended gain
-                       // Use last calculated audio params which includes gain based on data BEFORE pause/seek
-                       // Let's use currentAudioParams.gain which reflects the last *intended* non-zero gain
-                       targetGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, currentAudioParams.gain || 0.02)) : 0;
+                      // Let's use currentAudioParams.gain which reflects the last *intended* non-zero gain
+                      const targetGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, currentAudioParams.gain || 0.02)) : 0;
 
                       gainNode.gain.cancelScheduledValues(audioContext.currentTime); // Clear any pending fades
                       gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
                       gainNode.gain.linearRampToValueAtTime(targetGain, audioContext.currentTime + 0.2);
                        currentAudioParams.gain = targetGain; // Update state to the new target
+                       console.log("Audio gain faded in after seek resume.");
                   }
              }).catch(e => console.error("Error resuming AudioContext:", e));
          } else if (isAudioInitialized && audioContext && audioContext.state === 'running') {
               // If already running, fade gain back in in case it was muted during seeking
              if (gainNode) {
                  // Recalculate intended gain for the current state (isPlaying, not seeking)
-                  const emotionFactor = sensorData[currentIndex] ? getEmotionFactor(sensorData[currentIndex].sessionEmotion) : getEmotionFactor(null);
-                  let targetGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, (getAudioTargetGain(sensorData[currentIndex], emotionFactor)))) : 0; // Recalculate intended gain
-                  targetGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, currentAudioParams.gain || 0.02)) : 0; // Use state
+                  const targetGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, currentAudioParams.gain || 0.02)) : 0;
 
                  gainNode.gain.cancelScheduledValues(audioContext.currentTime); // Clear any pending fades
                   gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
                   gainNode.gain.linearRampToValueAtTime(targetGain, audioContext.currentTime + 0.2);
                   currentAudioParams.gain = targetGain; // Update state
+                  console.log("Audio gain faded in after seek while running.");
              }
          }
 
 
     } else {
+         console.log("handleSeekBarChange: Not playing, rendering updated state.");
         // Not playing, render the updated state at the seeked position
         renderer.clear();
         if (vizMode === 'shader') {
@@ -1565,10 +1940,15 @@ function animate() {
 
 
     if (!isPlaying) {
-         animationFrameId = null;
          // If paused, we still need to render the current state if something changed (e.g. multiplier slider moved)
          // But we don't advance time or data index here.
          // Rendering is triggered by the change handlers (pauseAnimation, handleSeekBar*, updateMultiplierDisplay).
+         // We need to cancel the animation frame *if* the loop is still running after pause.
+         if (animationFrameId !== null) {
+              cancelAnimationFrame(animationFrameId);
+              animationFrameId = null;
+              console.log("Animation loop stopped due to isPlaying = false.");
+         }
          return; // Exit if not playing
     }
     animationFrameId = requestAnimationFrame(animate);
@@ -1605,7 +1985,8 @@ function animate() {
 
     const indexChanged = (nextIndex !== currentIndex);
 
-    if (indexChanged || currentIndex === 0) { // Process data point if index changed or it's the very first frame
+    if (indexChanged || (currentIndex === 0 && lastProcessedTimestamp === 0 && cappedElapsedTargetMs > 0)) { // Process data point if index changed or it's the very first step from 0
+         // console.log(`Index changed from ${currentIndex} to ${nextIndex} at target time ${cappedElapsedTargetMs} ms.`);
         currentIndex = nextIndex;
         const currentRow = sensorData[currentIndex];
         if (currentRow) {
@@ -1642,17 +2023,37 @@ function animate() {
         }
     } else {
          // Index hasn't changed, but need to update visuals that depend on continuous time (shaders, particles)
+         // Also, update audio parameters even if index hasn't strictly changed, as lerping happens over time.
          if (vizMode === 'shader' && bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
               // uTime update needs delta time and playback speed
-              const speedFactor = (bgShaderMaterial.uniforms.uEmotionSpeed.value || 1.0); // Get the current emotion speed factor uniform value
-              bgShaderMaterial.uniforms.uTime.value += deltaTime * playbackSpeed * speedFactor;
-              if(isNaN(bgShaderMaterial.uniforms.uTime.value)) bgShaderMaterial.uniforms.uTime.value = 0;
-         } else if (vizMode === 'particles' && sensorData.length > 0 && currentIndex >= 0) {
-              // updateParticleVisuals handles uniform updates and particle emission based on isPlaying
-              // Pass deltaTime so uTime advances and new particles can be emitted
-              updateParticleVisuals(sensorData[currentIndex], deltaTime);
+              // The shader's internal speed uniform is based on emotion, not playbackSpeed directly
+              // Let's just advance uTime based on elapsed *simulated* time since start
+              bgShaderMaterial.uniforms.uTime.value = cappedElapsedTargetMs / 1000.0; // Set shader time based on elapsed playback time
+              // The uEmotionSpeed uniform lerps to the target value in updateShaderVisuals (called when index changes or multipliers change)
+              // The shader uses uEmotionSpeed internally to affect animation rate.
+              // We don't need to multiply deltaTime by playbackSpeed or emotionFactor here, uTime is just elapsed time.
+              // Shader's internal time logic handles speed/emotion influence.
+         } else if (vizMode === 'particles' && particleMaterial && particleMaterial.uniforms.uTime) {
+              // Particle uTime should also just track elapsed time
+              particleMaterial.uniforms.uTime.value = cappedElapsedTargetMs / 1000.0;
+              // The uSpeedFactor uniform lerps to the target value in updateParticleVisuals
+               // Need to call updateParticleVisuals to potentially emit particles based on current data and deltaTime
+               if (sensorData.length > 0 && currentIndex >= 0) {
+                    updateParticleVisuals(sensorData[currentIndex], deltaTime); // Pass deltaTime for emission logic
+               }
          }
-         // Graph doesn't update unless index changes or multipliers change (handled by updateMultiplierDisplay)
+
+         // Update audio parameters even if index didn't change, as some changes might lerp over time.
+         // This is already handled by updateAudio being called in the indexChanged block.
+         // If index doesn't change, updateAudio isn't called *every* frame. Is this desired?
+         // Audio should probably update whenever *time* advances, not just when index changes.
+         // Let's move the audio update outside the indexChanged block.
+
+          if (sensorData.length > 0 && currentIndex >= 0) {
+             const currentRow = sensorData[currentIndex];
+             const emotionFactor = getEmotionFactor(currentRow.sessionEmotion);
+             updateAudio(currentRow, emotionFactor); // Update audio parameters based on the current data point state
+          }
     }
 
 
@@ -1675,7 +2076,8 @@ function animate() {
 
     // Animation end check
     // Check if the capped target time has reached or exceeded the total duration AND we are playing
-    if (isPlaying && totalDurationMs > 0 && cappedElapsedTargetMs >= totalDurationMs) {
+    if (isPlaying && totalDurationMs > 0 && currentElapsedTargetMs >= totalDurationMs) { // Use currentElapsedTargetMs here, not capped, to trigger *exactly* when time runs out
+        console.log("Animation reached end.");
         // Move to the very last data point for the final state update
         currentIndex = sensorData.length - 1;
         const lastRow = sensorData[currentIndex];
@@ -1780,6 +2182,7 @@ function toggleCustomizationPanel() {
 }
 
 function updateMultiplierDisplay(event) {
+     console.log("updateMultiplierDisplay called.");
     const sliderId = event.target.id;
     const value = parseFloat(event.target.value);
 
@@ -1802,6 +2205,7 @@ function updateMultiplierDisplay(event) {
     // Update visualization if not playing/seeking and data is loaded
      if (!isPlaying && !isSeeking && sensorData.length > 0 && currentIndex >= 0) {
          const currentRow = sensorData[currentIndex];
+         console.log("updateMultiplierDisplay: Updating visuals for paused/seeking state.");
          if (vizMode === 'shader') {
              // Recalculate shader uniforms based on the *current* data row and *new* multipliers
              updateShaderVisuals(currentRow);
@@ -1866,6 +2270,7 @@ function getEmotionFactor(emotionName) {
 function onWindowResize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
+    console.log(`onWindowResize: Resizing to ${width}x${height}`);
 
     if (camera && renderer && backgroundCamera) {
         camera.aspect = width / height;
@@ -1884,6 +2289,7 @@ function onWindowResize() {
         // Only render if not playing and not seeking, and data exists
         if (!isPlaying && !isSeeking && sensorData.length > 0 && currentIndex >= 0) {
              const currentRow = sensorData[currentIndex];
+             console.log("onWindowResize: Rendering current state after resize.");
              if (vizMode === 'shader') {
                   updateShaderVisuals(currentRow);
              } else if (vizMode === 'graph') { // vizMode === 'graph'
@@ -1905,6 +2311,7 @@ function onWindowResize() {
              }
         } else if (!isPlaying && !isSeeking) {
            // If no data, render the default scene based on mode
+             console.log("onWindowResize: Rendering default state after resize (no data).");
              renderer.clear();
              if (vizMode === 'shader') {
                  renderer.render(backgroundScene, backgroundCamera);
@@ -1914,8 +2321,8 @@ function onWindowResize() {
                       if (graphGeometry) graphGeometry.setDrawRange(0, 0);
                        if (graphShadedAreaGeometry) graphShadedAreaGeometry.setDrawRange(0, 0);
                       if (pointMesh) pointMesh.visible = false;
-                      graphLine.visible = true;
-                      graphShadedAreaMesh.visible = true;
+                      if (graphLine) graphLine.visible = true;
+                      if (graphShadedAreaMesh) graphShadedAreaMesh.visible = true;
                   } else if (vizMode === 'particles') {
                        clearParticles(); // Ensure no particles shown
                        if (particleSystem) particleSystem.visible = true; // Keep object visible but empty
@@ -1968,7 +2375,7 @@ function getAudioTargetGain(data, emotionFactor) {
      let targetGain = 0.02; // Base gain
 
      // Decibels -> Gain
-     if (data && data.decibels != null && typeof data.decibels === 'number') {
+     if (data && data.decibels != null && typeof data.decibels === 'number' && isFinite(data.decibels)) {
          const decibelNorm = Math.min(1, Math.max(0, (data.decibels + 40) / 70.0)); // -40dB to 30dB map to 0-1
          targetGain += decibelNorm * 0.06; // Add up to 0.06 to base gain
      }
@@ -2004,13 +2411,13 @@ function updateAudio(data, emotionFactor) {
     // Base gain is calculated by getAudioTargetGain, then adjusted based on state
 
     // Temperature -> Frequency
-    if (data.temperature_celsius != null && typeof data.temperature_celsius === 'number') {
+    if (data.temperature_celsius != null && typeof data.temperature_celsius === 'number' && isFinite(data.temperature_celsius)) {
         const tempNorm = Math.min(1, Math.max(0, (data.temperature_celsius - 10) / 25)); // 10°C -> 0, 35°C -> 1
         targetFreq = 220 + tempNorm * 660; // 220Hz (A3) から 880Hz (A5) の範囲で変化
     }
 
     // Decibels -> Filter frequency
-    if (data.decibels != null && typeof data.decibels === 'number') {
+    if (data.decibels != null && typeof data.decibels === 'number' && isFinite(data.decibels)) {
         // -40dB to 30dB map to 0-1
         const decibelNorm = Math.min(1, Math.max(0, (data.decibels + 40) / 70.0));
         targetFilterFreq = 2000 + decibelNorm * 3000; // 2000Hz to 5000Hz
@@ -2018,53 +2425,56 @@ function updateAudio(data, emotionFactor) {
 
     // Emotion -> Oscillator type, filter parameters, multipliers
     // Use emotionFactor directly for timbre/pitch/filter characteristics.
-    switch (data.sessionEmotion) {
-        case "楽しい":
-            oscillator.type = 'triangle';
-            targetFreq *= (1.0 + (emotionFactor.speedFactor - 1.0) * 0.2); // SpeedFactor influences pitch slightly
-            targetFilterFreq = 4000 + (emotionFactor.particleMovement - 1.0) * 1000; // Movement influences filter
-            targetFilterQ = 1.5 + (emotionFactor.sizeVariety - 1.0) * 0.5; // Size influences Q
-            break;
-        case "悲しい":
-            oscillator.type = 'sine';
-            targetFreq *= (1.0 - (1.0 - emotionFactor.speedFactor) * 0.2); // Inverse speed for sadness pitch?
-            targetFilterFreq = 800 + (1.0 - emotionFactor.colorVariety) * 500; // Color variety influences filter
-            targetFilterQ = 0.9;
-            break;
-        case "怒り":
-            oscillator.type = 'sawtooth';
-            targetFreq *= (1.0 + (emotionFactor.speedFactor - 1.0) * 0.3);
-            targetFilterFreq = 2500 + (emotionFactor.speedFactor - 1.0) * 1500 + Math.random() * 500; // Speed + random for filter
-            targetFilterQ = 3 + (emotionFactor.particleMovement - 1.0) * 2 + Math.random() * 1; // Movement + random for Q
-            break;
-        case "穏やか":
-            oscillator.type = 'sine';
-            targetFreq *= (1.0 - (1.0 - emotionFactor.speedFactor) * 0.1);
-            targetFilterFreq = 1800 + (emotionFactor.speedFactor - 1.0) * 500;
-            targetFilterQ = 1.2;
-            break;
-        default: // Other/Default
-            oscillator.type = 'sine';
-            targetFilterFreq = 2500;
-            targetFilterQ = 1.0;
-            break;
-    }
+     if (oscillator) { // Check if oscillator exists before changing type
+         switch (data.sessionEmotion) {
+             case "楽しい":
+                 oscillator.type = 'triangle';
+                 targetFreq *= (1.0 + (emotionFactor.speedFactor - 1.0) * 0.2); // SpeedFactor influences pitch slightly
+                 targetFilterFreq = 4000 + (emotionFactor.particleMovement - 1.0) * 1000; // Movement influences filter
+                 targetFilterQ = 1.5 + (emotionFactor.sizeVariety - 1.0) * 0.5; // Size influences Q
+                 break;
+             case "悲しい":
+                 oscillator.type = 'sine';
+                 targetFreq *= (1.0 - (1.0 - emotionFactor.speedFactor) * 0.2); // Inverse speed for sadness pitch?
+                 targetFilterFreq = 800 + (1.0 - emotionFactor.colorVariety) * 500; // Color variety influences filter
+                 targetFilterQ = 0.9;
+                 break;
+             case "怒り":
+                 oscillator.type = 'sawtooth';
+                 targetFreq *= (1.0 + (emotionFactor.speedFactor - 1.0) * 0.3);
+                 targetFilterFreq = 2500 + (emotionFactor.speedFactor - 1.0) * 1500 + Math.random() * 500; // Speed + random for filter
+                 targetFilterQ = 3 + (emotionFactor.particleMovement - 1.0) * 2 + Math.random() * 1; // Movement + random for Q
+                 break;
+             case "穏やか":
+                 oscillator.type = 'sine';
+                 targetFreq *= (1.0 - (1.0 - emotionFactor.speedFactor) * 0.1);
+                 targetFilterFreq = 1800 + (emotionFactor.speedFactor - 1.0) * 500;
+                 targetFilterQ = 1.2;
+                 break;
+             default: // Other/Default
+                 oscillator.type = 'sine';
+                 targetFilterFreq = 2500;
+                 targetFilterQ = 1.0;
+                 break;
+         }
+     }
+
 
     // Apply parameters smoothly, clamp values
     const finalFreq = Math.max(50, Math.min(10000, targetFreq));
-    if (finalFreq !== currentAudioParams.frequency) {
+    if (oscillator && finalFreq !== currentAudioParams.frequency) {
         oscillator.frequency.setTargetAtTime(finalFreq, currentTime, smoothTime);
         currentAudioParams.frequency = finalFreq;
     }
 
     const finalFilterFreq = Math.max(100, Math.min(8000, targetFilterFreq));
-    if (finalFilterFreq !== currentAudioParams.filterFreq) {
+    if (filterNode && finalFilterFreq !== currentAudioParams.filterFreq) {
         filterNode.frequency.setTargetAtTime(finalFilterFreq, currentTime, smoothTime);
-        currentAudioParams.filterFreq = finalFilterFreq;
+         currentAudioParams.filterFreq = finalFilterFreq;
     }
 
     const finalFilterQ = Math.max(0.1, Math.min(10, targetFilterQ));
-    if (finalFilterQ !== currentAudioParams.filterQ) {
+    if (filterNode && finalFilterQ !== currentAudioParams.filterQ) {
         filterNode.Q.setTargetAtTime(finalFilterQ, currentTime, smoothTime);
          currentAudioParams.filterQ = finalFilterQ;
     }
@@ -2074,10 +2484,11 @@ function updateAudio(data, emotionFactor) {
 
     // Apply gain smoothly, based on play/seek state
     const finalGain = isPlaying && !isSeeking ? calculatedTargetGainFromData : 0;
-    if (finalGain !== currentAudioParams.gain) {
+    if (gainNode && finalGain !== currentAudioParams.gain) {
          // Use linearRampToValueAtTime for smoother fade in/out than setTargetAtTime for large changes
          if (Math.abs(finalGain - gainNode.gain.value) > 0.01) { // Only ramp if there's a significant change
              gainNode.gain.cancelScheduledValues(currentTime); // Clear any pending ramps
+             gainNode.gain.setValueAtTime(gainNode.gain.value, currentTime); // Start ramp from current value
              gainNode.gain.linearRampToValueAtTime(finalGain, currentTime + smoothTime);
          } else {
               // If change is small, set instantly or use setTargetAtTime with very short time
@@ -2091,7 +2502,7 @@ function updateAudio(data, emotionFactor) {
     // steps_in_interval sound effect
     // Only trigger if steps > 0 and we haven't triggered recently (debounce based on audio context time)
     // Use audioContext.currentTime for timing comparison
-    if (data.steps_in_interval > 0 && typeof data.steps_in_interval === 'number') {
+    if (isPlaying && data.steps_in_interval > 0 && typeof data.steps_in_interval === 'number' && isFinite(data.steps_in_interval)) {
         // Debounce time should be inversely proportional to playback speed
         const stepDebounceTime = 0.1 / playbackSpeed; // seconds
         if (!updateAudio.lastStepTime || (currentTime - updateAudio.lastStepTime >= stepDebounceTime)) {
@@ -2143,7 +2554,7 @@ function updateAudio(data, emotionFactor) {
 
     // photoTakenId sound effect
     // Only trigger if photoTakenId is 1 and we haven't triggered recently (debounce based on audio context time)
-    if (data.photoTakenId === 1 && typeof data.photoTakenId === 'number') {
+    if (isPlaying && data.photoTakenId === 1 && typeof data.photoTakenId === 'number' && isFinite(data.photoTakenId)) {
         const photoDebounceTime = 0.5 / playbackSpeed; // seconds
          if (!updateAudio.lastPhotoTime || (currentTime - updateAudio.lastPhotoTime >= photoDebounceTime)) {
             // Create temporary nodes for the sound effect
@@ -2166,7 +2577,9 @@ function updateAudio(data, emotionFactor) {
 
             clickOsc.connect(clickFilter);
             clickFilter.connect(clickGain);
-            clickGain.connect(audioContext.destination);
+            gainNode.connect(audioContext.destination); // Connect to main gainNode? No, connect directly to destination for click sound.
+             clickGain.connect(audioContext.destination);
+
 
             // Start and stop sound
             clickOsc.start(currentTime);
