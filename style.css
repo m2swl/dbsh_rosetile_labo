@@ -33,6 +33,11 @@
     --nagame-color-surface-container: #90C8F0; /* Main Blue from image background */
     --nagame-color-on-surface-container: #001f30; /* Dark Blue for text on blue bg */
 
+    /* Origami Theme (Light) - Based on the provided blue image */
+    --origami-color-primary: #1f2d3d; /* Darker Blue from icon for text/accents */
+    --origami-color-surface-container: #FADEBC; /* Main Blue from image background */
+    --origami-color-on-surface-container: #001f30; /* Dark Blue for text on blue bg */
+
     /* Typography - MD3 scales (approximate) */
     --md-sys-typescale-headline-large-font-family-name: 'Noto Sans JP';
     --md-sys-typescale-headline-large-font-weight: 700;
@@ -194,6 +199,17 @@ body {
 }
 .project-card-nagame .body-medium {
     color: var(--nagame-color-on-surface-container);
+}
+
+.project-card-origami {
+    background-color: var(--origami-color-surface-container);
+}
+.project-card-origami .title-large,
+.project-card-origami .card-icon { /* Icon color for Origami */
+    color: var(--origami-color-primary);
+}
+.project-card-origami .body-medium {
+    color: var(--origami-color-on-surface-container);
 }
 
 
