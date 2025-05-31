@@ -1,7 +1,7 @@
 /* --- 基本テーマ変数 (Ugokiのstyle.cssより抜粋・調整) --- */
 :root {
     /* Light Theme (Yamabuki Gold based) */
-    --md-sys-color-primary: #FFC107; /* 山吹色 - プライマリ (例: Material Design 黄色系) */
+    --md-sys-color-primary: #422C00; /* 山吹色 - プライマリ (例: Material Design 黄色系) */
     --md-sys-color-on-primary: #422C00; /* プライマリ上のテキスト/アイコン */
     --md-sys-color-primary-container: #FFDEAD; /* 薄い山吹色/淡いオレンジ - プライマリコンテナ (例: ナバホホワイト) */
     --md-sys-color-on-primary-container: #2C1B00; /* プライマリコンテナ上のテキスト */
