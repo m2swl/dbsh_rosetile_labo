@@ -71,266 +71,279 @@
 body {
     margin: 0;
     overflow: hidden;
-    font-family: 'Noto Sans JP', Arial, sans-serif; /* Noto Sans JPを優先 */
+    font-family: 'Noto Sans JP', Arial, sans-serif;
     background-color: var(--md-sys-color-background);
     color: var(--md-sys-color-on-background);
     transition: background-color 0.3s ease, color 0.3s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 #controls {
     position: absolute;
     top: 10px;
     left: 10px;
-    padding: 10px;
-    background-color: color-mix(in srgb, var(--md-sys-color-surface-container-low) 90%, transparent); /* 半透明度を少し下げる */
+    padding: 12px; /* Increased padding slightly */
+    background-color: color-mix(in srgb, var(--md-sys-color-surface-container-low) 88%, transparent);
     border: 1px solid var(--md-sys-color-outline-variant);
-    border-radius: 12px; /* 丸みを調整 */
+    border-radius: 16px; /* More rounded */
     z-index: 10;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    max-width: calc(100vw - 40px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2); /* 影を濃く */
-    backdrop-filter: blur(5px); /* 背景を少しぼかす */
+    gap: 8px; /* Gap between items */
+    max-width: calc(100vw - 30px); /* Ensure padding from edge */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1); /* Softer shadow */
+    backdrop-filter: blur(8px); /* Stronger blur */
+    -webkit-backdrop-filter: blur(8px);
 }
 
 #controls label,
-#controls span {
-    margin-left: 10px;
-    margin-right: 5px;
+#controls span:not(.material-symbols-outlined) { /* Exclude icons from this span styling */
     color: var(--md-sys-color-on-surface-variant);
-    font-size: 0.9em;
-    white-space: nowrap; /* テキストが改行されないように */
+    font-size: 0.875em; /* 14px if base is 16px */
+    white-space: nowrap;
+    margin-right: 4px; /* Adjust spacing */
 }
+#controls span#speedValue,
+#controls span#currentVizModeText {
+    min-width: 3em; /* Ensure space for text like "5.0x" or "Shader" */
+    text-align: left;
+}
+
 
 #controls button {
-    margin-left: 10px;
-    margin-right: 5px;
-    margin-bottom: 5px; /* flex wrapで要素が下に移動した時に隙間を作る */
-    padding: 8px 16px; /* パディングを少し増やす */
-    border-radius: 20px; /* Pill shape */
-    border: none; /* 標準の枠線をなくす */
-    outline: 1px solid var(--md-sys-color-outline); /* Material Design風のアウトライン */
-    background-color: var(--md-sys-color-surface-container-high); /* ボタン背景色を調整 */
-    color: var(--md-sys-color-on-surface); /* ボタンテキスト色を調整 */
-    cursor: pointer;
-    transition: background-color 0.2s ease, outline-color 0.2s ease, color 0.2s ease;
-    font-size: 0.9em;
-    display: inline-flex; /* アイコンとテキストを中央揃え */
-    align-items: center;
-    gap: 4px; /* アイコンとテキストの隙間 */
-}
-#controls button .material-symbols-outlined {
-    font-size: 1.1em; /* アイコンサイズ */
-}
-
-/* Primary style for key actions like Play */
-#playButton {
-    background-color: var(--md-sys-color-primary);
-    color: var(--md-sys-color-on-primary);
-    outline: none; /* Primaryボタンはアウトラインなし */
-}
-
-#controls button:hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--md-sys-color-surface-container-high) 90%, var(--md-sys-color-on-surface-variant) 10%);
-    outline-color: var(--md-sys-color-outline);
-}
-#playButton:hover:not(:disabled) {
-     background-color: color-mix(in srgb, var(--md-sys-color-primary) 90%, var(--md-sys-color-on-primary) 10%);
-}
-
-
-#controls button:disabled {
-    outline-color: var(--md-sys-color-outline);
-    background-color: var(--md-sys-color-surface-variant);
-    color: var(--md-sys-color-on-surface-variant);
-    opacity: 0.7;
-    cursor: default;
-}
-
-.icon-button {
-    padding: 8px; /* アイコンボタンはパディングを均等に */
-    border-radius: 50%; /* 丸い形 */
-    width: 40px; /* 固定サイズ */
-    height: 40px; /* 固定サイズ */
-    justify-content: center; /* アイコンを中央に */
-    margin-left: 5px; /* 他のボタンとのマージン調整 */
-    margin-right: 5px; /* 他のボタンとのマージン調整 */
-    margin-bottom: 5px;
-}
-.icon-button .material-symbols-outlined {
-     font-size: 1.4em; /* アイコンサイズを大きく */
-}
-
-
-#controls input[type="file"] {
-    margin-left: 0;
-    margin-bottom: 5px; /* margin-bottomを追加 */
-    /* ブラウザデフォルトのファイル入力スタイルはテーマ適用が難しい */
-    color: var(--md-sys-color-on-surface-variant);
-}
-/* Attempt to style the file input button */
-#controls input[type="file"]::file-selector-button {
     padding: 8px 16px;
-    border-radius: 20px;
+    border-radius: 20px; /* Pill shape */
     border: none;
     outline: 1px solid var(--md-sys-color-outline);
     background-color: var(--md-sys-color-surface-container-high);
     color: var(--md-sys-color-on-surface);
     cursor: pointer;
-    transition: background-color 0.2s ease, outline-color 0.2s ease, color 0.2s ease;
-    font-size: 0.9em;
-    margin-right: 10px; /* ファイル名との隙間 */
+    transition: background-color 0.2s ease, outline-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    font-size: 0.875em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px; /* Icon-text gap */
+    line-height: 1.2; /* Ensure text vertical alignment */
+    min-height: 36px; /* Consistent height */
+}
+#controls button .material-symbols-outlined {
+    font-size: 1.2em; /* Icon size relative to button font */
+}
+
+#playButton {
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+    outline: none;
+}
+#playButton:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--md-sys-color-primary) 90%, var(--md-sys-color-on-primary) 10%);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+#controls button:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--md-sys-color-surface-container-high) 90%, var(--md-sys-color-on-surface-variant) 10%);
+    outline-color: var(--md-sys-color-primary); /* Highlight outline on hover */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+#controls button:disabled {
+    background-color: var(--md-sys-color-surface-variant);
+    color: var(--md-sys-color-on-surface-variant);
+    outline-color: var(--md-sys-color-outline-variant); /* Muted outline for disabled */
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.icon-button {
+    padding: 8px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+}
+.icon-button .material-symbols-outlined {
+     font-size: 1.4em;
+}
+
+#controls input[type="file"] {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 0.875em;
+}
+#controls input[type="file"]::file-selector-button {
+    padding: 7px 15px; /* Slightly adjusted from button */
+    border-radius: 20px;
+    border: none;
+    outline: 1px solid var(--md-sys-color-outline);
+    background-color: var(--md-sys-color-secondary-container); /* Different color for distinction */
+    color: var(--md-sys-color-on-secondary-container);
+    cursor: pointer;
+    transition: background-color 0.2s ease, outline-color 0.2s ease;
+    font-size: 0.875em; /* Match parent */
+    margin-right: 8px;
 }
 #controls input[type="file"]::file-selector-button:hover {
-     background-color: color-mix(in srgb, var(--md-sys-color-surface-container-high) 90%, var(--md-sys-color-on-surface-variant) 10%);
+     background-color: color-mix(in srgb, var(--md-sys-color-secondary-container) 90%, var(--md-sys-color-on-secondary-container) 10%);
+     outline-color: var(--md-sys-color-primary);
 }
 
 #controls input[type="range"] {
-    margin-left: 5px;
-    vertical-align: middle;
-    flex-grow: 1; /* seekBarContainer内で幅を広げる */
-    /* TODO: More detailed range input styling might be needed for full theme consistency */
-    -webkit-appearance: none; /* デフォルトスタイルを解除 */
+    -webkit-appearance: none;
     appearance: none;
-    height: 8px; /* トラックの高さ */
-    background: var(--md-sys-color-surface-variant); /* トラックの色 */
+    height: 8px;
+    background: var(--md-sys-color-surface-variant);
     border-radius: 4px;
     outline: none;
     transition: background 0.2s ease;
+    cursor: pointer;
+    flex-grow: 1;
 }
 #controls input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 16px; /* ツマミの幅 */
-    height: 16px; /* ツマミの高さ */
-    background: var(--md-sys-color-primary); /* ツマミの色 */
+    width: 18px; /* Slightly larger thumb */
+    height: 18px;
+    background: var(--md-sys-color-primary);
     border-radius: 50%;
     cursor: pointer;
-    margin-top: -4px; /* トラックの中央に配置 */
-    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-    transition: background 0.2s ease;
+    margin-top: -5px; /* Adjust for thumb height */
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    transition: background 0.2s ease, transform 0.1s ease;
 }
 #controls input[type="range"]::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     background: var(--md-sys-color-primary);
     border-radius: 50%;
+    border: none; /* Remove default border for Firefox */
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-    transition: background 0.2s ease;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    transition: background 0.2s ease, transform 0.1s ease;
 }
-#controls input[type="range"]:hover::-webkit-slider-thumb {
-    background: var(--md-sys-color-primary); /* Hover時も同じ色か、少し濃く */
-}
-#controls input[type="range"]:hover::-moz-range-thumb {
-    background: var(--md-sys-color-primary);
+#controls input[type="range"]:active::-webkit-slider-thumb,
+#controls input[type="range"]:active::-moz-range-thumb {
+    transform: scale(1.1); /* Slight scale on active */
 }
 
 
 #visualizationContainer {
     width: 100vw;
     height: 100vh;
-    background-color: var(--md-sys-color-background); /* テーマの色を使う */
+    background-color: var(--md-sys-color-background);
+    position: fixed; /* Ensure it's behind controls */
+    top: 0;
+    left: 0;
+    z-index: 0;
 }
 
 #dataDisplayContainer {
     position: absolute;
     bottom: 10px;
     left: 10px;
-    padding: 8px 12px;
-    background-color: color-mix(in srgb, var(--md-sys-color-surface-container-lowest) 85%, transparent); /* 半透明度を少し下げる */
+    padding: 10px 14px;
+    background-color: color-mix(in srgb, var(--md-sys-color-surface-container-lowest) 85%, transparent);
     border: 1px solid var(--md-sys-color-outline-variant);
-    border-radius: 12px; /* 丸みを調整 */
+    border-radius: 12px;
     z-index: 10;
-    font-size: 0.75em; /* 少し小さく */
-    max-width: 300px; /* 幅を少し広げる */
-    max-height: 200px; /* 高さを少し増やす */
+    font-size: 0.8em;
+    max-width: 320px;
+    max-height: 220px;
     overflow-y: auto;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     color: var(--md-sys-color-on-surface);
-    backdrop-filter: blur(5px); /* 背景を少しぼかす */
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 #dataDisplayContainer p {
     margin-top: 0;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     color: var(--md-sys-color-on-surface-variant);
+    font-weight: 500; /* Slightly bolder file name line */
 }
 #currentData pre {
     margin: 0;
-    font-family: monospace;
+    font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, Courier, monospace; /* Monospaced font stack */
     white-space: pre-wrap;
     word-break: break-all;
     color: var(--md-sys-color-on-surface);
+    line-height: 1.4;
 }
 
 #seekBarContainer {
-    width: 100%;
-    margin-top: 8px;
+    width: 100%; /* Take full width of controls flex item */
     display: flex;
     align-items: center;
-    padding: 5px 0;
-    flex-wrap: nowrap; /* シークバー関連は折り返さない */
+    padding: 4px 0;
+    gap: 8px;
+    flex-basis: 100%; /* Force to new line if controls wrap */
+    order: 10; /* Ensure it's at the bottom of the controls panel when wrapped */
 }
 #seekBarContainer input[type="range"] {
-    margin-left: 0;
-    margin-right: 10px;
+    margin: 0; /* Remove default margins */
 }
 #seekBarContainer span {
-    margin-left: 0px;
-    margin-right: 0px;
-    min-width: 40px; /* MM:SS 形式で幅を確保 */
+    min-width: 40px;
     text-align: center;
     font-size: 0.85em;
     color: var(--md-sys-color-on-surface-variant);
 }
 
 #customizationPanel {
-    width: 100%; /* コントロールパネルの幅に合わせる */
+    width: 100%;
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid var(--md-sys-color-outline-variant); /* 上部に区切り線 */
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+    flex-basis: 100%; /* Take full width */
+    order: 5; /* Position below main controls but above seekbar if wrapped */
 }
 #customizationPanel.hidden {
     display: none;
 }
+#customizationPanel .panel-content { /* Added for potentially better structure if needed */
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
 #customizationPanel .slider-group {
     display: flex;
     align-items: center;
-    margin-bottom: 8px;
-    width: 100%;
-    gap: 8px; /* ラベルとスライダーの隙間 */
+    gap: 8px;
 }
 #customizationPanel .slider-group label {
-     margin: 0; /* 親から継承するマージンをリセット */
-     min-width: 80px; /* ラベルの最小幅 */
-     white-space: nowrap;
+     margin: 0;
+     min-width: 90px; /* Ensure labels align */
+     font-size: 0.875em;
 }
 #customizationPanel .slider-group input[type="range"] {
     flex-grow: 1;
-    margin: 0; /* 親から継承するマージンをリセット */
+    margin: 0;
 }
 #customizationPanel .slider-group span {
-     margin: 0; /* 親から継承するマージンをリセット */
-     min-width: 35px; /* 値表示の最小幅 */
+     margin: 0;
+     min-width: 40px; /* Space for "3.0x" */
      text-align: right;
+     font-size: 0.875em;
 }
 
 /* Custom scrollbar for data display */
 #dataDisplayContainer::-webkit-scrollbar {
     width: 8px;
 }
-
 #dataDisplayContainer::-webkit-scrollbar-track {
     background: var(--md-sys-color-surface-container);
     border-radius: 4px;
 }
-
 #dataDisplayContainer::-webkit-scrollbar-thumb {
-    background: var(--md-sys-color-outline-variant);
+    background: var(--md-sys-color-outline); /* Darker thumb */
     border-radius: 4px;
 }
-
 #dataDisplayContainer::-webkit-scrollbar-thumb:hover {
-    background: var(--md-sys-color-outline);
+    background: var(--md-sys-color-primary); /* Highlight on hover */
+}
+
+/* Ensure Material Symbols are vertically aligned */
+.material-symbols-outlined {
+    vertical-align: middle;
 }

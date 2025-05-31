@@ -18,6 +18,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 
     <link href="style.css" rel="stylesheet">
+
+    <!-- Libraries (ensure PapaParse and Three.js are loaded before main.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Three.js Post-Processing (Commented out as not used in current main.js) -->
+    <!--
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/BokehPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/BokehShader.js"></script>
+    -->
+
+    <!-- main.js is loaded last and relies on DOMContentLoaded -->
+    <script src="main.js"></script>
+
 </head>
 <body>
     <div id="controls">
@@ -30,56 +47,44 @@
         <span id="speedValue">1.0x</span>
 
         <button id="toggleDarkModeButton" class="icon-button" title="Toggle Dark Mode"><span class="material-symbols-outlined">dark_mode</span></button>
-        <button id="toggleCustomizationButton" class="icon-button" title="Toggle Customization Panel"><span class="material-symbols-outlined">tune</span> カスタム</button>
-        <!-- New button for visualization mode -->
-        <button id="toggleVizModeButton" class="icon-button" title="Switch Visualization"><span class="material-symbols-outlined">blur_on</span> Viz 切替</button>
+        <button id="toggleCustomizationButton" class="icon-button" title="Toggle Customization Panel"><span class="material-symbols-outlined">tune</span></button>
+        <button id="toggleVizModeButton" class="icon-button" title="Switch Visualization"><span class="material-symbols-outlined">blur_on</span></button>
+        <span id="currentVizModeText">Shader</span>
 
         <div id="seekBarContainer">
-            <input type="range" id="seekBar" value="0" min="0" step="1"> <!-- step=1ms -->
-            <span id="currentTimeDisplay">0:00.00</span>/<span id="totalTimeDisplay">0:00.00</span>
+            <input type="range" id="seekBar" value="0" min="0" step="1" disabled>
+            <span id="currentTimeDisplay">0:00</span>/<span id="totalTimeDisplay">0:00</span>
         </div>
 
         <div id="customizationPanel" class="hidden">
-            <div class="slider-group">
-                <label for="intensityMultiplier">強度乗数:</label>
-                <input type="range" id="intensityMultiplier" min="0.1" max="3.0" step="0.1" value="1.0">
-                <span id="intensityValue">1.0x</span>
+            <div class="panel-content">
+                <div class="slider-group">
+                    <label for="intensityMultiplier">強度乗数:</label>
+                    <input type="range" id="intensityMultiplier" min="0.1" max="3.0" step="0.1" value="1.0">
+                    <span id="intensityValue">1.0x</span>
+                </div>
+                <div class="slider-group">
+                    <label for="varietyMultiplier">多様性乗数:</label>
+                    <input type="range" id="varietyMultiplier" min="0.1" max="3.0" step="0.1" value="1.0">
+                    <span id="varietyValue">1.0x</span>
+                </div>
+                <div class="slider-group">
+                    <label for="highlightMultiplier">ハイライト乗数:</label>
+                    <input type="range" id="highlightMultiplier" min="0.1" max="3.0" step="0.1" value="1.0">
+                    <span id="highlightValue">1.0x</span>
+                </div>
             </div>
-            <div class="slider-group">
-                <label for="varietyMultiplier">多様性乗数:</label>
-                <input type="range" id="varietyMultiplier" min="0.1" max="3.0" step="0.1" value="1.0">
-                <span id="varietyValue">1.0x</span>
-            </div>
-            <div class="slider-group">
-                 <label for="highlightMultiplier">ハイライト乗数:</label>
-                 <input type="range" id="highlightMultiplier" min="0.1" max="3.0" step="0.1" value="1.0">
-                 <span id="highlightValue">1.0x</span>
-             </div>
         </div>
     </div>
 
     <div id="dataDisplayContainer">
         <p>CSV File: <span id="csvFileName">N/A</span></p>
         <div id="currentData">
-            <!-- データはJSで動的に挿入 -->
+            Loading...
         </div>
     </div>
 
     <div id="visualizationContainer"></div>
-
-    <!-- ライブラリの読み込み -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
-
-    <!-- Three.jsのポストプロセッシング関連 - Keep these here just in case, although not strictly used by this feature -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/BokehPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/BokehShader.js"></script>
-
-    <script src="main.js" defer></script>
 
 </body>
 </html>
