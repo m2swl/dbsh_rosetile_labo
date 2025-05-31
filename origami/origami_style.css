@@ -1,0 +1,195 @@
+/* --- 基本テーマ変数 (Ugokiのstyle.cssより抜粋・調整) --- */
+:root {
+    /* Light Theme (Yamabuki Gold based) */
+    --md-sys-color-primary: #FFC107; /* 山吹色 - プライマリ (例: Material Design 黄色系) */
+    --md-sys-color-on-primary: #422C00; /* プライマリ上のテキスト/アイコン */
+    --md-sys-color-primary-container: #FFDEAD; /* 薄い山吹色/淡いオレンジ - プライマリコンテナ (例: ナバホホワイト) */
+    --md-sys-color-on-primary-container: #2C1B00; /* プライマリコンテナ上のテキスト */
+
+    --md-sys-color-secondary: #705D41; /* セカンダリ (例: 黄土色系) */
+    --md-sys-color-on-secondary: #FFFFFF;
+    --md-sys-color-secondary-container: #FADEBC; /* 薄いセカンダリ */
+    --md-sys-color-on-secondary-container: #281A05;
+
+    --md-sys-color-tertiary: #536543; /* ターシャリ (例: オリーブグリーン系) */
+    --md-sys-color-on-tertiary: #FFFFFF;
+    --md-sys-color-tertiary-container: #D8EABE; /* 薄いターシャリ */
+    --md-sys-color-on-tertiary-container: #121F06;
+
+    --md-sys-color-error: #BA1A1A; /* エラーカラーは変更なしでも可 */
+    --md-sys-color-on-error: #FFFFFF;
+    --md-sys-color-error-container: #FFDAD6;
+    --md-sys-color-on-error-container: #410002;
+
+    --md-sys-color-background: #FFFCF4; /* 背景 (例: 非常に薄いクリーム色) */
+    --md-sys-color-on-background: #1F1B13; /* 背景上のテキスト */
+    --md-sys-color-surface: #FFFCF4; /* サーフェス */
+    --md-sys-color-on-surface: #1F1B13; /* サーフェス上のテキスト */
+    --md-sys-color-surface-variant: #F0E2CF; /* サーフェスバリアント (例: 薄いベージュ) */
+    --md-sys-color-on-surface-variant: #4E4639; /* サーフェスバリアント上のテキスト */
+
+    --md-sys-color-outline: #817667; /* アウトライン */
+    --md-sys-color-outline-variant: #D3C5B4; /* アウトラインバリアント */
+
+    --md-sys-color-surface-container-lowest: #FFFFFF; /* 白 */
+    --md-sys-color-surface-container-low: #FFF8EC; /* さらに薄いクリーム */
+    --md-sys-color-surface-container: #F8F2E2; /* 薄いクリーム/ベージュ */
+    --md-sys-color-surface-container-high: #F2EDD8;
+    --md-sys-color-surface-container-highest: #EDE7D2;
+
+    --app-font-family: 'Noto Sans JP', sans-serif;
+    --app-bar-height: 56px;
+}
+
+[data-theme="dark"] {
+    /* Dark Theme (Yamabuki Gold based) */
+    --md-sys-color-primary: #FFC107; /* ダークテーマでも山吹色をアクセントに */
+    --md-sys-color-on-primary: #583700;
+    --md-sys-color-primary-container: #7A5000; /* プライマリコンテナ (暗め) */
+    --md-sys-color-on-primary-container: #FFDEAD; /* 薄い山吹色 (明るいテキスト) */
+
+    --md-sys-color-secondary: #DDC2A1; /* セカンダリ (明るめ) */
+    --md-sys-color-on-secondary: #3F2E17;
+    --md-sys-color-secondary-container: #58442B; /* セカンダリコンテナ (暗め) */
+    --md-sys-color-on-secondary-container: #FADEBC;
+
+    --md-sys-color-tertiary: #BCCD9D; /* ターシャリ (明るめ) */
+    --md-sys-color-on-tertiary: #263619;
+    --md-sys-color-tertiary-container: #3C4D2D; /* ターシャリコンテナ (暗め) */
+    --md-sys-color-on-tertiary-container: #D8EABE;
+
+    --md-sys-color-error: #FFB4AB;
+    --md-sys-color-on-error: #690005;
+    --md-sys-color-error-container: #93000A;
+    --md-sys-color-on-error-container: #FFDAD6;
+
+    --md-sys-color-background: #17130B; /* 背景 (非常に暗い茶色/黒に近い) */
+    --md-sys-color-on-background: #EAE1D2; /* 背景上のテキスト (明るいベージュ) */
+    --md-sys-color-surface: #17130B; /* サーフェス */
+    --md-sys-color-on-surface: #EAE1D2; /* サーフェス上のテキスト */
+    --md-sys-color-surface-variant: #4E4639; /* サーフェスバリアント (暗い茶色) */
+    --md-sys-color-on-surface-variant: #D3C5B4; /* サーフェスバリアント上のテキスト */
+
+    --md-sys-color-outline: #9C8F80; /* アウトライン */
+    --md-sys-color-outline-variant: #4E4639; /* アウトラインバリアント */
+
+    --md-sys-color-surface-container-lowest: #120E07; /* さらに暗い */
+    --md-sys-color-surface-container-low: #1F1B13; /* 背景より少し明るい */
+    --md-sys-color-surface-container: #241F17;
+    --md-sys-color-surface-container-high: #2E2921;
+    --md-sys-color-surface-container-highest: #39342B;
+}
+
+body {
+    font-family: var(--app-font-family);
+    margin: 0;
+    background-color: var(--md-sys-color-background);
+    color: var(--md-sys-color-on-background);
+    transition: background-color 0.3s ease, color 0.3s ease;
+    padding-top: var(--app-bar-height);
+    box-sizing: border-box;
+}
+
+.app-bar {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: var(--app-bar-height);
+    background-color: var(--md-sys-color-surface-variant);
+    color: var(--md-sys-color-on-surface-variant);
+    display: flex; align-items: center; padding: 0 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+.app-bar h1 { font-size: 1.25rem; margin: 0; flex-grow: 1; font-weight: 500; }
+
+.main-content {
+    width: 100%;
+    /* height: calc(100vh - var(--app-bar-height)); */ /* Ugokiのナビゲーションバーは無いので調整 */
+    overflow-y: auto;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.generator-container {
+    background-color: var(--md-sys-color-surface-container-low);
+    padding: 20px;
+    border-radius: 12px; /* Ugokiのカード風 */
+    border: 1px solid var(--md-sys-color-outline-variant);
+    max-width: 900px; /* 表示幅を制限 */
+    margin: 0 auto;
+}
+
+.file-input {
+    padding: 10px 15px;
+    border-radius: 20px; /* Material 3 like button */
+    border: 1px solid var(--md-sys-color-primary);
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    font-family: var(--app-font-family);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.file-input:hover {
+    background-color: color-mix(in srgb, var(--md-sys-color-primary-container) 85%, var(--md-sys-color-on-primary-container) 15%);
+}
+
+
+.origami-display-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px; /* 以前の30pxから少し詰める */
+    margin-top: 20px;
+    align-items: flex-start;
+    justify-content: center; /* 中央寄せ */
+}
+
+#origamiCanvas {
+    border: 1px solid var(--md-sys-color-outline); 
+    background-color: #fff; /* SVG背景はJSで動的に設定されるが、フォールバック */
+    flex-shrink: 0;
+    max-width: 100%; /* Ensure it's responsive */
+}
+
+.description-panel { /* 以前の #description */
+    flex-basis: 300px;
+    flex-grow: 1;
+    background-color: var(--md-sys-color-surface-container);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.description-panel h3 {
+    color: var(--md-sys-color-primary);
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 1.1em;
+}
+.description-panel p {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--md-sys-color-on-surface-variant);
+}
+.description-panel p strong {
+    color: var(--md-sys-color-on-surface);
+    font-weight: 500;
+}
+
+
+#dataInfluence .parameter-influence { /* 以前の .parameter-influence */
+    background-color: var(--md-sys-color-surface-container-high);
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 0.85em;
+    border-left: 3px solid var(--md-sys-color-secondary);
+}
+#dataInfluence .parameter-influence strong {
+    color: var(--md-sys-color-secondary); /* PrimaryからSecondaryへ変更 */
+    font-weight: 700;
+}
+
+h2 {
+    color: var(--md-sys-color-primary);
+    font-weight: 500;
+}
