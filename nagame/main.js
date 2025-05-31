@@ -1126,6 +1126,11 @@ function emitParticles(data, emotionFactor) {
          const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0)); // -40dB to 30dB -> 0 to 1
          dataHighlightValue += decibelNorm * 0.5; // Add up to 0.5
      }
+      // Check for photoTakenId as a highlight trigger
+     if (data.photoTakenId === 1 && typeof data.photoTakenId === 'number' && isFinite(data.photoTakenId)) {
+         dataHighlightValue += 1.0; // Add a significant boost for photo events
+     }
+
      // Apply highlight multiplier to the calculated data highlight influence
      const finalHighlightInfluence = Math.max(0.0, Math.min(2.0, dataHighlightValue * manualHighlightMultiplier)); // Cap influence
 
@@ -1270,25 +1275,25 @@ function updateParticleVisuals(data, deltaTime) {
 // Rename original updateVisuals to updateShaderVisuals
 function updateShaderVisuals(data) {
     // Update data display (always show data regardless of viz mode) - Duplicated, see note in updateParticleVisuals
-    let dataStr = "";
-    const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval', 'photoTakenId'];
-    for(const key of keysToShow){
-        if(data[key] !== undefined && data[key] !== null){
-            let value = data[key];
-             if (typeof value === 'number' && isFinite(value)) {
-                if (!Number.isInteger(value)) {
-                    value = value.toFixed(2);
-                }
-                if(key === 'temperature_celsius') value += ' °C';
-                if(key === 'decibels') value += ' dB';
-                if(key === 'timestamp') value = formatTime(value); // Format timestamp for display
-            } else if (typeof value === 'string') {
-                 value = value.trim(); // Clean up string values
-            }
-            dataStr += `${key}: ${value}\n`;
-        }
-    }
-    currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
+     let dataStr = "";
+     const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval', 'photoTakenId'];
+     for(const key of keysToShow){
+         if(data[key] !== undefined && data[key] !== null){
+             let value = data[key];
+              if (typeof value === 'number' && isFinite(value)) {
+                 if (!Number.isInteger(value)) {
+                     value = value.toFixed(2);
+                 }
+                 if(key === 'temperature_celsius') value += ' °C';
+                 if(key === 'decibels') value += ' dB';
+                 if(key === 'timestamp') value = formatTime(value); // Format timestamp for display
+             } else if (typeof value === 'string') {
+                  value = value.trim(); // Clean up string values
+             }
+             dataStr += `${key}: ${value}\n`;
+         }
+     }
+     currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
 
 
     // --- Update Shader Uniforms ---
@@ -1317,6 +1322,11 @@ function updateShaderVisuals(data) {
         const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
         dataHighlight += decibelNorm * 0.6;
     }
+     // Check for photoTakenId as a highlight trigger
+     if (data.photoTakenId === 1 && typeof data.photoTakenId === 'number' && isFinite(data.photoTakenId)) {
+         dataHighlight += 1.0; // Add a significant boost
+     }
+
     const finalHighlight = Math.max(0.0, Math.min(3.0, dataHighlight * manualHighlightMultiplier));
     bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(
          bgShaderMaterial.uniforms.uHighlightIntensity.value,
@@ -1641,6 +1651,11 @@ function updateGraphVisualsHelper(data) {
          const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
          sensorBoostRaw += decibelNorm * 0.3;
      }
+     // Check for photoTakenId as a boost trigger for the graph Y
+     if (data.photoTakenId === 1 && typeof data.photoTakenId === 'number' && isFinite(data.photoTakenId)) {
+         sensorBoostRaw += 0.5; // Add a boost for photo events
+     }
+
       // Apply highlight multiplier ONLY to the sensor boost part, as it's meant to represent external "highlight" events
      const sensorBoostMultiplied = sensorBoostRaw * manualHighlightMultiplier;
 
@@ -1985,7 +2000,8 @@ function animate() {
 
     const indexChanged = (nextIndex !== currentIndex);
 
-    if (indexChanged || (currentIndex === 0 && lastProcessedTimestamp === 0 && cappedElapsedTargetMs > 0)) { // Process data point if index changed or it's the very first step from 0
+    // Process data point if index changed or it's the very first step from 0 and time has advanced
+    if (indexChanged || (currentIndex === 0 && lastProcessedTimestamp === 0 && cappedElapsedTargetMs > 0)) {
          // console.log(`Index changed from ${currentIndex} to ${nextIndex} at target time ${cappedElapsedTargetMs} ms.`);
         currentIndex = nextIndex;
         const currentRow = sensorData[currentIndex];
@@ -2024,35 +2040,26 @@ function animate() {
     } else {
          // Index hasn't changed, but need to update visuals that depend on continuous time (shaders, particles)
          // Also, update audio parameters even if index hasn't strictly changed, as lerping happens over time.
-         if (vizMode === 'shader' && bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
-              // uTime update needs delta time and playback speed
-              // The shader's internal speed uniform is based on emotion, not playbackSpeed directly
-              // Let's just advance uTime based on elapsed *simulated* time since start
-              bgShaderMaterial.uniforms.uTime.value = cappedElapsedTargetMs / 1000.0; // Set shader time based on elapsed playback time
-              // The uEmotionSpeed uniform lerps to the target value in updateShaderVisuals (called when index changes or multipliers change)
-              // The shader uses uEmotionSpeed internally to affect animation rate.
-              // We don't need to multiply deltaTime by playbackSpeed or emotionFactor here, uTime is just elapsed time.
-              // Shader's internal time logic handles speed/emotion influence.
-         } else if (vizMode === 'particles' && particleMaterial && particleMaterial.uniforms.uTime) {
-              // Particle uTime should also just track elapsed time
-              particleMaterial.uniforms.uTime.value = cappedElapsedTargetMs / 1000.0;
-              // The uSpeedFactor uniform lerps to the target value in updateParticleVisuals
-               // Need to call updateParticleVisuals to potentially emit particles based on current data and deltaTime
-               if (sensorData.length > 0 && currentIndex >= 0) {
-                    updateParticleVisuals(sensorData[currentIndex], deltaTime); // Pass deltaTime for emission logic
-               }
-         }
-
-         // Update audio parameters even if index didn't change, as some changes might lerp over time.
-         // This is already handled by updateAudio being called in the indexChanged block.
-         // If index doesn't change, updateAudio isn't called *every* frame. Is this desired?
-         // Audio should probably update whenever *time* advances, not just when index changes.
-         // Let's move the audio update outside the indexChanged block.
 
           if (sensorData.length > 0 && currentIndex >= 0) {
              const currentRow = sensorData[currentIndex];
+
+               // Update shader uTime if in shader mode
+             if (vizMode === 'shader' && bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
+                   bgShaderMaterial.uniforms.uTime.value = cappedElapsedTargetMs / 1000.0; // Set shader time based on elapsed playback time
+             }
+               // Update particle uTime and emit particles if in particle mode
+             if (vizMode === 'particles') {
+                 if (particleMaterial && particleMaterial.uniforms.uTime) {
+                     particleMaterial.uniforms.uTime.value = cappedElapsedTargetMs / 1000.0;
+                 }
+                 // Need to call updateParticleVisuals to emit particles based on current data and deltaTime
+                 updateParticleVisuals(currentRow, deltaTime); // Pass deltaTime for emission logic
+              }
+
+             // Update audio parameters based on the current data point state
              const emotionFactor = getEmotionFactor(currentRow.sessionEmotion);
-             updateAudio(currentRow, emotionFactor); // Update audio parameters based on the current data point state
+             updateAudio(currentRow, emotionFactor);
           }
     }
 
@@ -2577,8 +2584,7 @@ function updateAudio(data, emotionFactor) {
 
             clickOsc.connect(clickFilter);
             clickFilter.connect(clickGain);
-            gainNode.connect(audioContext.destination); // Connect to main gainNode? No, connect directly to destination for click sound.
-             clickGain.connect(audioContext.destination);
+             clickGain.connect(audioContext.destination); // Connect to main gainNode? No, connect directly to destination for click sound.
 
 
             // Start and stop sound
@@ -2603,8 +2609,8 @@ function formatTime(ms) {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
      const milliseconds = Math.floor((ms % 1000) / 10); // Get tenths of a second
-     return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
-    // return `${minutes}:${seconds.toString().padStart(2, '0')}`; // Keep MM:SS format for display
+     // return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`; // Keep MM:SS.ms format for display
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`; // Keep MM:SS format for display
 }
 
 // ウィンドウリサイズイベントリスナーを追加
