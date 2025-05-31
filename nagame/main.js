@@ -1,9 +1,8 @@
-
 // グローバル変数
 let scene, camera, renderer;
 let sensorData = [];
 let currentIndex = 0;
-let animationStartTime = 0;
+let actualStartTime = 0; // Actual start time of playback relative to performance.now()
 let lastProcessedTimestamp = 0;
 let playbackSpeed = 1.0;
 let isPlaying = false;
@@ -16,6 +15,16 @@ let graphShadedAreaMesh, graphShadedAreaGeometry, graphShadedAreaMaterial; // Gr
 let dataHistory = [];
 const HISTORY_WINDOW_MS = 15000; // 15 seconds history window for the graph
 const MAX_HISTORY_POINTS = 500; // Limit number of points in history for performance
+
+// Particle specific variables
+let particleGeometry, particleMaterial, particleSystem;
+let particleTexture;
+const MAX_PARTICLES = 5000; // Maximum number of particles
+
+// Particle attributes for BufferGeometry (fixed size arrays)
+let pPositions, pVelocities, pEmissionTimes, pLifespans, pSizes, pColors;
+let pAttributeIndex = 0; // Index for writing to buffer attributes (wrap around)
+let particleCount = 0; // Logical count of emitted particles (resets on clear/reset)
 
 
 let audioContext, oscillator, gainNode, filterNode; // 音声用
@@ -55,7 +64,7 @@ const toggleVizModeButton = document.getElementById('toggleVizModeButton');
 // 状態変数
 let darkModeEnabled = false;
 let customizationPanelVisible = false; // Customization panel state
-let vizMode = 'shader'; // 'shader' or 'graph'
+let vizMode = 'shader'; // 'shader', 'graph', or 'particles'
 let manualIntensityMultiplier = 1.0;
 let manualVarietyMultiplier = 1.0;
 let manualHighlightMultiplier = 1.0;
@@ -170,22 +179,314 @@ const backgroundFragmentShader = `
     }
 `;
 
+// Particle shader code
+const particleVertexShader = `
+    attribute vec3 initialPosition;
+    attribute vec3 initialVelocity;
+    attribute float emissionTime;
+    attribute float lifespan;
+    attribute float size;
+    attribute vec4 color; // rgb + alpha
+
+    uniform float uTime; // Time in seconds since start of particle visualization
+    uniform float uSpeedFactor; // Use for scaling movement speed
+
+    varying vec4 vColor;
+
+    void main() {
+        float age = uTime - emissionTime;
+        // Discard particles that are dead or haven't been emitted yet
+        if (age < 0.0 || age > lifespan) {
+            gl_Position = vec4(1e20); // Move far away (using vec4(value) sets xyz and w=value)
+            vColor = vec4(0.0);
+            gl_PointSize = 0.0;
+            return;
+        }
+
+        // Calculate position based on initial state, age, and speed factor
+        // Add a little vertical random wiggle?
+        vec3 currentPosition = initialPosition + initialVelocity * age * uSpeedFactor;
+         // currentPosition.y += sin(age * 5.0) * 0.05; // Example wiggle
+
+
+        // Perspective scaling for point size
+        // The size attribute is the desired pixel size.
+        // THREE.js handles perspective scaling when sizeAttenuation: true is used with Points material
+        gl_PointSize = size; // Point size in pixels
+
+
+        // Calculate transparency based on age (fade in/out)
+        float fadeStartTime = lifespan * 0.05; // Start fading in after 5% life
+        float fadeEndTime = lifespan * 0.8; // Start fading out after 80% life
+        float alpha = color.a;
+        if (age < fadeStartTime) {
+            alpha *= smoothstep(0.0, fadeStartTime, age);
+        } else if (age > fadeEndTime) {
+            alpha *= (1.0 - smoothstep(fadeEndTime, lifespan, age));
+        }
+
+        vColor = vec4(color.rgb, alpha);
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(currentPosition, 1.0);
+    }
+`;
+
+const particleFragmentShader = `
+    uniform sampler2D uTexture;
+
+    varying vec4 vColor;
+
+    void main() {
+        // Sample the texture at the current point coordinate
+        vec4 texColor = texture2D(uTexture, gl_PointCoord);
+
+        // Combine texture color with particle color and opacity
+        vec4 finalColor = texColor * vColor;
+
+        // Discard fragments with very low alpha to avoid rendering invisible parts
+        // This helps performance and transparency sorting artifacts
+        if (finalColor.a < 0.005) discard;
+
+        gl_FragColor = finalColor;
+    }
+`;
+
+
+// ファイル読み込み処理
+function handleFileLoad(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    csvFileNameDisplay.textContent = file.name;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target.result;
+        parseCSV(text);
+        if (sensorData.length > 0) {
+            const firstTimestamp = sensorData[0].timestamp;
+            const lastTimestamp = sensorData[sensorData.length - 1].timestamp;
+            const totalDurationMs = lastTimestamp - firstTimestamp; // Total duration from first to last point
+
+            totalTimeDisplay.textContent = formatTime(totalDurationMs);
+            seekBar.max = totalDurationMs; // Max value is total duration
+            seekBar.value = 0;
+            currentTimeDisplay.textContent = formatTime(0);
+            seekBar.disabled = false;
+
+            // Reset state for new data
+            currentIndex = 0;
+            // lastProcessedTimestamp should track the timestamp *from the original CSV*, not relative one
+            // The relative timestamps are used internally for calculation, but seeking/display should use original relative values.
+            // Let's clarify timestamp usage:
+            // sensorData[i].timestamp is NOW relative to the first entry's timestamp (which is treated as 0).
+            // seek bar value is relative elapsed time (0 to totalDurationMs).
+            // lastProcessedTimestamp should track the current relative elapsed time.
+             lastProcessedTimestamp = 0; // Relative timestamp
+
+            isPlaying = false;
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            pauseAnimation(); // Ensure UI reflects paused state
+            resetButton.disabled = false;
+
+
+            // Initialize visuals and audio with the first data point (which has relative timestamp 0)
+            const firstRow = sensorData[0];
+
+            // Rebuild graph history for the very start
+            rebuildGraphHistory(firstRow.timestamp); // timestamp is 0 here
+
+            // Update visuals based on the current mode
+             if (vizMode === 'shader') {
+                 updateShaderVisuals(firstRow);
+                  // Reset shader uTime to 0 for the start
+                 if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
+                      bgShaderMaterial.uniforms.uTime.value = 0.0;
+                      delete bgShaderMaterial.uniforms.uTime.lastFrameTime; // Clear lastFrameTime
+                 }
+             } else if (vizMode === 'graph') { // vizMode === 'graph'
+                 updateGraphVisuals(firstRow);
+             } else { // vizMode === 'particles'
+                  clearParticles(); // Start with no particles
+                  updateParticleVisuals(firstRow, 0); // Update uniforms based on first row (no emission)
+                 // Reset particle uTime to 0 for the start
+                  if (particleMaterial && particleMaterial.uniforms.uTime) {
+                       particleMaterial.uniforms.uTime.value = 0.0;
+                  }
+             }
+
+             // Update audio state based on the first frame (gain should be 0 as not playing)
+            if (!isAudioInitialized) {
+                 initAudio(); // Initialize audio context if not already
+            }
+            const emotionFactor = getEmotionFactor(firstRow.sessionEmotion);
+            updateAudio(firstRow, emotionFactor);
+
+            // Initial render
+            renderer.clear();
+            if (vizMode === 'shader') {
+                 renderer.render(backgroundScene, backgroundCamera);
+            } else {
+                 renderer.render(scene, camera);
+            }
+
+
+        } else {
+            // Handle empty data case
+            totalTimeDisplay.textContent = formatTime(0);
+            seekBar.max = 0;
+            seekBar.value = 0;
+            currentTimeDisplay.textContent = formatTime(0);
+            seekBar.disabled = true;
+            currentDataDisplay.textContent = 'No data loaded.';
+            sensorData = [];
+            currentIndex = 0;
+            lastProcessedTimestamp = 0; // Reset timestamp
+            dataHistory = []; // Clear graph history
+            clearParticles(); // Clear particle history
+
+
+            // Reset visuals to default empty state
+             if (vizMode === 'shader') {
+                  if (bgShaderMaterial && bgShaderMaterial.uniforms) {
+                       bgShaderMaterial.uniforms.uBaseColor.value.setRGB(0.2, 0.3, 0.7); // Default color
+                       bgShaderMaterial.uniforms.uHighlightIntensity.value = 0.1;
+                       bgShaderMaterial.uniforms.uEmotionSpeed.value = 0.5;
+                       bgShaderMaterial.uniforms.uEmotionIntensity.value = 0.3;
+                       bgShaderMaterial.uniforms.uColorVariety.value = 0.2;
+                       if (bgShaderMaterial.uniforms.uTime) {
+                           bgShaderMaterial.uniforms.uTime.value = 0.0;
+                            delete bgShaderMaterial.uniforms.uTime.lastFrameTime;
+                       }
+                  }
+             } else if (vizMode === 'graph') { // vizMode === 'graph'
+                 if (graphGeometry) graphGeometry.setDrawRange(0, 0);
+                 if (graphShadedAreaGeometry) graphShadedAreaGeometry.setDrawRange(0, 0);
+                 if (pointMesh) pointMesh.visible = false;
+                 // Keep graph objects visible but empty
+                 if (graphLine) graphLine.visible = true;
+                 if (graphShadedAreaMesh) graphShadedAreaMesh.visible = true;
+             } else { // vizMode === 'particles'
+                  clearParticles(); // Ensure no particles are displayed
+                   if (particleSystem && particleMaterial && particleMaterial.uniforms.uTime) {
+                       particleMaterial.uniforms.uTime.value = 0.0;
+                       if (particleSystem) particleSystem.visible = true; // Keep object visible but empty
+                  }
+             }
+
+
+            // Reset audio
+             if (isAudioInitialized && audioContext && audioContext.state !== 'closed') {
+                  // Stop sound, reset params
+                  gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.1);
+                  currentAudioParams.gain = 0;
+                  // Optionally reset frequency/filter to defaults
+                  oscillator.frequency.setTargetAtTime(440, audioContext.currentTime, 0.1);
+                  filterNode.frequency.setTargetAtTime(2500, audioContext.currentTime, 0.1);
+                  filterNode.Q.setTargetAtTime(1, audioContext.currentTime, 0.1);
+                   currentAudioParams.frequency = 440;
+                  currentAudioParams.filterFreq = 2500;
+                  currentAudioParams.filterQ = 1;
+             }
+
+
+             renderer.clear();
+             if (vizMode === 'shader') {
+                  renderer.render(backgroundScene, backgroundCamera);
+             } else {
+                  renderer.render(scene, camera);
+             }
+        }
+    };
+    reader.readAsText(file);
+}
+
+
+function parseCSV(text) {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length <= 1) {
+        sensorData = [];
+        console.warn("CSV contains no data rows.");
+        return;
+    }
+
+    const headers = lines[0].split(',');
+    const dataRows = lines.slice(1);
+
+    // Use PapaParse for more robust CSV parsing
+    const results = PapaParse.parse(dataRows.join('\n'), {
+         header: true,
+         skipEmptyLines: true,
+         dynamicTyping: (header) => {
+             // Automatically detect numbers for known numeric fields
+             if (['timestamp', 'temperature_celsius', 'illuminance', 'decibels', 'accelX', 'accelY', 'accelZ', 'gyroX', 'gyroY', 'gyroZ', 'steps_in_interval', 'photoTakenId'].includes(header.trim())) {
+                 return true; // Try to parse as number
+             }
+              return false; // Keep as string
+         }
+    });
+
+     if (results.errors.length > 0) {
+         console.error("CSV parsing errors:", results.errors);
+         // Decide how to handle errors: proceed with valid rows or abort?
+         // Let's proceed with valid rows
+     }
+
+     sensorData = results.data.filter(data => data.timestamp != null && !isNaN(data.timestamp)); // Filter out rows without a valid timestamp
+
+    // Ensure timestamps are relative to the first timestamp for easier calculation later
+    if (sensorData.length > 0) {
+        const firstTimestamp = sensorData[0].timestamp;
+        sensorData.forEach(data => {
+             // Check if timestamp is already relative (e.g., if CSV provided it that way)
+             // Assume the first timestamp is the base unless it looks like an absolute value far from 0.
+             // Simple check: if first timestamp > 10 years in ms, assume epoch time and make relative.
+             // Otherwise, assume it's already relative or 0-based.
+             // Given the context, it's likely Unix epoch ms or similar.
+             // Let's always make it relative to the first timestamp found.
+             if (data.timestamp != null) {
+                data.timestamp -= firstTimestamp;
+             }
+        });
+         // Store the original first timestamp if needed elsewhere? Not currently used, but good practice maybe.
+         // Let's adjust the logic to work with the adjusted timestamps (relative to the first)
+         lastProcessedTimestamp = sensorData[0].timestamp; // This is now 0 after making relative
+    } else {
+         lastProcessedTimestamp = 0;
+    }
+
+    console.log(`Loaded ${sensorData.length} data points.`);
+     if (sensorData.length > 0) {
+         console.log("First data point:", sensorData[0]);
+         console.log("Last data point:", sensorData[sensorData.length - 1]);
+     }
+}
+
+
 // 初期化処理
 function init() {
-    scene = new THREE.Scene(); // Used for Graph
+    // Scene is shared for Graph and Particles
+    scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 1.0; // Camera position for Graph/Shader elements at Z=0
+    // Position camera slightly back if needed for the scale of Graph/Particles, but Z=1 works for the current setup mapping Y to -1/1
+    camera.position.z = 1.0; // Camera position for Graph/Particle elements at Z=0
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.autoClear = false;
+    renderer.autoClear = false; // We will manually clear if needed (e.g., between shader and other renders)
     vizContainer.appendChild(renderer.domElement);
 
     // Setup for the Shader background
     backgroundScene = new THREE.Scene();
-    backgroundCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1); // Fixed orthographic camera for the 2D shader plane
-    const bgPlaneGeo = new THREE.PlaneGeometry(2, 2); // Plane covers the whole screen (-1 to 1 in orthographic space)
+    // Fixed orthographic camera for the 2D shader plane (covers -1 to 1 in X and Y)
+    backgroundCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const bgPlaneGeo = new THREE.PlaneGeometry(2, 2); // Plane covers the whole screen
     bgShaderMaterial = new THREE.ShaderMaterial({
         vertexShader: backgroundVertexShader,
         fragmentShader: backgroundFragmentShader,
@@ -193,7 +494,7 @@ function init() {
             uTime: { value: 0.0 },
             uBaseColor: { value: new THREE.Color(0.2, 0.3, 0.7) }, // 初期ベースカラー (RGB)
             uHighlightIntensity: { value: 0.1 },                 // 初期ハイライト強度
-            uEmotionSpeed: { value: 0.5 },                       // 感情による速度係数
+            uEmotionSpeed: { value: 0.5 },                       // 感情による速度係数 (shaders internal speed)
             uEmotionIntensity: { value: 0.3 },                   // 感情による変化の強さ係数
             uColorVariety: { value: 0.2 }                        // 感情による色の多様性
         },
@@ -206,6 +507,9 @@ function init() {
     // Initialize graph visualization elements
     initGraph();
 
+    // Initialize particle visualization elements
+    initParticles();
+
 
     // イベントリスナー設定
     csvFileInput.addEventListener('change', handleFileLoad);
@@ -215,26 +519,39 @@ function init() {
     speedControl.addEventListener('input', (e) => {
         playbackSpeed = parseFloat(e.target.value);
         speedValueDisplay.textContent = `${playbackSpeed.toFixed(1)}x`;
-        // Playback speed affects uEmotionSpeed calculation in updateShaderVisuals and graph x-axis time mapping
+        // Playback speed affects the animation loop's time progression
          if (!isPlaying && !isSeeking && sensorData.length > 0 && currentIndex >= 0) {
+              // If paused, update visuals to reflect potential changes influenced by speed (e.g., graph x-axis mapping)
+              // Although current graph implementation scales the *window* dynamically, not the playback speed.
+              // Speed *does* affect the target time when seeking, and how fast uTime updates.
+              // If paused, re-render the current frame to show the state based on multipliers if applicable.
+              const currentRow = sensorData[currentIndex];
               if (vizMode === 'shader') {
-                   // Re-calculate shader uniforms based on new playback speed
-                   updateShaderVisuals(sensorData[currentIndex]); // This recalculates speed factor
-                   renderer.clear();
-                   renderer.render(backgroundScene, backgroundCamera);
-              } else {
-                   // Graph time mapping depends on playbackSpeed indirectly via animate loop's cappedElapsedTarget
-                   // Redraw graph with current data point based on new speed affecting history time window
-                   rebuildGraphHistory(sensorData[currentIndex].timestamp);
-                   updateGraphVisuals(sensorData[currentIndex]);
-                   renderer.clear();
-                   renderer.render(scene, camera);
+                   // Re-calculate shader uniforms based on new playback speed affecting uTime advance rate (in animate)
+                   // uEmotionSpeed uniform itself isn't directly tied to playbackSpeed, just the multiplier from emotion.
+                   // But updating visuals while paused ensures multipliers are applied.
+                   updateShaderVisuals(currentRow);
+              } else if (vizMode === 'graph') {
+                   // Graph time mapping and history window are relative to data timestamps, not playback speed directly.
+                   // The speed influences *which* points are shown over time, but the *look* of the points within the window is fixed.
+                   // No specific visual update needed for graph on speed change while paused.
+              } else { // vizMode === 'particles'
+                   // Particle uTime advance rate is affected by playback speed.
+                   // If paused, uTime is frozen, but uniforms like uSpeedFactor (based on emotion) might update.
+                   updateParticleVisuals(currentRow, 0); // Update uniforms, no emission
               }
+              // Re-render after speed change if paused and data loaded
+              renderer.clear();
+              if (vizMode === 'shader') {
+                   renderer.render(backgroundScene, backgroundCamera);
+               } else {
+                   renderer.render(scene, camera);
+               }
          }
     });
     seekBar.addEventListener('input', handleSeekBarInput);
     seekBar.addEventListener('change', handleSeekBarChange);
-    seekBar.disabled = true;
+    seekBar.disabled = true; // Disabled until CSV is loaded
 
     // 新しいイベントリスナー
     toggleDarkModeButton.addEventListener('click', toggleDarkMode);
@@ -259,19 +576,34 @@ function initGraph() {
     // Create graph geometry (dynamic line)
     graphGeometry = new THREE.BufferGeometry();
     graphGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_HISTORY_POINTS * 3), 3));
-    graphMaterial = new THREE.LineBasicMaterial({ color: 0x8844EE, linewidth: 2 }); // Purple color
+    graphMaterial = new THREE.LineBasicMaterial({ color: 0x8844EE, linewidth: 2 }); // Purple color (light mode)
     graphLine = new THREE.Line(graphGeometry, graphMaterial);
     scene.add(graphLine); // Add to the main scene
 
     // Create graph shaded area geometry (dynamic mesh)
     graphShadedAreaGeometry = new THREE.BufferGeometry();
     graphShadedAreaGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_HISTORY_POINTS * 4 * 3), 3));
-    graphShadedAreaGeometry.setIndex(new THREE.BufferAttribute(new Uint16Array((MAX_HISTORY_POINTS - 1) * 6), 1));
+    // Indices for quads (two triangles per quad)
+    const shadedAreaIndicesArray = new Uint16Array((MAX_HISTORY_POINTS - 1) * 6);
+     for (let i = 0; i < MAX_HISTORY_POINTS - 1; i++) {
+          const baseIndex = i * 4; // 4 vertices per segment (quad)
+          const indexIndex = i * 6;
+          // Triangle 1 (top-left, bottom-left, bottom-right)
+          shadedAreaIndicesArray[indexIndex] = baseIndex; // v0
+          shadedAreaIndicesArray[indexIndex + 1] = baseIndex + 2; // v2
+          shadedAreaIndicesArray[indexIndex + 2] = baseIndex + 3; // v3
+          // Triangle 2 (top-left, bottom-right, top-right)
+          shadedAreaIndicesArray[indexIndex + 3] = baseIndex; // v0
+          shadedAreaIndicesArray[indexIndex + 4] = baseIndex + 3; // v3
+          shadedAreaIndicesArray[indexIndex + 5] = baseIndex + 1; // v1
+     }
+
+    graphShadedAreaGeometry.setIndex(new THREE.BufferAttribute(shadedAreaIndicesArray, 1));
     graphShadedAreaMaterial = new THREE.MeshBasicMaterial({
-        color: 0x8844EE,
+        color: 0x8844EE, // Match line color (light mode)
         transparent: true,
         opacity: 0.5,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide // Needed if camera can go behind the plane
     });
     graphShadedAreaMesh = new THREE.Mesh(graphShadedAreaGeometry, graphShadedAreaMaterial);
     scene.add(graphShadedAreaMesh);
@@ -279,354 +611,262 @@ function initGraph() {
 
     // Create the current point indicator (sphere)
     const pointGeometry = new THREE.SphereGeometry(0.02, 16, 16);
-    const pointMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+    const pointMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Black point for light mode contrast
     pointMesh = new THREE.Mesh(pointGeometry, pointMaterial);
     scene.add(pointMesh);
 
     // Initialize data history
     dataHistory = [];
+
+     // Ensure graph objects are hidden initially until data is loaded and mode is set
+     if (graphLine) graphLine.visible = false;
+     if (graphShadedAreaMesh) graphShadedAreaMesh.visible = false;
+     if (pointMesh) pointMesh.visible = false;
 }
 
-function toggleVisualizationMode() {
-    vizMode = vizMode === 'shader' ? 'graph' : 'shader';
-    setVisualizationMode(vizMode);
-}
-
-function setVisualizationMode(mode) {
-    vizMode = mode;
-    // Update button text/icon
-    toggleVizModeButton.querySelector('.material-symbols-outlined').textContent = vizMode === 'shader' ? 'area_chart' : 'blur_on';
-    toggleVizModeButton.title = vizMode === 'shader' ? 'Switch to Graph Viz' : 'Switch to Shader Viz';
-
-    // Manage visibility of visualization elements
-    const isShader = vizMode === 'shader';
-    if (backgroundScene.children[0]) backgroundScene.children[0].visible = isShader; // The shader plane
-    if (graphLine) graphLine.visible = !isShader;
-    // Only show point/shaded area if in graph mode AND data exists (checked inside updateGraphVisuals)
-    if (pointMesh) pointMesh.visible = !isShader && dataHistory.length > 0; // Initial visibility state
-    if (graphShadedAreaMesh) graphShadedAreaMesh.visible = !isShader && dataHistory.length >= 2; // Initial visibility state
-
-
-    // Re-render immediately to show the change if not playing/seeking
-    if (!isPlaying && !isSeeking) {
-         if (sensorData.length > 0 && currentIndex >= 0) {
-             // Update visuals based on the new mode's requirements using the current data
-             if (vizMode === 'shader') {
-                 updateShaderVisuals(sensorData[currentIndex]);
-             } else { // vizMode === 'graph'
-                 // For graph, rebuild history and update geometry based on current time
-                 rebuildGraphHistory(sensorData[currentIndex].timestamp);
-                 updateGraphVisuals(sensorData[currentIndex]); // Update graph geometry based on history
-             }
-              renderer.clear();
-              if (vizMode === 'shader') {
-                   renderer.render(backgroundScene, backgroundCamera);
-               } else {
-                   renderer.render(scene, camera);
-               }
-         } else {
-             // No data, render default state for the mode
-             renderer.clear();
-             if (vizMode === 'shader') {
-                 renderer.render(backgroundScene, backgroundCamera);
-             } else {
-                 // Graph mode with no data: render empty graph scene
-                 if (graphGeometry) graphGeometry.setDrawRange(0, 0);
-                  if (graphShadedAreaGeometry) graphShadedAreaGeometry.setDrawRange(0, 0);
-                 if (pointMesh) pointMesh.visible = false;
-                 graphLine.visible = (vizMode === 'graph'); // Keep line/mesh objects visible, but empty
-                 graphShadedAreaMesh.visible = (vizMode === 'graph');
-                 renderer.render(scene, camera);
-             }
+function initParticles() {
+    // Load the particle texture
+    const loader = new THREE.TextureLoader();
+    // Use a local path relative to index.html
+    loader.load('./assets/particle.png', (texture) => {
+        particleTexture = texture;
+         // If material already exists, update the uniform value
+         if (particleMaterial) {
+              particleMaterial.uniforms.uTexture.value = particleTexture;
+              particleMaterial.needsUpdate = true;
          }
-    }
-}
-
-
-// Modify animate function
-function animate() {
-    if (!isPlaying) {
-         animationFrameId = null;
-         return;
-    }
-    animationFrameId = requestAnimationFrame(animate);
-
-    const performanceNow = performance.now();
-    const performanceElapsed = performanceNow - actualStartTime;
-    const currentCsvElapsedTarget = (performanceElapsed * playbackSpeed);
-    // Ensure currentCsvElapsedTarget doesn't exceed total duration
-     const totalDurationMs = sensorData.length > 0 ? sensorData[sensorData.length - 1].timestamp - sensorData[0].timestamp : 0;
-     const cappedElapsedTarget = Math.min(totalDurationMs, currentCsvElapsedTarget);
-
-    const currentCsvTimestampTarget = sensorData.length > 0 ? sensorData[0].timestamp + cappedElapsedTarget : 0;
-
-
-    let nextIndex = currentIndex;
-     // Ensure we don't go out of bounds
-    while (nextIndex < sensorData.length - 1 && sensorData[nextIndex + 1].timestamp <= currentCsvTimestampTarget) {
-        nextIndex++;
-    }
-     // Ensure the index corresponds to the capped time target if we jump ahead
-    if (sensorData.length > 0 && sensorData[nextIndex].timestamp > currentCsvTimestampTarget) {
-         // This shouldn't happen with the while loop condition, but as a safeguard:
-         // If the current index timestamp is past the target, find the correct index again from the start
-         nextIndex = 0;
-         while (nextIndex < sensorData.length - 1 && sensorData[nextIndex + 1].timestamp <= currentCsvTimestampTarget) {
-              nextIndex++;
-         }
-    }
-
-
-    if (nextIndex !== currentIndex || currentIndex === 0) { // Always update on first frame or index change
-        currentIndex = nextIndex;
-        const currentRow = sensorData[currentIndex];
-        if (currentRow) {
-            // Update visuals based on current mode
-            if (vizMode === 'shader') {
-                updateShaderVisuals(currentRow);
-            } else { // vizMode === 'graph'
-                 // Add current point to history
-                const scaledY = updateGraphVisualsHelper(currentRow); // Calculate value
-                const currentTimestamp = currentRow.timestamp;
-                // Filter old points from history *before* adding the new one
-                const windowStartTime = currentTimestamp - HISTORY_WINDOW_MS;
-                dataHistory = dataHistory.filter(point => point.timestamp >= windowStartTime);
-                // Add the new point
-                dataHistory.push({ timestamp: currentTimestamp, value: scaledY });
-                 // Cap history size
-                 if (dataHistory.length > MAX_HISTORY_POINTS) {
-                     dataHistory = dataHistory.slice(dataHistory.length - MAX_HISTORY_POINTS);
-                 }
-                updateGraphVisuals(currentRow); // Update geometry based on the new history
-            }
-
-            // Update audio regardless of mode
-            const emotionFactor = getEmotionFactor(currentRow.sessionEmotion);
-            updateAudio(currentRow, emotionFactor);
-
-            lastProcessedTimestamp = currentRow.timestamp;
+          console.log("Particle texture loaded.");
+    }, undefined, (err) => {
+        console.error('Error loading particle texture:', err);
+        // Fallback? Or handle visually (e.g., particles won't render correctly)
+        // Maybe set uTexture to null or a default solid white texture?
+        if (particleMaterial) {
+             // Could use a default texture or just accept that rendering will be broken without it
         }
-    }
-
-    // Update shader uTime only if in shader mode
-    if (vizMode === 'shader' && bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
-        const lastTime = bgShaderMaterial.uniforms.uTime.lastTime || performanceNow;
-        const deltaTime = (performanceNow - lastTime) / 1000.0;
-        bgShaderMaterial.uniforms.uTime.value += deltaTime * playbackSpeed; // uTime should also scale with playback speed
-        bgShaderMaterial.uniforms.uTime.lastTime = performanceNow;
-        if(isNaN(bgShaderMaterial.uniforms.uTime.value)) bgShaderMaterial.uniforms.uTime.value = 0;
-    }
+    });
 
 
-    // Update seek bar and time display regardless of mode
-    if (!isSeeking && sensorData.length > 0) {
-        seekBar.value = Math.max(0, Math.min(parseFloat(seekBar.max), cappedElapsedTarget)); // Use capped time
-        currentTimeDisplay.textContent = formatTime(cappedElapsedTarget); // Use capped time
-    }
+    particleGeometry = new THREE.BufferGeometry();
 
-    // Render based on current mode
-    renderer.clear(); // Clear the buffer
-    if (vizMode === 'shader') {
-        renderer.render(backgroundScene, backgroundCamera); // Render shader scene
-    } else { // vizMode === 'graph'
-        renderer.render(scene, camera); // Render graph scene
-    }
+    // Create attribute buffers (fixed size)
+    pPositions = new Float32Array(MAX_PARTICLES * 3);
+    pVelocities = new Float32Array(MAX_PARTICLES * 3);
+    pEmissionTimes = new Float32Array(MAX_PARTICLES); // Time relative to particle shader uTime = 0
+    pLifespans = new Float32Array(MAX_PARTICLES); // Life duration in seconds
+    pSizes = new Float32Array(MAX_PARTICLES); // Size in pixels
+    pColors = new Float32Array(MAX_PARTICLES * 4); // RGBA color
 
-    // Animation end check
-    if (sensorData.length > 0 && currentIndex >= sensorData.length - 1 && cappedElapsedTarget >= totalDurationMs) {
-        pauseAnimation();
-        resetButton.disabled = false;
-        seekBar.value = seekBar.max;
-        currentTimeDisplay.textContent = totalTimeDisplay.textContent;
-         // Ensure visuals are updated to the very last frame upon finishing
-         if (vizMode === 'shader') {
-              updateShaderVisuals(sensorData[sensorData.length - 1]);
-         } else {
-             rebuildGraphHistory(sensorData[sensorData.length - 1].timestamp); // Rebuild history up to end
-             updateGraphVisuals(sensorData[sensorData.length - 1]); // Update graph
-         }
-         renderer.clear();
-         if (vizMode === 'shader') {
-              renderer.render(backgroundScene, backgroundCamera);
-         } else {
-              renderer.render(scene, camera);
-         }
+    particleGeometry.setAttribute('initialPosition', new THREE.BufferAttribute(pPositions, 3));
+    particleGeometry.setAttribute('initialVelocity', new THREE.BufferAttribute(pVelocities, 3));
+    particleGeometry.setAttribute('emissionTime', new THREE.BufferAttribute(pEmissionTimes, 1));
+    particleGeometry.setAttribute('lifespan', new THREE.BufferAttribute(pLifespans, 1));
+    particleGeometry.setAttribute('size', new THREE.BufferAttribute(pSizes, 1));
+    particleGeometry.setAttribute('color', new THREE.BufferAttribute(pColors, 4));
+
+    // Initialize all particles as inactive
+    for(let i = 0; i < MAX_PARTICLES; i++) {
+         pEmissionTimes[i] = -1000; // Set emission time far in the past so age > lifespan initially
+         pSizes[i] = 0; // Set size to 0 so they aren't visible
     }
+     // Mark initial attributes as needing update
+     particleGeometry.attributes.emissionTime.needsUpdate = true;
+     particleGeometry.attributes.size.needsUpdate = true;
+
+
+    particleMaterial = new THREE.ShaderMaterial({
+        vertexShader: particleVertexShader,
+        fragmentShader: particleFragmentShader,
+        uniforms: {
+            uTime: { value: 0.0 }, // This uniform will be updated by the animation loop (in seconds)
+            uTexture: { value: particleTexture || null }, // Texture uniform, set to null if not loaded yet
+            uSpeedFactor: { value: 1.0 } // Emotion speed influence on particle velocity
+        },
+        transparent: true,
+        blending: THREE.AdditiveBlending, // Additive blending for glowing effect
+        depthWrite: false, // Avoid depth sorting issues with transparent particles
+        sizeAttenuation: true // Enable size attenuation based on distance (gl_PointSize unit is pixels)
+    });
+
+    particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+    scene.add(particleSystem); // Add to the main scene (shared with graph)
+
+
+     // Ensure particle system is hidden initially
+     if (particleSystem) particleSystem.visible = false;
+     // Set initial draw range to full buffer size, shader handles visibility
+     particleGeometry.setDrawRange(0, MAX_PARTICLES); // Always render all points, shader discards inactive ones.
+}
+
+// Helper to clear all active particles
+function clearParticles() {
+     particleCount = 0; // Reset logical active count
+     // Mark all particles in the buffer as inactive by setting emission time
+     // Set emission time far in the past
+     for(let i = 0; i < MAX_PARTICLES; i++) {
+          pEmissionTimes[i] = -1000;
+     }
+     // Mark emissionTime attribute as needing update
+     if (particleGeometry) {
+          particleGeometry.attributes.emissionTime.needsUpdate = true;
+           // No need to reset draw range if shader discards based on age
+           // particleGeometry.setDrawRange(0, 0); // Could set draw range to 0 if not using shader discard
+     }
+      console.log("Cleared particles.");
 }
 
 
-// Rename original updateVisuals to updateShaderVisuals
-function updateShaderVisuals(data, options = {}) {
-    if (!data || !bgShaderMaterial) return;
+// Helper to emit particles based on data
+function emitParticles(data, emotionFactor) {
+    // Only emit if playing and particle texture is loaded
+    if (!isPlaying || !particleSystem || !particleTexture) return;
 
-    const defaultOptions = {
-        applyManualMultipliersOnly: false
-    };
-    const finalOptions = { ...defaultOptions, ...options };
+    // Determine emission rate per second based on data/emotion/multipliers
+    let emissionRatePerSec = 0; // Particles per second
+    if (data.sessionEmotion) {
+        // Higher intensity/speed -> more particles
+        emissionRatePerSec += (emotionFactor.particleMovement * 0.5 + emotionFactor.speedFactor * 0.3) * 50; // Base rate + emotion influence
+    }
+     // Add sensor influence
+     if (data.illuminance != null) emissionRatePerSec += Math.min(100, data.illuminance / 20); // More light, more particles (cap effect)
+     if (data.decibels != null) emissionRatePerSec += Math.min(100, (data.decibels + 40) / 5); // More noise, more particles (cap effect)
 
-    // Update data display (always show data regardless of viz mode)
-    if (!finalOptions.applyManualMultipliersOnly) { // Only update data display if not just applying multipliers
-        let dataStr = "";
-        const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval', 'photoTakenId'];
-        for(const key of keysToShow){
-            if(data[key] !== undefined && data[key] !== null){
-                let value = data[key];
-                 if (typeof value === 'number') {
-                    if (!Number.isInteger(value)) {
-                        value = value.toFixed(2);
-                    }
-                    if(key === 'temperature_celsius') value += ' °C';
-                    if(key === 'decibels') value += ' dB';
-                }
-                dataStr += `${key}: ${value}\n`;
-            }
-        }
-        currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
+     // Apply manual multipliers to emission rate
+     emissionRatePerSec *= manualIntensityMultiplier; // Use intensity multiplier for rate
+
+     // Limit max emission rate to avoid flooding the system
+     const MAX_EMISSION_PER_SEC = 1000; // Cap emission rate
+     emissionRatePerSec = Math.min(MAX_EMISSION_PER_SEC, emissionRatePerSec);
+
+
+    // Determine number of particles to emit this frame based on delta time and playback speed
+    // Use the global animate deltaTime, scaled by playback speed
+    const frameEmissionCount = Math.floor(emissionRatePerSec * animate.deltaTime * playbackSpeed);
+
+    if (frameEmissionCount <= 0) return;
+
+
+    // Determine particle parameters based on data/emotion/multipliers
+    const baseLifespan = 3.0; // seconds
+    const baseSpeed = 0.05; // units per second (world units)
+    const baseSize = 15; // pixels (screen units)
+
+    // Parameters influenced by data/emotion/multipliers
+    // Lifespan could be fixed or vary inversely with speed/emotion
+    const effectiveLifespan = baseLifespan; // Keep fixed lifespan for simplicity
+
+    const effectiveSpeed = baseSpeed * (emotionFactor.particleMovement * 0.8 + 0.2); // Speed based on movement factor
+     effectiveSpeed *= manualIntensityMultiplier; // Intensity multiplier affects speed
+
+    const effectiveSize = baseSize * (emotionFactor.sizeVariety * 0.5 + 0.5); // Size based on variety factor
+    effectiveSize *= manualVarietyMultiplier; // Variety multiplier affects size
+
+     // Color influenced by base color, emotion, and potentially highlight
+     const baseColor = parseSessionColor(data.sessionColor) || { r: 0.5, g: 0.5, b: 0.7 };
+     const targetColor = new THREE.Color(baseColor.r, baseColor.g, baseColor.b);
+     // Add highlight influence to color? Or just make it brighter?
+     // Let's blend towards white based on calculated highlight value
+     let dataHighlightValue = 0.05; // Recalculate data highlight
+     if (data.illuminance != null && typeof data.illuminance === 'number') {
+          // Log scale for illuminance mapping
+         const minLogLux = Math.log(1);
+         const maxLogLux = Math.log(10001); // Max + 1 to handle 0 lux
+         const logLux = Math.log(Math.max(1, data.illuminance + 1)); // Max 1 to avoid log(0)
+         const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
+         dataHighlightValue += luxNorm * 1.0; // Add up to 1.0
+     }
+     if (data.decibels != null && typeof data.decibels === 'number') {
+         // Simple linear mapping for decibels
+         const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0)); // -40dB to 30dB -> 0 to 1
+         dataHighlightValue += decibelNorm * 0.5; // Add up to 0.5
+     }
+     // Apply highlight multiplier to the calculated data highlight influence
+     const finalHighlightInfluence = Math.max(0.0, Math.min(2.0, dataHighlightValue * manualHighlightMultiplier)); // Cap influence
+
+
+     // Blend towards white or bright color based on highlight influence
+     const particleFinalColor = targetColor.clone();
+     // Blend towards a bright, slightly tinted color (e.g., white with a hint of base color) based on highlight
+     // Use interpolateRgb or lerp? Lerp towards a bright value.
+      particleFinalColor.lerp(new THREE.Color(0.9 + baseColor.r * 0.1, 0.9 + baseColor.g * 0.1, 0.9 + baseColor.b * 0.1), finalHighlightInfluence * 0.8);
+
+
+     // Alpha based on intensity, emotion, and highlight
+     let targetAlpha = 0.4 + emotionFactor.particleMovement * 0.2 + finalHighlightInfluence * 0.1; // Base alpha + influences
+     targetAlpha = Math.min(1.0, targetAlpha * manualIntensityMultiplier); // Intensity affects alpha
+
+
+    const currentShaderTime = particleMaterial.uniforms.uTime.value; // Get current shader time (in seconds)
+
+    // Emit the calculated number of particles
+    for (let i = 0; i < frameEmissionCount; i++) {
+        // Find the next particle slot to write to (wrap around the buffer)
+        const index = pAttributeIndex; // Use the current index pointer
+        const index3 = index * 3;
+        const index4 = index * 4;
+
+        // Set initial position (e.g., origin [0,0,0] in world space)
+        pPositions[index3] = 0;
+        pPositions[index3 + 1] = 0;
+        pPositions[index3 + 2] = 0;
+
+        // Set initial velocity (random direction, speed based on effectiveSpeed)
+        // Emit in a sphere or cone shape? Sphere for now.
+        const phi = Math.random() * Math.PI * 2; // Azimuthal angle
+        const theta = Math.acos((Math.random() * 2) - 1); // Polar angle (distribute points on sphere)
+        const speed = effectiveSpeed * (0.8 + Math.random() * 0.4); // Add some speed variation
+
+        pVelocities[index3] = speed * Math.sin(theta) * Math.cos(phi);
+        pVelocities[index3 + 1] = speed * Math.sin(theta) * Math.sin(phi);
+        pVelocities[index3 + 2] = speed * Math.cos(theta);
+
+
+        // Set emission time (current shader time)
+        pEmissionTimes[index] = currentShaderTime;
+
+        // Set lifespan
+        pLifespans[index] = effectiveLifespan;
+
+        // Set size
+        pSizes[index] = effectiveSize * (0.8 + Math.random() * 0.4); // Add some size variation
+
+        // Set color and alpha
+        pColors[index4] = particleFinalColor.r;
+        pColors[index4 + 1] = particleFinalColor.g;
+        pColors[index4 + 2] = particleFinalColor.b;
+        pColors[index4 + 3] = targetAlpha; // Use the calculated alpha
+
+        // Move pointer to the next slot (wrap around)
+        pAttributeIndex = (pAttributeIndex + 1) % MAX_PARTICLES;
+        particleCount++; // Increment logical count
     }
 
-    // --- Update Shader Uniforms ---
-    // Only update shader uniforms if currently in shader mode OR if applyManualMultipliersOnly is true (for slider updates while paused in shader mode)
-    if (vizMode === 'shader' || (finalOptions.applyManualMultipliersOnly && vizMode === 'shader')) { // Explicitly check vizMode
-         const lerpFactor = isPlaying ? 0.15 : 1.0;
+     // Mark all relevant attributes as needing update
+     // Since we are writing to a circular buffer, we need to update the modified range
+     // or just mark the entire buffer dirty for simplicity if updates are frequent.
+     // Marking the whole buffer dirty is often acceptable for particle systems.
+     particleGeometry.attributes.initialPosition.needsUpdate = true;
+     particleGeometry.attributes.initialVelocity.needsUpdate = true;
+     particleGeometry.attributes.emissionTime.needsUpdate = true;
+     particleGeometry.attributes.lifespan.needsUpdate = true; // If lifespan varies
+     particleGeometry.attributes.size.needsUpdate = true;
+     particleGeometry.attributes.color.needsUpdate = true;
 
-         if (!finalOptions.applyManualMultipliersOnly) {
-             let baseColorData = parseSessionColor(data.sessionColor);
-             if (!baseColorData || typeof baseColorData.r === 'undefined') {
-                 baseColorData = { r: 0.4, g: 0.4, b: 0.6 };
-             }
-             const targetBaseColor = new THREE.Color(baseColorData.r, baseColorData.g, baseColorData.b);
-             bgShaderMaterial.uniforms.uBaseColor.value.lerp(targetBaseColor, lerpFactor);
-
-             let dataHighlight = 0.05;
-             if (data.illuminance != null && typeof data.illuminance === 'number') {
-                  const minLogLux = Math.log(1);
-                  const maxLogLux = Math.log(10001);
-                  const logLux = Math.log(Math.max(1, data.illuminance + 1));
-                  const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
-                  dataHighlight += luxNorm * 1.5;
-             }
-             if (data.decibels != null && typeof data.decibels === 'number') {
-                 const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
-                 dataHighlight += decibelNorm * 0.6;
-             }
-             const finalHighlight = Math.max(0.0, Math.min(3.0, dataHighlight * manualHighlightMultiplier));
-             bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(
-                  bgShaderMaterial.uniforms.uHighlightIntensity.value,
-                  finalHighlight,
-                  lerpFactor
-              );
-
-             let emotionFactor = getEmotionFactor(data.sessionEmotion);
-             if (!emotionFactor || typeof emotionFactor.speedFactor === 'undefined') {
-                 emotionFactor = { speedFactor: 1.0, colorVariety: 1.0, sizeVariety: 1.0, particleMovement: 1.0, apertureFactor: 1.0 };
-             }
-
-             // Effective speed affects the shader animation speed directly
-             const effectiveSpeed = emotionFactor.speedFactor * playbackSpeed;
-             bgShaderMaterial.uniforms.uEmotionSpeed.value = THREE.MathUtils.lerp(
-                 bgShaderMaterial.uniforms.uEmotionSpeed.value,
-                 effectiveSpeed,
-                 lerpFactor
-             );
-
-             const dataIntensity = (emotionFactor.particleMovement * 0.7 + 0.1);
-             const finalIntensity = dataIntensity * manualIntensityMultiplier;
-             bgShaderMaterial.uniforms.uEmotionIntensity.value = THREE.MathUtils.lerp(
-                 bgShaderMaterial.uniforms.uEmotionIntensity.value,
-                 Math.max(0.1, Math.min(2.0, finalIntensity)),
-                 lerpFactor
-             );
-
-             const dataVariety = emotionFactor.colorVariety * 0.5;
-             const finalVariety = dataVariety * manualVarietyMultiplier;
-             bgShaderMaterial.uniforms.uColorVariety.value = THREE.MathUtils.lerp(
-                 bgShaderMaterial.uniforms.uColorVariety.value,
-                 Math.max(0.1, Math.min(1.5, finalVariety)),
-                 lerpFactor
-             );
-
-         } else { // applyManualMultipliersOnly is true
-             const lerpFactorManual = 1.0; // Apply multipliers instantly
-
-             const currentCalculatedHighlightBase = bgShaderMaterial.uniforms.uHighlightIntensity.value / (manualHighlightMultiplier || 1.0);
-             const currentCalculatedIntensityBase = bgShaderMaterial.uniforms.uEmotionIntensity.value / (manualIntensityMultiplier || 1.0);
-             const currentCalculatedVarietyBase = bgShaderMaterial.uniforms.uColorVariety.value / (manualVarietyMultiplier || 1.0);
-
-             const targetHighlight = Math.max(0.0, Math.min(3.0, currentCalculatedHighlightBase * manualHighlightMultiplier));
-             const targetIntensity = Math.max(0.1, Math.min(2.0, currentCalculatedIntensityBase * manualIntensityMultiplier));
-             const targetVariety = Math.max(0.1, Math.min(1.5, currentCalculatedVarietyBase * manualVarietyMultiplier));
-
-             bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(bgShaderMaterial.uniforms.uHighlightIntensity.value, targetHighlight, lerpFactorManual);
-             bgShaderMaterial.uniforms.uEmotionIntensity.value = THREE.MathUtils.lerp(bgShaderMaterial.uniforms.uEmotionIntensity.value, targetIntensity, lerpFactorManual);
-             bgShaderMaterial.uniforms.uColorVariety.value = THREE.MathUtils.lerp(bgShaderMaterial.uniforms.uColorVariety.value, targetVariety, lerpFactorManual);
-         }
-
-         // Photo flash effect - still applies in shader mode
-        if (data.photoTakenId === 1) {
-            if (bgShaderMaterial) {
-                const currentCalculatedHighlight = bgShaderMaterial.uniforms.uHighlightIntensity.value;
-                const flashBoost = 1.5;
-                const flashTargetHighlight = Math.min(3.5, currentCalculatedHighlight + flashBoost);
-                const flashDuration = 150;
-
-                // Only manually render the flash if paused and in shader mode
-                const needsRender = !isPlaying && !isSeeking && vizMode === 'shader';
-
-                if (needsRender) renderer.clear();
-
-                bgShaderMaterial.uniforms.uHighlightIntensity.value = flashTargetHighlight;
-                if (needsRender) renderer.render(backgroundScene, backgroundCamera);
-
-                setTimeout(() => {
-                     if (bgShaderMaterial) {
-                        // Lerp back to the value calculated from data + multipliers
-                         // Re-calculate the intended value without the flash boost
-                         let dataHighlight = 0.05;
-                          if (data.illuminance != null && typeof data.illuminance === 'number') {
-                             const minLogLux = Math.log(1); const maxLogLux = Math.log(10001);
-                             const logLux = Math.log(Math.max(1, data.illuminance + 1));
-                             const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
-                             dataHighlight += luxNorm * 1.5;
-                          }
-                          if (data.decibels != null && typeof data.decibels === 'number') {
-                              const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
-                              dataHighlight += decibelNorm * 0.6;
-                          }
-                          const originalHighlight = Math.max(0.0, Math.min(3.0, dataHighlight * manualHighlightMultiplier));
-
-                        bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(
-                             bgShaderMaterial.uniforms.uHighlightIntensity.value,
-                             originalHighlight, // Lerp back to the value without flash boost
-                             1.0 // Instant return for simplicity after the flash
-                         );
-                         if (needsRender) {
-                            renderer.clear();
-                            renderer.render(backgroundScene, backgroundCamera);
-                         }
-                     }
-                }, flashDuration);
-
-            }
-        }
-    }
+     // Ensure the draw range covers all possible particles, shader hides inactive
+     // particleGeometry.setDrawRange(0, MAX_PARTICLES); // This is already set in initParticles
 }
 
 
-// New function to update graph visuals
-function updateGraphVisuals(data) {
-    // Check if in graph mode before proceeding with graph updates
-    if (vizMode !== 'graph' || !graphGeometry || !pointMesh || !graphShadedAreaGeometry || !graphShadedAreaMaterial) {
-        // Ensure graph elements are hidden if not in graph mode
-        if (graphLine) graphLine.visible = false;
-        if (pointMesh) pointMesh.visible = false;
-        if (graphShadedAreaMesh) graphShadedAreaMesh.visible = false;
-        return;
-    }
+// New function to update particle visuals (called by animate, handleSeekBarInput/Change, updateMultiplierDisplay)
+function updateParticleVisuals(data, deltaTime) {
+     // Check if in particle mode before proceeding
+     if (vizMode !== 'particles' || !particleSystem || !particleMaterial) {
+          if (particleSystem) particleSystem.visible = false;
+          return;
+     }
+      if (particleSystem) particleSystem.visible = true;
 
 
-    // Update data display (always update data display)
-    // This part is also done in updateShaderVisuals, maybe move it outside?
-    // Let's keep it in both for simplicity, it doesn't hurt.
+    // Update data display (always update data display) - Duplicated from updateShaderVisuals/updateGraphVisuals, should refactor common parts
     let dataStr = "";
     const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval', 'photoTakenId'];
     for(const key of keysToShow){
@@ -638,11 +878,210 @@ function updateGraphVisuals(data) {
                 }
                 if(key === 'temperature_celsius') value += ' °C';
                 if(key === 'decibels') value += ' dB';
+                 if(key === 'timestamp') value = formatTime(value); // Format timestamp for display
             }
             dataStr += `${key}: ${value}\n`;
         }
     }
     currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
+
+
+    // Update shader time uniform for particle animation ONLY IF PLAYING
+    if (isPlaying && particleMaterial.uniforms.uTime) {
+         particleMaterial.uniforms.uTime.value += deltaTime * playbackSpeed; // uTime progresses with playback speed
+         if(isNaN(particleMaterial.uniforms.uTime.value)) particleMaterial.uniforms.uTime.value = 0;
+    }
+
+    // Update emotion speed uniform for particle movement scaling regardless of playing state (needed for static visuals when paused)
+     const emotionFactor = getEmotionFactor(data.sessionEmotion);
+     if (particleMaterial.uniforms.uSpeedFactor) {
+         const targetSpeedFactor = emotionFactor.speedFactor;
+         // Use a lerp factor that applies changes instantly when paused, smoothly when playing
+         const currentLerpFactor = isPlaying ? 0.15 : 1.0;
+         particleMaterial.uniforms.uSpeedFactor.value = THREE.MathUtils.lerp(
+              particleMaterial.uniforms.uSpeedFactor.value,
+              targetSpeedFactor,
+              currentLerpFactor
+         );
+     }
+
+
+    // Emit new particles based on current data ONLY IF PLAYING
+    if (isPlaying) {
+        emitParticles(data, emotionFactor);
+    }
+
+     // Ensure draw range is always MAX_PARTICLES, shader handles hiding
+     // This is already set in initParticles and should not need repeating per frame unless MAX_PARTICLES changes (it doesn't)
+     // particleGeometry.setDrawRange(0, MAX_PARTICLES);
+}
+
+
+// Rename original updateVisuals to updateShaderVisuals
+function updateShaderVisuals(data) {
+    // Update data display (always show data regardless of viz mode) - Duplicated, see note in updateParticleVisuals
+    let dataStr = "";
+    const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval', 'photoTakenId'];
+    for(const key of keysToShow){
+        if(data[key] !== undefined && data[key] !== null){
+            let value = data[key];
+             if (typeof value === 'number') {
+                if (!Number.isInteger(value)) {
+                    value = value.toFixed(2);
+                }
+                if(key === 'temperature_celsius') value += ' °C';
+                if(key === 'decibels') value += ' dB';
+                if(key === 'timestamp') value = formatTime(value); // Format timestamp for display
+            }
+            dataStr += `${key}: ${value}\n`;
+        }
+    }
+    currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
+
+
+    // --- Update Shader Uniforms ---
+    // Only update shader uniforms if bgShaderMaterial exists
+    if (!bgShaderMaterial || !bgShaderMaterial.uniforms) return;
+
+    const lerpFactor = isPlaying ? 0.15 : 1.0; // Lerp faster when paused/seeking (effectively instant)
+
+
+    let baseColorData = parseSessionColor(data.sessionColor);
+    if (!baseColorData || typeof baseColorData.r === 'undefined') {
+        baseColorData = { r: 0.4, g: 0.4, b: 0.6 };
+    }
+    const targetBaseColor = new THREE.Color(baseColorData.r, baseColorData.g, baseColorData.b);
+    bgShaderMaterial.uniforms.uBaseColor.value.lerp(targetBaseColor, lerpFactor);
+
+    let dataHighlight = 0.05;
+    if (data.illuminance != null && typeof data.illuminance === 'number') {
+         const minLogLux = Math.log(1);
+         const maxLogLux = Math.log(10001);
+         const logLux = Math.log(Math.max(1, data.illuminance + 1));
+         const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
+         dataHighlight += luxNorm * 1.5;
+    }
+    if (data.decibels != null && typeof data.decibels === 'number') {
+        const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
+        dataHighlight += decibelNorm * 0.6;
+    }
+    const finalHighlight = Math.max(0.0, Math.min(3.0, dataHighlight * manualHighlightMultiplier));
+    bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(
+         bgShaderMaterial.uniforms.uHighlightIntensity.value,
+         finalHighlight,
+         lerpFactor
+     );
+
+    let emotionFactor = getEmotionFactor(data.sessionEmotion);
+    if (!emotionFactor || typeof emotionFactor.speedFactor === 'undefined') {
+        emotionFactor = { speedFactor: 1.0, colorVariety: 1.0, sizeVariety: 1.0, particleMovement: 1.0, apertureFactor: 1.0 };
+    }
+
+     // The uEmotionSpeed uniform should represent the *boost* from emotion, not including playbackSpeed
+     // uTime calculation in animate uses playbackSpeed * uEmotionSpeed
+     const effectiveEmotionSpeedBoost = emotionFactor.speedFactor;
+     bgShaderMaterial.uniforms.uEmotionSpeed.value = THREE.MathUtils.lerp(
+         bgShaderMaterial.uniforms.uEmotionSpeed.value,
+         effectiveEmotionSpeedBoost,
+         lerpFactor
+     );
+
+
+    const dataIntensity = (emotionFactor.particleMovement * 0.7 + 0.1);
+    // Apply the CURRENT manual multiplier here
+    const finalIntensity = dataIntensity * manualIntensityMultiplier;
+    bgShaderMaterial.uniforms.uEmotionIntensity.value = THREE.MathUtils.lerp(
+        bgShaderMaterial.uniforms.uEmotionIntensity.value,
+        Math.max(0.1, Math.min(2.0, finalIntensity)),
+        lerpFactor
+    );
+
+    const dataVariety = emotionFactor.colorVariety * 0.5;
+    // Apply the CURRENT manual multiplier here
+    const finalVariety = dataVariety * manualVarietyMultiplier;
+    bgShaderMaterial.uniforms.uColorVariety.value = THREE.MathUtils.lerp(
+        bgShaderMaterial.uniforms.uColorVariety.value,
+        Math.max(0.1, Math.min(1.5, finalVariety)),
+        lerpFactor
+    );
+
+
+     // Photo flash effect - still applies in shader mode regardless of playback state
+     // Only trigger flash if this is a new photo event at a timestamp > the last triggered flash timestamp
+     // Use data.timestamp (relative to CSV start) for comparison
+     if (data.photoTakenId === 1 && typeof data.photoTakenId === 'number' && data.timestamp > (updateShaderVisuals.lastPhotoFlashTimestamp || 0)) {
+         if (bgShaderMaterial) {
+             const flashDurationMs = 150; // ms
+             const flashAmount = 1.5; // How much to boost highlight intensity
+
+             // Store the highlight value *before* the flash boost
+             const originalHighlightBeforeFlash = bgShaderMaterial.uniforms.uHighlightIntensity.value;
+
+             // Apply the flash boost immediately
+             bgShaderMaterial.uniforms.uHighlightIntensity.value = Math.min(3.5, originalHighlightBeforeFlash + flashAmount);
+
+             // Trigger a render immediately if paused/seeking, to show the flash
+             if (!isPlaying && !isSeeking && vizMode === 'shader') {
+                  renderer.clear();
+                  renderer.render(backgroundScene, backgroundCamera);
+             }
+
+             // Schedule the return to the original value after flashDurationMs
+             setTimeout(() => {
+                  if (bgShaderMaterial) {
+                      // Use lerp to smoothly return, lerpFactor=1.0 for instant return after timeout
+                      bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(
+                          bgShaderMaterial.uniforms.uHighlightIntensity.value,
+                          originalHighlightBeforeFlash, // Lerp back to the value before the flash boost
+                          1.0 // Apply instantly after the timeout
+                      );
+                      // Trigger a render after the flash is over if paused/seeking
+                      if (!isPlaying && !isSeeking && vizMode === 'shader') {
+                         renderer.clear();
+                         renderer.render(backgroundScene, backgroundCamera);
+                      }
+                  }
+             }, flashDurationMs / playbackSpeed); // Scale flash duration by playback speed
+
+             // Update the last photo flash timestamp *in terms of CSV time*
+             updateShaderVisuals.lastPhotoFlashTimestamp = data.timestamp;
+         }
+     }
+}
+// Static property to track the last timestamp a photo flash was triggered (using CSV relative time)
+updateShaderVisuals.lastPhotoFlashTimestamp = 0;
+
+
+// New function to update graph visuals (geometry and point position)
+function updateGraphVisuals(data) {
+    // Check if in graph mode before proceeding with graph updates
+    if (vizMode !== 'graph' || !graphGeometry || !pointMesh || !graphShadedAreaGeometry || !graphShadedAreaMaterial) {
+        // Ensure graph elements are hidden if not in graph mode
+        if (graphLine) graphLine.visible = false;
+        if (pointMesh) pointMesh.visible = false;
+        if (graphShadedAreaMesh) graphShadedAreaMesh.visible = false;
+        return;
+    }
+
+
+    // Update data display (always update data display) - Duplicated, see note above
+     let dataStr = "";
+     const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval', 'photoTakenId'];
+     for(const key of keysToShow){
+         if(data[key] !== undefined && data[key] !== null){
+             let value = data[key];
+              if (typeof value === 'number') {
+                 if (!Number.isInteger(value)) {
+                     value = value.toFixed(2);
+                 }
+                 if(key === 'temperature_celsius') value += ' °C';
+                 if(key === 'decibels') value += ' dB';
+                  if(key === 'timestamp') value = formatTime(value); // Format timestamp for display
+             }
+             dataStr += `${key}: ${value}\n`;
+         }
+     }
+     currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
 
 
     // Clear graph visuals if no data history
@@ -660,25 +1099,29 @@ function updateGraphVisuals(data) {
     // --- Update Graph Geometry and Point ---
 
     // Calculate the visible width at Z=0 for the perspective camera
-    const vFOV = THREE.MathUtils.degToRad(camera.fov);
+    // This allows the graph to scale correctly with window size
+    const vFOV = THREE.MathUtils.degToRad(camera.fov); // Vertical field of view in radians
     const viewHeightAtZero = 2 * Math.tan( vFOV / 2 ) * camera.position.z;
     const viewWidthAtZero = viewHeightAtZero * camera.aspect;
-    const xRange = viewWidthAtZero;
+    const xRange = viewWidthAtZero * 0.9; // Use 90% of width for padding (0.05 on each side)
 
 
     // Update graph line geometry positions
     const linePositions = graphGeometry.attributes.position.array;
     let linePositionIndex = 0;
 
-    const currentTimestamp = data.timestamp;
-    const minHistoryTimestamp = dataHistory.length > 0 ? dataHistory[0].timestamp : currentTimestamp; // Should have history points here
-    const historyDuration = currentTimestamp - minHistoryTimestamp;
+    const currentTimestamp = data.timestamp; // This is the ABSOLUTE timestamp (relative to start of data)
+    // The graph window shows HISTORY_WINDOW_MS ending at currentTimestamp
+    const windowStartTime = currentTimestamp - HISTORY_WINDOW_MS;
+    const visibleHistory = dataHistory.filter(point => point.timestamp >= windowStartTime && point.timestamp <= currentTimestamp);
 
 
-    for (let i = 0; i < dataHistory.length; i++) {
-        const point = dataHistory[i];
-        const elapsedInHistory = point.timestamp - minHistoryTimestamp;
-        const xNorm = (historyDuration > 0) ? (elapsedInHistory / historyDuration) : 0;
+    for (let i = 0; i < visibleHistory.length; i++) {
+        const point = visibleHistory[i];
+        // Map timestamp within the window (windowStartTime to currentTimestamp) to X range (-xRange/2 to +xRange/2)
+        const elapsedInWindow = point.timestamp - windowStartTime;
+        const windowDuration = HISTORY_WINDOW_MS; // The fixed window duration
+        const xNorm = (windowDuration > 0) ? (elapsedInWindow / windowDuration) : 0;
         const xPos = xNorm * xRange - xRange / 2; // Map normalized time to X range (-xRange/2 to +xRange/2)
 
         linePositions[linePositionIndex++] = xPos;
@@ -690,43 +1133,45 @@ function updateGraphVisuals(data) {
         linePositions[i] = 0;
     }
     graphGeometry.attributes.position.needsUpdate = true;
-    graphGeometry.setDrawRange(0, dataHistory.length);
+    graphGeometry.setDrawRange(0, visibleHistory.length); // Only draw the visible points
 
 
     // Update graph shaded area geometry
     const shadedAreaPositions = graphShadedAreaGeometry.attributes.position.array;
-    const shadedAreaIndices = graphShadedAreaGeometry.index.array;
+    const shadedAreaIndices = graphShadedAreaGeometry.index.array; // Indices array is fixed
     let shadedPosIndex = 0;
     let shadedIdxIndex = 0;
 
     // Map color from sessionColor to shaded area material
      const baseColorData = parseSessionColor(data.sessionColor);
      if (baseColorData) {
+         // Smoothly transition color? Or set instantly? Instant for now.
          graphShadedAreaMaterial.color.setRGB(baseColorData.r, baseColorData.g, baseColorData.b);
      }
 
-    // Only draw shaded area if at least two points exist
-    if (dataHistory.length >= 2) {
-         const baseLineY = -1.0; // The Y coordinate for the base of the shaded area
+    // Only draw shaded area if at least two visible points exist
+    if (visibleHistory.length >= 2) {
+         const baseLineY = -0.9; // The Y coordinate for the base of the shaded area (slightly above bottom)
 
-         for (let i = 0; i < dataHistory.length - 1; i++) {
-            const p1 = dataHistory[i];
-            const p2 = dataHistory[i+1];
+         for (let i = 0; i < visibleHistory.length - 1; i++) {
+            const p1 = visibleHistory[i];
+            const p2 = visibleHistory[i+1];
 
-             // Get scaled X positions for p1 and p2 (using the same xRange)
-            const elapsedInHistory1 = p1.timestamp - minHistoryTimestamp;
-            const xNorm1 = (historyDuration > 0) ? (elapsedInHistory1 / historyDuration) : 0;
+             // Get scaled X positions for p1 and p2 (using the same xRange and window mapping)
+            const elapsedInWindow1 = p1.timestamp - windowStartTime;
+            const xNorm1 = (windowDuration > 0) ? (elapsedInWindow1 / windowDuration) : 0;
             const xPos1 = xNorm1 * xRange - xRange / 2;
 
-            const elapsedInHistory2 = p2.timestamp - minHistoryTimestamp;
-            const xNorm2 = (historyDuration > 0) ? (elapsedInHistory2 / historyDuration) : 0;
+            const elapsedInWindow2 = p2.timestamp - windowStartTime;
+            const xNorm2 = (windowDuration > 0) ? (elapsedInWindow2 / windowDuration) : 0;
             const xPos2 = xNorm2 * xRange - xRange / 2;
 
             const yPos1 = p1.value;
             const yPos2 = p2.value;
 
-            // Vertices for the quad (p1, p2, base_p1, base_p2)
-            const v1_index = shadedPosIndex / 3; // Index of the current vertex group
+            // Vertices for the quad (p1_top, p2_top, p1_bottom, p2_bottom)
+            // p1_top (v0), p2_top (v1), p1_bottom (v2), p2_bottom (v3) - using relative indices for the current quad segment
+            const baseVertexIndexForSegment = shadedPosIndex / 3; // Starting index for this segment's 4 vertices
 
             // Top-left (from line)
             shadedAreaPositions[shadedPosIndex++] = xPos1;
@@ -748,16 +1193,15 @@ function updateGraphVisuals(data) {
             shadedAreaPositions[shadedPosIndex++] = baseLineY;
             shadedAreaPositions[shadedPosIndex++] = 0;
 
-            // Indices for the two triangles forming the quad (v1, v2, v3, v4)
-            // Vertices: 0=TL, 1=TR, 2=BL, 3=BR
-            // Indices: (0, 2, 3), (0, 3, 1)
-             shadedAreaIndices[shadedIdxIndex++] = v1_index; // TL
-             shadedAreaIndices[shadedIdxIndex++] = v1_index + 2; // BL
-             shadedAreaIndices[shadedIdxIndex++] = v1_index + 3; // BR
-
-             shadedAreaIndices[shadedIdxIndex++] = v1_index; // TL
-             shadedAreaIndices[shadedIdxIndex++] = v1_index + 3; // BR
-             shadedAreaIndices[shadedIdxIndex++] = v1_index + 1; // TR
+            // Indices for the two triangles forming the quad (v0, v1, v2, v3)
+            // Triangle 1: v0, v2, v3 (top-left, bottom-left, bottom-right)
+             shadedAreaIndices[shadedIdxIndex++] = baseVertexIndexForSegment;
+             shadedAreaIndices[shadedIdxIndex++] = baseVertexIndexForSegment + 2;
+             shadedAreaIndices[shadedIdxIndex++] = baseVertexIndexForSegment + 3;
+             // Triangle 2: v0, v3, v1 (top-left, bottom-right, top-right)
+             shadedAreaIndices[shadedIdxIndex++] = baseVertexIndexForSegment;
+             shadedAreaIndices[shadedIdxIndex++] = baseVertexIndexForSegment + 3;
+             shadedAreaIndices[shadedIdxIndex++] = baseVertexIndexForSegment + 1;
          }
      }
 
@@ -765,94 +1209,148 @@ function updateGraphVisuals(data) {
      for (let i = shadedPosIndex; i < MAX_HISTORY_POINTS * 4 * 3; i++) {
          shadedAreaPositions[i] = 0;
      }
-     // Clear unused indices
-      for (let i = shadedIdxIndex; i < (MAX_HISTORY_POINTS - 1) * 6; i++) {
-          shadedAreaIndices[i] = 0;
-      }
+     // Indices array is fixed size based on MAX_HISTORY_POINTS, just need to set draw range
+      // No need to clear indices, just ensure draw range is correct.
+
 
     graphShadedAreaGeometry.attributes.position.needsUpdate = true;
-    graphShadedAreaGeometry.index.needsUpdate = true;
-    graphShadedAreaGeometry.setDrawRange(0, shadedIdxIndex); // Draw based on number of indices
+    // graphShadedAreaGeometry.index.needsUpdate = true; // Index array is fixed, doesn't need per-frame update
+    graphShadedAreaGeometry.setDrawRange(0, shadedIdxIndex); // Draw based on number of active indices
 
 
     // Update the position and visibility of the current point sphere
-    if (vizMode === 'graph' && dataHistory.length > 0) {
-        const lastPoint = dataHistory[dataHistory.length - 1];
-        // The sphere position is the last point on the line
-        // Find its calculated X position using the same logic
-        const elapsedInHistory = lastPoint.timestamp - minHistoryTimestamp;
-        const xNorm = (historyDuration > 0) ? (elapsedInHistory / historyDuration) : 0;
-        const xPos = xNorm * xRange - xRange / 2;
-        pointMesh.position.set(xPos, lastPoint.value, 0);
-        pointMesh.visible = true;
+    if (vizMode === 'graph' && visibleHistory.length > 0) {
+        // Position the sphere at the LAST visible point in history, which corresponds to the current data point
+        const lastPointInHistory = visibleHistory[visibleHistory.length - 1];
+        if (lastPointInHistory) {
+            // The sphere position is the last point on the line
+            // Find its calculated X position using the same logic as above
+            const elapsedInWindow = lastPointInHistory.timestamp - windowStartTime;
+            const windowDuration = HISTORY_WINDOW_MS;
+            const xNorm = (windowDuration > 0) ? (elapsedInWindow / windowDuration) : 0;
+            const xPos = xNorm * xRange - xRange / 2;
+            pointMesh.position.set(xPos, lastPointInHistory.value, 0);
+            pointMesh.visible = true;
+             // Ensure point color matches dark/light mode
+             if (pointMesh.material) {
+                  pointMesh.material.color.setHex(darkModeEnabled ? 0xFFFFFF : 0x000000);
+             }
+        } else {
+             pointMesh.visible = false; // Should not happen if visibleHistory.length > 0, but safe
+        }
+
     } else {
-        pointMesh.visible = false; // Hide sphere if not in graph mode or no data
+        pointMesh.visible = false; // Hide sphere if not in graph mode or no visible history
     }
 
      // Ensure graph objects are visible only in graph mode (redundant with setVisualizationMode but safe)
      if (graphLine) graphLine.visible = (vizMode === 'graph');
      if (graphShadedAreaMesh) graphShadedAreaMesh.visible = (vizMode === 'graph');
-     // Shaded area is only drawn if >= 2 points, visibility set by drawRange
+     // pointMesh visibility handled above based on visibleHistory
 }
 
 
 // Helper function to calculate the y-value for the graph
+// This now incorporates all manual multipliers
 function updateGraphVisualsHelper(data) {
     if (!data) return 0.0;
 
-    let plotValue = 0.5; // Default center value
+    let plotValueBase = 0.5; // Default center value for the emotion/variety part
+    let emotionFactor = { speedFactor: 1.0, colorVariety: 1.0, sizeVariety: 1.0, particleMovement: 1.0, apertureFactor: 1.0 };
     if (data.sessionEmotion) {
-        const emotionFactor = getEmotionFactor(data.sessionEmotion);
-        const intensity = (emotionFactor.particleMovement * 0.7 + 0.1) * manualIntensityMultiplier;
-        const variety = emotionFactor.colorVariety * 0.5 * manualVarietyMultiplier;
-        plotValue = (intensity + variety) / 2.0;
-        plotValue = Math.max(0, Math.min(1, (plotValue - 0.2) / 3.8)); // Map 0.2-4.0 to 0-1
+         emotionFactor = getEmotionFactor(data.sessionEmotion);
+        // Combine factors that influence the "intensity/variety" feel
+        // Using particleMovement and colorVariety as the primary drivers for graph shape
+        let emotionCombinedRaw = (emotionFactor.particleMovement * 0.7 + emotionFactor.colorVariety * 0.3);
+
+        // Apply intensity and variety multipliers to the emotion/variety combined value
+        let emotionCombinedMultiplied = emotionCombinedRaw * manualIntensityMultiplier * 0.7 + emotionCombinedRaw * manualVarietyMultiplier * 0.3;
+
+        // Map the multiplied emotion combined value to a 0-1 range for plot value base
+        // Assuming the raw combined value might range from ~0.3 (sad/calm low multipliers) up to ~2.5 (angry/happy high multipliers)
+        // Let's map this scaled range (0 to ~7.5 with multipliers) to a 0-1 base value.
+        // Example mapping: 0 -> 0, 3 -> 0.5, 6 -> 1
+        plotValueBase = Math.max(0, Math.min(1, emotionCombinedMultiplied / 6.0));
+
+
     }
-     let sensorBoost = 0;
+     let sensorBoostRaw = 0;
      if (data.illuminance != null && typeof data.illuminance === 'number') {
         const minLogLux = Math.log(1);
         const maxLogLux = Math.log(10001);
         const logLux = Math.log(Math.max(1, data.illuminance + 1));
         const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
-        sensorBoost += luxNorm * 0.5;
+        sensorBoostRaw += luxNorm * 0.5;
      }
      if (data.decibels != null && typeof data.decibels === 'number') {
          const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
-         sensorBoost += decibelNorm * 0.3;
+         sensorBoostRaw += decibelNorm * 0.3;
      }
-      sensorBoost *= manualHighlightMultiplier;
+      // Apply highlight multiplier ONLY to the sensor boost part, as it's meant to represent external "highlight" events
+     const sensorBoostMultiplied = sensorBoostRaw * manualHighlightMultiplier;
 
-     plotValue = Math.max(0, Math.min(1, plotValue + sensorBoost));
+     // Combine the base value (from emotion/variety) and the sensor boost (from sensor/highlight)
+     const totalValue = plotValueBase + sensorBoostMultiplied; // Expected range might be 0 to ~1 + 0.5*3 = ~2.5
 
-     // Scale plotValue to Y range (-1 to 1 in the scene)
-     const scaledY = plotValue * 2.0 - 1.0;
+     // Map the total value (e.g., 0 to ~3.5 with multipliers) to the final Y range (-1 to 1)
+     // Let's try mapping totalValue from 0 to 2 to -1 to 1, centering around 1.
+     // Mapping: 0 -> -1, 1 -> 0, 2 -> 1
+     const scaledY = Math.max(-1, Math.min(1, (totalValue - 1.0) / 1.0)); // Adjust scaling as needed
+
      return scaledY;
 }
 
 
-// Helper function to rebuild graph history upon seeking/reset
+// Helper function to rebuild graph history upon seeking/reset/mode switch to graph
 function rebuildGraphHistory(seekAbsoluteTimestamp) {
     if (sensorData.length === 0) {
         dataHistory = [];
         return;
     }
 
+    // seekAbsoluteTimestamp is already relative to the start of the data (timestamp 0)
     const windowStartTime = seekAbsoluteTimestamp - HISTORY_WINDOW_MS;
 
     dataHistory = [];
-    for (let i = 0; i < sensorData.length; i++) {
+    // Find the index to start searching from. Efficiently jump close to windowStartTime.
+    let startIndex = 0;
+    // Use binary search or a simple loop
+    for(let i = 0; i < sensorData.length; i++) {
+        if (sensorData[i].timestamp >= windowStartTime) {
+             // Found the first point >= windowStartTime, go back a few points just in case interpolation is needed or window boundary is tricky
+            startIndex = Math.max(0, i - 2); // Go back a couple indices
+            break;
+        }
+         // If we reach the end and all timestamps are before windowStartTime, start from the beginning.
+         if (i === sensorData.length - 1) startIndex = 0;
+    }
+    // Ensure startIndex is not past the end
+    startIndex = Math.min(startIndex, sensorData.length - 1);
+     // If data is empty after filtering, startIndex could be -1 or sensorData.length. Ensure it's valid.
+     if (sensorData.length === 0) startIndex = 0;
+
+
+    // Add points within the history window up to the seek target timestamp
+    for (let i = startIndex; i < sensorData.length; i++) {
         const row = sensorData[i];
+         // Only add points strictly less than or equal to the seek time AND within the window
         if (row.timestamp >= windowStartTime && row.timestamp <= seekAbsoluteTimestamp) {
-             const scaledY = updateGraphVisualsHelper(row);
+             const scaledY = updateGraphVisualsHelper(row); // Calculate Y value for this historical point using CURRENT multipliers
              dataHistory.push({ timestamp: row.timestamp, value: scaledY });
         } else if (row.timestamp > seekAbsoluteTimestamp) {
+            // Data is sorted by timestamp, stop searching once we pass the seek time
             break;
         }
     }
 
+    // Ensure history doesn't exceed max points
     if (dataHistory.length > MAX_HISTORY_POINTS) {
          dataHistory = dataHistory.slice(dataHistory.length - MAX_HISTORY_POINTS);
      }
+     // Ensure dataHistory is sorted by timestamp (should be if sensorData is sorted and logic is correct)
+     dataHistory.sort((a, b) => a.timestamp - b.timestamp);
+
+     // console.log(`Rebuilt graph history for time ${seekAbsoluteTimestamp} ms. Found ${dataHistory.length} points.`);
 }
 
 // Modify handleSeekBarInput
@@ -862,16 +1360,20 @@ function handleSeekBarInput() {
     currentTimeDisplay.textContent = formatTime(seekTimeMs);
 
     if (sensorData.length > 0) {
+         // Find the data index closest to the seeked time (last index <= target time)
          const seekTargetElapsedCsvTime = parseFloat(seekBar.value);
-         const seekTargetAbsoluteCsvTime = sensorData[0].timestamp + seekTargetElapsedCsvTime;
          let tempIndex = 0;
+
+         // Find the last index whose timestamp is <= seekTargetElapsedCsvTime
          for (let i = 0; i < sensorData.length; i++) {
-             if (sensorData[i].timestamp <= seekTargetAbsoluteCsvTime) {
+             if (sensorData[i].timestamp <= seekTargetElapsedCsvTime) {
                  tempIndex = i;
              } else {
-                 break;
+                 break; // Assumes data is sorted by timestamp
              }
          }
+        tempIndex = Math.max(0, Math.min(sensorData.length - 1, tempIndex));
+
         const currentRow = sensorData[tempIndex];
         if (currentRow) {
              // Update data display immediately
@@ -886,6 +1388,7 @@ function handleSeekBarInput() {
                          }
                          if(key === 'temperature_celsius') value += ' °C';
                          if(key === 'decibels') value += ' dB';
+                         if(key === 'timestamp') value = formatTime(value); // Format timestamp for display
                      }
                      dataStr += `${key}: ${value}\n`;
                  }
@@ -893,24 +1396,43 @@ function handleSeekBarInput() {
              currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
 
              // Update visualization visuals based on current mode while seeking
+             // When seeking, we update the visuals to reflect the state at the seeked time.
+             // If paused, this also triggers a manual render.
              if (vizMode === 'shader') {
-                  updateShaderVisuals(currentRow, { applyManualMultipliersOnly: !isPlaying }); // Apply multipliers only if paused
-
-                  if (!isPlaying) {
+                  updateShaderVisuals(currentRow); // Passes current multipliers automatically
+                   // Shader uTime should reflect the seek position when scrubbing
+                  if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
+                      bgShaderMaterial.uniforms.uTime.value = seekTargetElapsedCsvTime / 1000.0; // Set based on elapsed time in seconds
+                       // Don't update lastFrameTime here, only in animate
+                  }
+                  if (!isPlaying) { // Render immediately if paused
                       renderer.clear();
                       renderer.render(backgroundScene, backgroundCamera);
                   }
-             } else { // vizMode === 'graph'
-                 // Rebuild history up to the seeked point
-                 rebuildGraphHistory(seekTargetAbsoluteCsvTime);
+             } else if (vizMode === 'graph') {
+                 // Rebuild history up to the seeked point using the seek target time
+                 // Use the actual timestamp of the currentRow for rebuilding history to be accurate
+                 rebuildGraphHistory(currentRow.timestamp);
                  // Update graph geometry based on the history and the data point at the seeked time (for pointMesh)
                  updateGraphVisuals(currentRow);
-
-                  if (!isPlaying) {
+                  if (!isPlaying) { // Render immediately if paused
+                       renderer.clear();
+                       renderer.render(scene, camera);
+                  }
+             } else { // vizMode === 'particles'
+                  // On seek input, update uniforms but don't emit/move particles.
+                  // Particles are cleared and reset on seek *change* or play.
+                 updateParticleVisuals(currentRow, 0); // Pass 0 deltaTime, no emission while seeking
+                  // Particle uTime should also reflect the seek position when scrubbing
+                 if (particleMaterial && particleMaterial.uniforms.uTime) {
+                      particleMaterial.uniforms.uTime.value = seekTargetElapsedCsvTime / 1000.0; // Set based on elapsed time in seconds
+                 }
+                  if (!isPlaying) { // Render immediately if paused
                        renderer.clear();
                        renderer.render(scene, camera);
                   }
              }
+
              // Audio params are updated but gain should be 0 due to isSeeking (controlled in updateAudio)
              const emotionFactor = getEmotionFactor(currentRow.sessionEmotion);
              updateAudio(currentRow, emotionFactor);
@@ -923,53 +1445,104 @@ function handleSeekBarChange() {
     isSeeking = false; // End seeking
     if (sensorData.length === 0) return;
 
-    const seekTargetElapsedCsvTime = parseFloat(seekBar.value);
-    const seekTargetAbsoluteCsvTime = sensorData[0].timestamp + seekTargetElapsedCsvTime;
+    const seekTargetElapsedCsvTime = parseFloat(seekBar.value); // This is relative to start (0)
 
+    // Find the data index closest to the seeked time (last index <= target)
     let newIndex = 0;
-    for (let i = 0; i < sensorData.length; i++) {
-        if (sensorData[i].timestamp <= seekTargetAbsoluteCsvTime) {
-            newIndex = i;
-        } else {
-            break;
-        }
-    }
+     for (let i = 0; i < sensorData.length; i++) {
+         if (sensorData[i].timestamp <= seekTargetElapsedCsvTime) {
+             newIndex = i;
+         } else {
+             break; // Assumes data is sorted by timestamp
+         }
+     }
+    newIndex = Math.max(0, Math.min(sensorData.length - 1, newIndex));
     currentIndex = newIndex;
 
+
+    // Reset actual start time based on the new currentIndex's timestamp
+    // actualStartTime = performance.now() - (sensorData[currentIndex].timestamp / playbackSpeed);
+    // Correction: actualStartTime should be calculated relative to the *start* of the CSV data (timestamp 0).
+    // So, performance.now() - (elapsed_time_in_csv / playbackSpeed)
     actualStartTime = performance.now() - (seekTargetElapsedCsvTime / playbackSpeed);
 
+
     // Rebuild graph history for the new seek point regardless of mode
-    rebuildGraphHistory(seekTargetAbsoluteCsvTime);
+     // Use the actual timestamp of the current data point for rebuilding history
+    rebuildGraphHistory(sensorData[currentIndex].timestamp);
+
+     // Clear particles on seek change
+     clearParticles();
+     if (particleMaterial && particleMaterial.uniforms.uTime) {
+         // Align particle shader time with the seeked position
+         particleMaterial.uniforms.uTime.value = sensorData[currentIndex].timestamp / 1000.0; // Convert ms to seconds
+     }
+
 
     // Update visuals and audio for the new current point
     if (sensorData[currentIndex]) {
-      lastProcessedTimestamp = sensorData[currentIndex].timestamp;
-      if (vizMode === 'shader') {
-        updateShaderVisuals(sensorData[currentIndex]);
-      } else {
-        updateGraphVisuals(sensorData[currentIndex]);
-      }
-       const emotionFactor = getEmotionFactor(sensorData[currentIndex].sessionEmotion);
-       updateAudio(sensorData[currentIndex], emotionFactor);
-    }
+      lastProcessedTimestamp = sensorData[currentIndex].timestamp; // Update last processed timestamp (relative elapsed time)
+      const currentRow = sensorData[currentIndex];
 
-    // Reset shader uTime regardless of mode, as it's relative to the start of play
-    if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
-        bgShaderMaterial.uniforms.uTime.value = 0.0;
-        delete bgShaderMaterial.uniforms.uTime.lastTime;
+      if (vizMode === 'shader') {
+        updateShaderVisuals(currentRow);
+         // Reset shader uTime as it's tied to playback start/seek
+        if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
+            bgShaderMaterial.uniforms.uTime.value = currentRow.timestamp / 1000.0; // Set based on elapsed time in seconds
+            delete bgShaderMaterial.uniforms.uTime.lastFrameTime; // Clear last frame time to ensure animate calculates delta correctly
+        }
+      } else if (vizMode === 'graph') {
+        updateGraphVisuals(currentRow);
+      } else { // vizMode === 'particles'
+         updateParticleVisuals(currentRow, 0); // Update uniforms for current state, no emission yet
+         // Particle uTime is already set above
+      }
+       // Audio parameters update, but gain is controlled by isPlaying/isSeeking state
+       const emotionFactor = getEmotionFactor(currentRow.sessionEmotion);
+       updateAudio(currentRow, emotionFactor);
     }
 
     if (isPlaying) {
-        if (animationFrameId) cancelAnimationFrame(animationFrameId);
-        animationFrameId = requestAnimationFrame(animate);
-         // Audio resume/fade in logic remains the same
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume().then(() => {
-                 if (gainNode) gainNode.gain.setTargetAtTime(Math.min(0.15, Math.max(0, currentAudioParams.gain)), audioContext.currentTime, 0.1);
-            });
-        } else if (gainNode) {
-             gainNode.gain.setTargetAtTime(Math.min(0.15, Math.max(0, currentAudioParams.gain)), audioContext.currentTime, 0.1);
+        // Restart animation loop if it was paused for seeking (shouldn't happen with current logic)
+        if (animationFrameId === null) { // If animation was stopped (e.g., by seeking at the end)
+             // Reset lastFrameTime for animate delta calculation upon resuming
+            animate.lastFrameTime = performance.now();
+             animate();
         }
+
+         // Audio resume/fade in logic remains the same as playAnimation, triggered if isPlaying is true after seek
+        if (isAudioInitialized && audioContext && audioContext.state === 'suspended') {
+             audioContext.resume().then(() => {
+                  if (gainNode) {
+                      // Ensure target gain is correct for the current state (isPlaying, not seeking)
+                      const emotionFactor = sensorData[currentIndex] ? getEmotionFactor(sensorData[currentIndex].sessionEmotion) : getEmotionFactor(null);
+                      let targetGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, (getAudioTargetGain(sensorData[currentIndex], emotionFactor)))) : 0; // Recalculate intended gain
+                       // Use last calculated audio params which includes gain based on data BEFORE pause/seek
+                       // Let's use currentAudioParams.gain which reflects the last *intended* non-zero gain
+                       targetGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, currentAudioParams.gain || 0.02)) : 0;
+
+                      gainNode.gain.cancelScheduledValues(audioContext.currentTime); // Clear any pending fades
+                      gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+                      gainNode.gain.linearRampToValueAtTime(targetGain, audioContext.currentTime + 0.2);
+                       currentAudioParams.gain = targetGain; // Update state to the new target
+                  }
+             }).catch(e => console.error("Error resuming AudioContext:", e));
+         } else if (isAudioInitialized && audioContext && audioContext.state === 'running') {
+              // If already running, fade gain back in in case it was muted during seeking
+             if (gainNode) {
+                 // Recalculate intended gain for the current state (isPlaying, not seeking)
+                  const emotionFactor = sensorData[currentIndex] ? getEmotionFactor(sensorData[currentIndex].sessionEmotion) : getEmotionFactor(null);
+                  let targetGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, (getAudioTargetGain(sensorData[currentIndex], emotionFactor)))) : 0; // Recalculate intended gain
+                  targetGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, currentAudioParams.gain || 0.02)) : 0; // Use state
+
+                 gainNode.gain.cancelScheduledValues(audioContext.currentTime); // Clear any pending fades
+                  gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+                  gainNode.gain.linearRampToValueAtTime(targetGain, audioContext.currentTime + 0.2);
+                  currentAudioParams.gain = targetGain; // Update state
+             }
+         }
+
+
     } else {
         // Not playing, render the updated state at the seeked position
         renderer.clear();
@@ -980,6 +1553,288 @@ function handleSeekBarChange() {
         }
     }
 }
+
+
+// Modify animate function
+function animate() {
+    // Calculate delta time for this frame
+    const now = performance.now();
+    const deltaTime = (now - (animate.lastFrameTime || now)) / 1000.0; // Delta in seconds
+    animate.lastFrameTime = now; // Store for next frame
+    animate.deltaTime = deltaTime; // Store delta time globally for emitters
+
+
+    if (!isPlaying) {
+         animationFrameId = null;
+         // If paused, we still need to render the current state if something changed (e.g. multiplier slider moved)
+         // But we don't advance time or data index here.
+         // Rendering is triggered by the change handlers (pauseAnimation, handleSeekBar*, updateMultiplierDisplay).
+         return; // Exit if not playing
+    }
+    animationFrameId = requestAnimationFrame(animate);
+
+
+    const performanceNow = performance.now();
+    // Elapsed time since actualStartTime, scaled by playback speed
+    const currentElapsedTargetMs = (performanceNow - actualStartTime) * playbackSpeed;
+
+    // Ensure currentElapsedTargetMs doesn't exceed total duration
+     const totalDurationMs = sensorData.length > 0 ? sensorData[sensorData.length - 1].timestamp : 0;
+     const cappedElapsedTargetMs = Math.min(totalDurationMs, currentElapsedTargetMs);
+
+    // Find the index corresponding to the capped time target
+    let nextIndex = currentIndex;
+     if (sensorData.length > 0) {
+          // Find the last index whose timestamp is less than or equal to the capped target time.
+          // This ensures we always process the data point that represents the state *at or just before* the current time.
+          // Optimized search: start from current index or slightly before
+          let searchStartIndex = Math.max(0, currentIndex - 2); // Look back a couple frames
+
+          for (let i = searchStartIndex; i < sensorData.length; i++) {
+              if (sensorData[i].timestamp <= cappedElapsedTargetMs) {
+                  nextIndex = i;
+              } else {
+                  // Since data is sorted, we found the last index <= target
+                  break;
+              }
+          }
+           // Ensure nextIndex is within bounds
+          nextIndex = Math.max(0, Math.min(sensorData.length - 1, nextIndex));
+     }
+
+
+    const indexChanged = (nextIndex !== currentIndex);
+
+    if (indexChanged || currentIndex === 0) { // Process data point if index changed or it's the very first frame
+        currentIndex = nextIndex;
+        const currentRow = sensorData[currentIndex];
+        if (currentRow) {
+            // Update visuals based on current mode
+            if (vizMode === 'shader') {
+                updateShaderVisuals(currentRow); // Shader uniforms lerp towards new values
+            } else if (vizMode === 'graph') {
+                 // Add current point to history *before* updating graph geometry
+                const scaledY = updateGraphVisualsHelper(currentRow); // Calculate value using current multipliers
+                const currentTimestamp = currentRow.timestamp; // Already relative to start
+                // Filter old points from history *before* adding the new one
+                const windowStartTime = currentTimestamp - HISTORY_WINDOW_MS;
+                // Filter history: Keep points within the window *and* up to the current timestamp
+                dataHistory = dataHistory.filter(point => point.timestamp >= windowStartTime); // Remove old points
+                 // Check if the current point is already the last point in history to avoid duplicates on index jumps
+                 if (dataHistory.length === 0 || dataHistory[dataHistory.length - 1].timestamp < currentTimestamp) {
+                     dataHistory.push({ timestamp: currentTimestamp, value: scaledY }); // Add current point
+                 }
+                 // Cap history size
+                 if (dataHistory.length > MAX_HISTORY_POINTS) {
+                     dataHistory = dataHistory.slice(dataHistory.length - MAX_HISTORY_POINTS);
+                 }
+                updateGraphVisuals(currentRow); // Update graph geometry based on the new history
+            } else { // vizMode === 'particles'
+                 // updateParticleVisuals handles uniform updates and particle emission based on isPlaying
+                 updateParticleVisuals(currentRow, deltaTime);
+            }
+
+            // Update audio regardless of mode
+            const emotionFactor = getEmotionFactor(currentRow.sessionEmotion);
+            updateAudio(currentRow, emotionFactor);
+
+            lastProcessedTimestamp = currentRow.timestamp; // Update last processed timestamp (relative elapsed time)
+        }
+    } else {
+         // Index hasn't changed, but need to update visuals that depend on continuous time (shaders, particles)
+         if (vizMode === 'shader' && bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
+              // uTime update needs delta time and playback speed
+              const speedFactor = (bgShaderMaterial.uniforms.uEmotionSpeed.value || 1.0); // Get the current emotion speed factor uniform value
+              bgShaderMaterial.uniforms.uTime.value += deltaTime * playbackSpeed * speedFactor;
+              if(isNaN(bgShaderMaterial.uniforms.uTime.value)) bgShaderMaterial.uniforms.uTime.value = 0;
+         } else if (vizMode === 'particles' && sensorData.length > 0 && currentIndex >= 0) {
+              // updateParticleVisuals handles uniform updates and particle emission based on isPlaying
+              // Pass deltaTime so uTime advances and new particles can be emitted
+              updateParticleVisuals(sensorData[currentIndex], deltaTime);
+         }
+         // Graph doesn't update unless index changes or multipliers change (handled by updateMultiplierDisplay)
+    }
+
+
+    // Update seek bar and time display regardless of mode
+    // Only update if not currently seeking (user is dragging the bar)
+    if (!isSeeking && sensorData.length > 0) {
+        // The time displayed/seeked should reflect the *target* time based on playback,
+        // which is cappedElapsedTargetMs.
+        seekBar.value = Math.max(0, Math.min(parseFloat(seekBar.max), cappedElapsedTargetMs));
+        currentTimeDisplay.textContent = formatTime(cappedElapsedTargetMs);
+    }
+
+    // Render based on current mode
+    renderer.clear(); // Clear the buffer
+    if (vizMode === 'shader') {
+        renderer.render(backgroundScene, backgroundCamera); // Render shader scene
+    } else { // vizMode === 'graph' or vizMode === 'particles'
+        renderer.render(scene, camera); // Render graph or particle scene
+    }
+
+    // Animation end check
+    // Check if the capped target time has reached or exceeded the total duration AND we are playing
+    if (isPlaying && totalDurationMs > 0 && cappedElapsedTargetMs >= totalDurationMs) {
+        // Move to the very last data point for the final state update
+        currentIndex = sensorData.length - 1;
+        const lastRow = sensorData[currentIndex];
+
+        // Update visuals for the very last frame
+        if (vizMode === 'shader') {
+             updateShaderVisuals(lastRow);
+        } else if (vizMode === 'graph') {
+            rebuildGraphHistory(lastRow.timestamp); // Rebuild history up to end
+            updateGraphVisuals(lastRow); // Update graph
+        } else { // vizMode === 'particles'
+             updateParticleVisuals(lastRow, deltaTime); // Update uniforms, final emission/state
+        }
+
+        // Update audio for the last frame
+        const emotionFactor = getEmotionFactor(lastRow.sessionEmotion);
+        updateAudio(lastRow, emotionFactor);
+
+         // Ensure seek bar is at the very end
+        seekBar.value = totalDurationMs;
+        currentTimeDisplay.textContent = formatTime(totalDurationMs);
+
+        // Render the final state
+         renderer.clear();
+         if (vizMode === 'shader') {
+              renderer.render(backgroundScene, backgroundCamera);
+         } else {
+              renderer.render(scene, camera);
+         }
+
+        // Then pause
+        pauseAnimation();
+        resetButton.disabled = false; // Enable reset after playback finishes
+    }
+}
+// Static properties for animate
+animate.lastFrameTime = 0;
+animate.deltaTime = 0;
+
+
+// --- Dark Mode and Customization ---
+
+function setInitialTheme() {
+    // Check system preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        enableDarkMode();
+    } else {
+        disableDarkMode();
+    }
+}
+
+function toggleDarkMode() {
+    if (darkModeEnabled) {
+        disableDarkMode();
+    } else {
+        enableDarkMode();
+    }
+}
+
+function enableDarkMode() {
+    document.body.classList.add('dark-mode');
+     document.documentElement.setAttribute('data-theme', 'dark'); // Apply data-theme attribute
+    darkModeEnabled = true;
+    toggleDarkModeButton.querySelector('.material-symbols-outlined').textContent = 'light_mode';
+    toggleDarkModeButton.title = 'Switch to Light Mode';
+    // Update graph colors for dark mode
+    if (graphMaterial) graphMaterial.color.setHex(0xBB86FC); // Brighter purple for dark mode
+    if (graphShadedAreaMaterial) graphShadedAreaMaterial.color.setHex(0xBB86FC); // Match line color
+    if (pointMesh && pointMesh.material) pointMesh.material.color.setHex(0xFFFFFF); // White point
+     // If data is loaded and not playing/seeking, re-render to show color change
+     if (!isPlaying && !isSeeking && sensorData.length > 0 && currentIndex >= 0 && vizMode === 'graph') {
+          updateGraphVisuals(sensorData[currentIndex]); // Forces color update and render
+          renderer.clear();
+          renderer.render(scene, camera);
+     }
+}
+
+function disableDarkMode() {
+    document.body.classList.remove('dark-mode');
+    document.documentElement.removeAttribute('data-theme'); // Remove data-theme attribute
+    darkModeEnabled = false;
+    toggleDarkModeButton.querySelector('.material-symbols-outlined').textContent = 'dark_mode';
+    toggleDarkModeButton.title = 'Switch to Dark Mode';
+    // Reset graph colors to light mode defaults
+    if (graphMaterial) graphMaterial.color.setHex(0x8844EE); // Original purple for light mode
+    if (graphShadedAreaMaterial) graphShadedAreaMaterial.color.setHex(0x8844EE); // Match line color
+     if (pointMesh && pointMesh.material) pointMesh.material.color.setHex(0x000000); // Black point for light mode contrast
+     // If data is loaded and not playing/seeking, re-render to show color change
+     if (!isPlaying && !isSeeking && sensorData.length > 0 && currentIndex >= 0 && vizMode === 'graph') {
+         updateGraphVisuals(sensorData[currentIndex]); // Forces color update and render
+         renderer.clear();
+         renderer.render(scene, camera);
+     }
+}
+
+function toggleCustomizationPanel() {
+    customizationPanelVisible = !customizationPanelVisible;
+    customizationPanel.classList.toggle('visible', customizationPanelVisible);
+     customizationPanel.classList.toggle('hidden', !customizationPanelVisible);
+    // Also ensure the button has the correct icon based on state
+    toggleCustomizationButton.querySelector('.material-symbols-outlined').textContent = customizationPanelVisible ? 'close' : 'tune';
+}
+
+function updateMultiplierDisplay(event) {
+    const sliderId = event.target.id;
+    const value = parseFloat(event.target.value);
+
+    switch(sliderId) {
+        case 'intensityMultiplier':
+            manualIntensityMultiplier = value;
+            intensityValueDisplay.textContent = value.toFixed(1);
+            break;
+        case 'varietyMultiplier':
+            manualVarietyMultiplier = value;
+            varietyValueDisplay.textContent = value.toFixed(1);
+            break;
+        case 'highlightMultiplier':
+            manualHighlightMultiplier = value;
+            highlightValueDisplay.textContent = value.toFixed(1);
+            // Note: Highlight multiplier affects BOTH shader and graph Y value calculation, and particle color/emission
+            break;
+    }
+
+    // Update visualization if not playing/seeking and data is loaded
+     if (!isPlaying && !isSeeking && sensorData.length > 0 && currentIndex >= 0) {
+         const currentRow = sensorData[currentIndex];
+         if (vizMode === 'shader') {
+             // Recalculate shader uniforms based on the *current* data row and *new* multipliers
+             updateShaderVisuals(currentRow);
+         } else if (vizMode === 'graph') {
+             // Rebuild history with the new multiplier values affecting Y calculation
+             rebuildGraphHistory(currentRow.timestamp); // Recalculates Y for history points
+             // Update graph visuals based on the current history and point
+             updateGraphVisuals(currentRow); // Redraws geometry
+         } else { // vizMode === 'particles'
+             // For particles, update uniforms that depend on multipliers (e.g. uSpeedFactor implicitly via lerp)
+             // And update particle parameters *on re-emission*.
+             // Manual multipliers affect parameters calculated inside emitParticles.
+             // Calling updateParticleVisuals here will update uniforms like uSpeedFactor
+             // and if isPlaying were true, it would also emit particles with the new params.
+             // When paused, emission is skipped, but uniforms are updated.
+             updateParticleVisuals(currentRow, 0); // Pass 0 deltaTime to avoid uTime change, update uniforms
+         }
+          // Always render after multiplier change if paused and data loaded
+          renderer.clear();
+          if (vizMode === 'shader') {
+               renderer.render(backgroundScene, backgroundCamera);
+           } else {
+               renderer.render(scene, camera);
+           }
+     }
+}
+
+// Initialize multiplier displays on load
+document.addEventListener('DOMContentLoaded', () => {
+     intensityValueDisplay.textContent = intensityMultiplierSlider.value;
+     varietyValueDisplay.textContent = varietyMultiplierSlider.value;
+     highlightValueDisplay.textContent = highlightMultiplierSlider.value;
+});
 
 
 // Helper functions (parseSessionColor, getEmotionFactor, formatTime, initAudio, updateAudio)
@@ -1017,25 +1872,36 @@ function onWindowResize() {
         camera.updateProjectionMatrix();
 
         // Orthographic camera for background doesn't need aspect update, but size might if it wasn't fixed -1 to 1
-        // backgroundCamera.left = -width / height;
-        // backgroundCamera.right = width / height;
-        // backgroundCamera.updateProjectionMatrix();
+        // backgroundCamera.left = -1;
+        // backgroundCamera.right = 1;
+        // backgroundCamera.top = 1;
+        // backgroundCamera.bottom = -1;
+        // backgroundCamera.updateProjectionMatrix(); // This is already set correctly in init
 
         renderer.setSize(width, height);
 
         // Update visuals for the current frame after resize
         // Only render if not playing and not seeking, and data exists
         if (!isPlaying && !isSeeking && sensorData.length > 0 && currentIndex >= 0) {
+             const currentRow = sensorData[currentIndex];
              if (vizMode === 'shader') {
-                  updateShaderVisuals(sensorData[currentIndex]);
-                  renderer.clear();
-                  renderer.render(backgroundScene, backgroundCamera);
-             } else { // vizMode === 'graph'
-                 // Recalculate graph geometry with new aspect ratio
+                  updateShaderVisuals(currentRow);
+             } else if (vizMode === 'graph') { // vizMode === 'graph'
+                 // Recalculate graph geometry with new aspect ratio affecting X range
                  // No need to rebuild history, just update the geometry using the existing history
-                 updateGraphVisuals(sensorData[currentIndex]); // This recalculates positions based on current aspect
-                 renderer.clear();
-                 renderer.render(scene, camera);
+                 updateGraphVisuals(currentRow); // This recalculates positions based on current aspect
+             } else { // vizMode === 'particles'
+                 // Particle positions are calculated in the shader relative to origin, camera doesn't change their relative positions.
+                 // Point size might be affected by projection, but shader handles sizeAttenuation.
+                 // No specific updateParticleVisuals call needed *because* of resize itself, unless it affects parameters calculation.
+                 // Ensure uniforms are up-to-date with current data/multipliers if paused
+                 updateParticleVisuals(currentRow, 0); // Pass 0 deltaTime
+             }
+             renderer.clear(); // Clear before rendering
+             if (vizMode === 'shader') {
+                  renderer.render(backgroundScene, backgroundCamera);
+             } else {
+                  renderer.render(scene, camera);
              }
         } else if (!isPlaying && !isSeeking) {
            // If no data, render the default scene based on mode
@@ -1043,12 +1909,17 @@ function onWindowResize() {
              if (vizMode === 'shader') {
                  renderer.render(backgroundScene, backgroundCamera);
              } else {
-                  // Graph mode with no data: render empty graph scene
-                  if (graphGeometry) graphGeometry.setDrawRange(0, 0);
-                   if (graphShadedAreaGeometry) graphShadedAreaGeometry.setDrawRange(0, 0);
-                  if (pointMesh) pointMesh.visible = false;
-                  graphLine.visible = (vizMode === 'graph'); // Ensure objects are visible
-                  graphShadedAreaMesh.visible = (vizMode === 'graph');
+                  // Graph or Particle mode with no data: render empty scene
+                  if (vizMode === 'graph') {
+                      if (graphGeometry) graphGeometry.setDrawRange(0, 0);
+                       if (graphShadedAreaGeometry) graphShadedAreaGeometry.setDrawRange(0, 0);
+                      if (pointMesh) pointMesh.visible = false;
+                      graphLine.visible = true;
+                      graphShadedAreaMesh.visible = true;
+                  } else if (vizMode === 'particles') {
+                       clearParticles(); // Ensure no particles shown
+                       if (particleSystem) particleSystem.visible = true; // Keep object visible but empty
+                  }
                   renderer.render(scene, camera);
              }
         }
@@ -1080,81 +1951,102 @@ function initAudio() {
         isAudioInitialized = true;
          console.log("AudioContext Initialized.");
 
-         // ユーザーインタラクション後にオーディオコンテキストが再開可能か確認
+         // User interaction is needed to resume context if suspended
          if (audioContext.state === 'suspended') {
-             console.log("AudioContext is suspended. User interaction is required to resume.");
+             console.log("AudioContext is suspended. User interaction (e.g., clicking play) is required to resume.");
          }
 
     } catch (e) {
         console.error("Error initializing audio:", e);
          isAudioInitialized = false; // 初期化失敗フラグ
+         // Disable audio controls or show message if initialization fails completely?
     }
 }
 
+// Helper to calculate the target gain value based on data (excluding isPlaying/isSeeking state)
+function getAudioTargetGain(data, emotionFactor) {
+     let targetGain = 0.02; // Base gain
+
+     // Decibels -> Gain
+     if (data && data.decibels != null && typeof data.decibels === 'number') {
+         const decibelNorm = Math.min(1, Math.max(0, (data.decibels + 40) / 70.0)); // -40dB to 30dB map to 0-1
+         targetGain += decibelNorm * 0.06; // Add up to 0.06 to base gain
+     }
+
+     // Emotion -> Gain multiplier (using apertureFactor)
+     if (emotionFactor) {
+          targetGain *= (emotionFactor.apertureFactor || 1.0);
+     }
+
+     // Clamp final gain (before considering play/seek state)
+     return Math.min(0.15, Math.max(0, targetGain));
+}
+
+
 function updateAudio(data, emotionFactor) {
-    if (!isAudioInitialized || !audioContext || !oscillator || !filterNode || !gainNode || audioContext.state === 'closed') {
-         if (!isAudioInitialized || audioContext.state === 'closed') return;
+    // Only update audio parameters if initialized and data exists
+    if (!isAudioInitialized || !audioContext || audioContext.state === 'closed' || !data) {
+         // Ensure gain is zero if audio is not initialized or data is missing/invalid
+         if (isAudioInitialized && gainNode) {
+              gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.1);
+               currentAudioParams.gain = 0;
+         }
+         return;
     }
 
     const currentTime = audioContext.currentTime;
-    const smoothTime = 0.1; // パラメータ変化の滑らかさ (秒)
+    const smoothTime = 0.05; // Parameter change smoothness (seconds)
 
-    // データに基づくパラメータ計算
-    let targetFreq = 440; // デフォルト周波数 (A4)
-    let targetFilterFreq = 2500; // デフォルトフィルター周波数
-    let targetFilterQ = 1; // デフォルトQ値
-    let targetGain = isPlaying && !isSeeking ? 0.02 : 0; // 基本ゲイン (再生中かつ非シーク中のみ音を出す)
+    // Data-based parameter calculation
+    let targetFreq = 440; // Default frequency (A4)
+    let targetFilterFreq = 2500; // Default filter frequency
+    let targetFilterQ = 1; // Default Q value
+    // Base gain is calculated by getAudioTargetGain, then adjusted based on state
 
-    // 温度 -> 周波数
+    // Temperature -> Frequency
     if (data.temperature_celsius != null && typeof data.temperature_celsius === 'number') {
         const tempNorm = Math.min(1, Math.max(0, (data.temperature_celsius - 10) / 25)); // 10°C -> 0, 35°C -> 1
         targetFreq = 220 + tempNorm * 660; // 220Hz (A3) から 880Hz (A5) の範囲で変化
     }
 
-    // デシベル -> ゲイン、フィルター周波数
+    // Decibels -> Filter frequency
     if (data.decibels != null && typeof data.decibels === 'number') {
-        // -40dB を 0, 30dB を 1 にマッピング
+        // -40dB to 30dB map to 0-1
         const decibelNorm = Math.min(1, Math.max(0, (data.decibels + 40) / 70.0));
-        targetGain += decibelNorm * 0.06; // ゲインにデシベルを少し加算
-        targetFilterFreq += decibelNorm * 2000; // デシベルが高いほどフィルターを開く
+        targetFilterFreq = 2000 + decibelNorm * 3000; // 2000Hz to 5000Hz
     }
 
-    // 感情 -> オシレータータイプ、フィルター、周波数/ゲイン乗数
-    const effectiveSpeed = emotionFactor.speedFactor * playbackSpeed; // 再生速度も考慮
+    // Emotion -> Oscillator type, filter parameters, multipliers
+    // Use emotionFactor directly for timbre/pitch/filter characteristics.
     switch (data.sessionEmotion) {
         case "楽しい":
             oscillator.type = 'triangle';
-            targetFreq *= (1.0 + effectiveSpeed * 0.2);
-            targetFilterFreq = 3000 + emotionFactor.particleMovement * 800 * effectiveSpeed;
-            targetFilterQ = 1.5 + emotionFactor.sizeVariety * 0.5;
-            targetGain += emotionFactor.apertureFactor * 0.02;
+            targetFreq *= (1.0 + (emotionFactor.speedFactor - 1.0) * 0.2); // SpeedFactor influences pitch slightly
+            targetFilterFreq = 4000 + (emotionFactor.particleMovement - 1.0) * 1000; // Movement influences filter
+            targetFilterQ = 1.5 + (emotionFactor.sizeVariety - 1.0) * 0.5; // Size influences Q
             break;
         case "悲しい":
             oscillator.type = 'sine';
-            targetFreq *= (0.8 / Math.sqrt(effectiveSpeed));
-            targetFilterFreq = 600 + emotionFactor.colorVariety * 300 / effectiveSpeed;
+            targetFreq *= (1.0 - (1.0 - emotionFactor.speedFactor) * 0.2); // Inverse speed for sadness pitch?
+            targetFilterFreq = 800 + (1.0 - emotionFactor.colorVariety) * 500; // Color variety influences filter
             targetFilterQ = 0.9;
-            targetGain *= 0.5;
             break;
         case "怒り":
             oscillator.type = 'sawtooth';
-            targetFreq *= (1.2 * effectiveSpeed);
-            targetFilterFreq = 1500 + Math.random() * 1000 * effectiveSpeed;
-            targetFilterQ = 3 + Math.random() * 2;
-            targetGain += emotionFactor.apertureFactor * 0.05;
+            targetFreq *= (1.0 + (emotionFactor.speedFactor - 1.0) * 0.3);
+            targetFilterFreq = 2500 + (emotionFactor.speedFactor - 1.0) * 1500 + Math.random() * 500; // Speed + random for filter
+            targetFilterQ = 3 + (emotionFactor.particleMovement - 1.0) * 2 + Math.random() * 1; // Movement + random for Q
             break;
         case "穏やか":
             oscillator.type = 'sine';
-            targetFreq *= (1.0 / Math.sqrt(effectiveSpeed));
-            targetFilterFreq = 2000 * Math.sqrt(effectiveSpeed);
+            targetFreq *= (1.0 - (1.0 - emotionFactor.speedFactor) * 0.1);
+            targetFilterFreq = 1800 + (emotionFactor.speedFactor - 1.0) * 500;
             targetFilterQ = 1.2;
-            targetGain *= 0.8;
             break;
-        default: // その他/デフォルト
+        default: // Other/Default
             oscillator.type = 'sine';
-            targetFilterFreq = 2200 * Math.sqrt(effectiveSpeed);
+            targetFilterFreq = 2500;
             targetFilterQ = 1.0;
-             targetGain *= 0.9;
             break;
     }
 
@@ -1177,73 +2069,117 @@ function updateAudio(data, emotionFactor) {
          currentAudioParams.filterQ = finalFilterQ;
     }
 
-    const finalGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, targetGain)) : 0; // Ensure gain is 0 if not playing or seeking
+    // Calculate target gain considering data and emotion *before* state check
+    const calculatedTargetGainFromData = getAudioTargetGain(data, emotionFactor);
+
+    // Apply gain smoothly, based on play/seek state
+    const finalGain = isPlaying && !isSeeking ? calculatedTargetGainFromData : 0;
     if (finalGain !== currentAudioParams.gain) {
-        gainNode.gain.setTargetAtTime(finalGain, currentTime, smoothTime);
-        currentAudioParams.gain = finalGain;
+         // Use linearRampToValueAtTime for smoother fade in/out than setTargetAtTime for large changes
+         if (Math.abs(finalGain - gainNode.gain.value) > 0.01) { // Only ramp if there's a significant change
+             gainNode.gain.cancelScheduledValues(currentTime); // Clear any pending ramps
+             gainNode.gain.linearRampToValueAtTime(finalGain, currentTime + smoothTime);
+         } else {
+              // If change is small, set instantly or use setTargetAtTime with very short time
+              gainNode.gain.setValueAtTime(finalGain, currentTime);
+         }
+
+        currentAudioParams.gain = finalGain; // Update state to the *actual* target gain (0 or calculated)
     }
 
 
-    // steps_in_interval があれば短い効果音を追加
+    // steps_in_interval sound effect
+    // Only trigger if steps > 0 and we haven't triggered recently (debounce based on audio context time)
+    // Use audioContext.currentTime for timing comparison
     if (data.steps_in_interval > 0 && typeof data.steps_in_interval === 'number') {
-        if (!updateAudio.lastStepTime || (currentTime - updateAudio.lastStepTime > 0.1)) {
+        // Debounce time should be inversely proportional to playback speed
+        const stepDebounceTime = 0.1 / playbackSpeed; // seconds
+        if (!updateAudio.lastStepTime || (currentTime - updateAudio.lastStepTime >= stepDebounceTime)) {
+             // Create temporary nodes for the sound effect
              const stepOsc = audioContext.createOscillator();
              const stepGain = audioContext.createGain();
              const stepFilter = audioContext.createBiquadFilter();
 
              stepOsc.type = 'triangle';
-             const stepPitch = 400 + Math.random() * 400 + data.steps_in_interval * 20;
+             // Pitch based on number of steps and emotion speed
+             const stepPitchBase = 300;
+             const stepPitchRange = 600; // Max pitch
+             const stepPitchStepsEffect = Math.min(data.steps_in_interval, 10) * 30; // Add up to 300Hz
+             const stepPitchEmotionEffect = (emotionFactor.speedFactor - 1.0) * 100; // Emotion speed adds +/- 100Hz
+             const stepPitch = Math.max(stepPitchBase, Math.min(stepPitchBase + stepPitchRange, stepPitchBase + Math.random() * 100 + stepPitchStepsEffect + stepPitchEmotionEffect));
+
              stepOsc.frequency.setValueAtTime(stepPitch, currentTime);
 
              stepFilter.type = 'bandpass';
-             const filterCenterFreq = 800 + data.steps_in_interval * 50;
-             stepFilter.frequency.setValueAtTime(filterCenterFreq, currentTime);
-             stepFilter.Q.setValueAtTime(5 + data.steps_in_interval * 0.5, currentTime);
+             const filterCenterFreqBase = 800;
+             const filterCenterFreqStepsEffect = Math.min(data.steps_in_interval, 10) * 60;
+             const filterCenterFreqEmotionEffect = (emotionFactor.colorVariety - 1.0) * 200;
+             const filterCenterFreq = Math.max(500, Math.min(3000, filterCenterFreqBase + filterCenterFreqStepsEffect + filterCenterFreqEmotionEffect));
 
-             stepGain.gain.setValueAtTime(0.05 * Math.min(data.steps_in_interval / 5, 1), currentTime);
-             stepGain.gain.exponentialRampToValueAtTime(0.0001, currentTime + 0.15);
+             stepFilter.frequency.setValueAtTime(filterCenterFreq, currentTime);
+             stepFilter.Q.setValueAtTime(5 + Math.min(data.steps_in_interval, 10) * 0.5, currentTime); // Q based on steps
+
+             // Gain based on number of steps, fade out
+             const stepPeakGain = 0.05 * Math.min(data.steps_in_interval / 5, 1) * (emotionFactor.apertureFactor || 1.0);
+             stepGain.gain.setValueAtTime(stepPeakGain, currentTime);
+             const stepSoundDuration = 0.15 / playbackSpeed; // Duration scaled by speed
+             stepGain.gain.exponentialRampToValueAtTime(0.0001, currentTime + stepSoundDuration);
 
              stepOsc.connect(stepFilter);
              stepFilter.connect(stepGain);
              stepGain.connect(audioContext.destination);
 
+             // Start and stop sound
              stepOsc.start(currentTime);
-             stepOsc.stop(currentTime + 0.15);
+             stepOsc.stop(currentTime + stepSoundDuration + 0.05); // Ensure stop happens after ramp
 
+             // Update the last step time using audio context time
              updateAudio.lastStepTime = currentTime;
+
+             console.log(`Step sound triggered at ${formatTime(data.timestamp)} (steps: ${data.steps_in_interval})`);
         }
     }
 
 
-    // photoTakenId があれば短いクリック音を追加
+    // photoTakenId sound effect
+    // Only trigger if photoTakenId is 1 and we haven't triggered recently (debounce based on audio context time)
     if (data.photoTakenId === 1 && typeof data.photoTakenId === 'number') {
-         if (!updateAudio.lastPhotoTime || (currentTime - updateAudio.lastPhotoTime > 0.5)) {
+        const photoDebounceTime = 0.5 / playbackSpeed; // seconds
+         if (!updateAudio.lastPhotoTime || (currentTime - updateAudio.lastPhotoTime >= photoDebounceTime)) {
+            // Create temporary nodes for the sound effect
             const clickOsc = audioContext.createOscillator();
             const clickGain = audioContext.createGain();
             const clickFilter = audioContext.createBiquadFilter();
 
             clickOsc.type = 'square';
-            clickOsc.frequency.setValueAtTime(2500, currentTime);
+            clickOsc.frequency.setValueAtTime(2500 + (emotionFactor.speedFactor - 1.0) * 500, currentTime); // Pitch slightly influenced by emotion speed
 
             clickFilter.type = 'highpass';
-            clickFilter.frequency.setValueAtTime(1500, currentTime);
+            clickFilter.frequency.setValueAtTime(1500 + (emotionFactor.particleMovement - 1.0) * 300, currentTime); // Filter influenced by movement
             clickFilter.Q.setValueAtTime(1.0, currentTime);
 
-            clickGain.gain.setValueAtTime(0.15, currentTime);
-            clickGain.gain.exponentialRampToValueAtTime(0.0001, currentTime + 0.1);
+            // Gain fade out influenced by emotion aperture
+            const clickPeakGain = 0.15 * (emotionFactor.apertureFactor || 1.0);
+            clickGain.gain.setValueAtTime(clickPeakGain, currentTime);
+            const clickSoundDuration = 0.1 / playbackSpeed; // Duration scaled by speed
+            clickGain.gain.exponentialRampToValueAtTime(0.0001, currentTime + clickSoundDuration);
 
             clickOsc.connect(clickFilter);
             clickFilter.connect(clickGain);
             clickGain.connect(audioContext.destination);
 
+            // Start and stop sound
             clickOsc.start(currentTime);
-            clickOsc.stop(currentTime + 0.1);
+            clickOsc.stop(currentTime + clickSoundDuration + 0.05); // Ensure stop happens after ramp
 
+            // Update the last photo time using audio context time
             updateAudio.lastPhotoTime = currentTime;
+
+             console.log(`Photo sound triggered at ${formatTime(data.timestamp)}`);
          }
     }
 }
-// updateAudio 関数の静的プロパティを初期化
+// updateAudio 関数の静的プロパティを初期化 (オーディオコンテキスト時間を使用)
 updateAudio.lastStepTime = 0;
 updateAudio.lastPhotoTime = 0;
 
@@ -1253,7 +2189,9 @@ function formatTime(ms) {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
-     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+     const milliseconds = Math.floor((ms % 1000) / 10); // Get tenths of a second
+     return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
+    // return `${minutes}:${seconds.toString().padStart(2, '0')}`; // Keep MM:SS format for display
 }
 
 // ウィンドウリサイズイベントリスナーを追加
