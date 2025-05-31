@@ -1,4 +1,3 @@
-// nagame/main.js
 
 // グローバル変数
 let scene, camera, renderer;
@@ -10,7 +9,15 @@ let playbackSpeed = 1.0;
 let isPlaying = false;
 let animationFrameId;
 
-let bgShaderMaterial, backgroundScene, backgroundCamera; // 背景用
+let bgShaderMaterial, backgroundScene, backgroundCamera; // 背景用 (Shader)
+// Graph specific variables
+let graphLine, graphPoint, graphGeometry, graphMaterial, pointMesh; // Graph line and point
+let graphShadedAreaMesh, graphShadedAreaGeometry, graphShadedAreaMaterial; // Graph shaded area
+let dataHistory = [];
+const HISTORY_WINDOW_MS = 15000; // 15 seconds history window for the graph
+const MAX_HISTORY_POINTS = 500; // Limit number of points in history for performance
+
+
 let audioContext, oscillator, gainNode, filterNode; // 音声用
 let isAudioInitialized = false;
 let isSeeking = false; // シークバー操作中フラグ
@@ -41,10 +48,14 @@ const varietyMultiplierSlider = document.getElementById('varietyMultiplier');
 const varietyValueDisplay = document.getElementById('varietyValue');
 const highlightMultiplierSlider = document.getElementById('highlightMultiplier');
 const highlightValueDisplay = document.getElementById('highlightValue');
+// Visualization mode toggle button
+const toggleVizModeButton = document.getElementById('toggleVizModeButton');
+
 
 // 状態変数
 let darkModeEnabled = false;
-let customizationPanelVisible = false;
+let customizationPanelVisible = false; // Customization panel state
+let vizMode = 'shader'; // 'shader' or 'graph'
 let manualIntensityMultiplier = 1.0;
 let manualVarietyMultiplier = 1.0;
 let manualHighlightMultiplier = 1.0;
@@ -161,19 +172,20 @@ const backgroundFragmentShader = `
 
 // 初期化処理
 function init() {
-    scene = new THREE.Scene();
+    scene = new THREE.Scene(); // Used for Graph
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 1.0; // 背景シェーダーがメインなので、カメラはかなり手前
+    camera.position.z = 1.0; // Camera position for Graph/Shader elements at Z=0
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.autoClear = false; // 背景レンダリング後にメインシーンを重ねる場合に必要だが、今回は背景のみなので不要かも。念のため残す
+    renderer.autoClear = false;
     vizContainer.appendChild(renderer.domElement);
 
+    // Setup for the Shader background
     backgroundScene = new THREE.Scene();
-    backgroundCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    const bgPlaneGeo = new THREE.PlaneGeometry(2, 2);
+    backgroundCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1); // Fixed orthographic camera for the 2D shader plane
+    const bgPlaneGeo = new THREE.PlaneGeometry(2, 2); // Plane covers the whole screen (-1 to 1 in orthographic space)
     bgShaderMaterial = new THREE.ShaderMaterial({
         vertexShader: backgroundVertexShader,
         fragmentShader: backgroundFragmentShader,
@@ -191,6 +203,10 @@ function init() {
     const bgMesh = new THREE.Mesh(bgPlaneGeo, bgShaderMaterial);
     backgroundScene.add(bgMesh);
 
+    // Initialize graph visualization elements
+    initGraph();
+
+
     // イベントリスナー設定
     csvFileInput.addEventListener('change', handleFileLoad);
     playButton.addEventListener('click', playAnimation);
@@ -199,6 +215,22 @@ function init() {
     speedControl.addEventListener('input', (e) => {
         playbackSpeed = parseFloat(e.target.value);
         speedValueDisplay.textContent = `${playbackSpeed.toFixed(1)}x`;
+        // Playback speed affects uEmotionSpeed calculation in updateShaderVisuals and graph x-axis time mapping
+         if (!isPlaying && !isSeeking && sensorData.length > 0 && currentIndex >= 0) {
+              if (vizMode === 'shader') {
+                   // Re-calculate shader uniforms based on new playback speed
+                   updateShaderVisuals(sensorData[currentIndex]); // This recalculates speed factor
+                   renderer.clear();
+                   renderer.render(backgroundScene, backgroundCamera);
+              } else {
+                   // Graph time mapping depends on playbackSpeed indirectly via animate loop's cappedElapsedTarget
+                   // Redraw graph with current data point based on new speed affecting history time window
+                   rebuildGraphHistory(sensorData[currentIndex].timestamp);
+                   updateGraphVisuals(sensorData[currentIndex]);
+                   renderer.clear();
+                   renderer.render(scene, camera);
+              }
+         }
     });
     seekBar.addEventListener('input', handleSeekBarInput);
     seekBar.addEventListener('change', handleSeekBarChange);
@@ -210,354 +242,239 @@ function init() {
     intensityMultiplierSlider.addEventListener('input', updateMultiplierDisplay);
     varietyMultiplierSlider.addEventListener('input', updateMultiplierDisplay);
     highlightMultiplierSlider.addEventListener('input', updateMultiplierDisplay);
+    toggleVizModeButton.addEventListener('click', toggleVisualizationMode); // Listener for the new button
 
     // 初期テーマ設定 (システム設定優先)
     setInitialTheme();
 
-    // 初期レンダリング
-    if (renderer && backgroundScene && backgroundCamera) {
-         renderer.render(backgroundScene, backgroundCamera);
-     } else {
-         console.warn("Initial render skipped.");
-     }
-    onWindowResize(); // 初期サイズ調整
+    // 初期visualization mode設定
+    vizMode = 'shader'; // Start with shader mode
+    setVisualizationMode(vizMode); // Apply visibility and button icon
+
+    // Initial rendering is handled by onWindowResize
+    onWindowResize();
 }
 
-function setInitialTheme() {
-    const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    darkModeEnabled = prefersDarkMode;
-    document.documentElement.setAttribute('data-theme', darkModeEnabled ? 'dark' : 'light');
-    // アイコンの表示を更新 (これはCSSで制御することも可能だがJSでも)
-    toggleDarkModeButton.querySelector('.material-symbols-outlined').textContent = darkModeEnabled ? 'light_mode' : 'dark_mode';
+function initGraph() {
+    // Create graph geometry (dynamic line)
+    graphGeometry = new THREE.BufferGeometry();
+    graphGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_HISTORY_POINTS * 3), 3));
+    graphMaterial = new THREE.LineBasicMaterial({ color: 0x8844EE, linewidth: 2 }); // Purple color
+    graphLine = new THREE.Line(graphGeometry, graphMaterial);
+    scene.add(graphLine); // Add to the main scene
+
+    // Create graph shaded area geometry (dynamic mesh)
+    graphShadedAreaGeometry = new THREE.BufferGeometry();
+    graphShadedAreaGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_HISTORY_POINTS * 4 * 3), 3));
+    graphShadedAreaGeometry.setIndex(new THREE.BufferAttribute(new Uint16Array((MAX_HISTORY_POINTS - 1) * 6), 1));
+    graphShadedAreaMaterial = new THREE.MeshBasicMaterial({
+        color: 0x8844EE,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+    });
+    graphShadedAreaMesh = new THREE.Mesh(graphShadedAreaGeometry, graphShadedAreaMaterial);
+    scene.add(graphShadedAreaMesh);
+
+
+    // Create the current point indicator (sphere)
+    const pointGeometry = new THREE.SphereGeometry(0.02, 16, 16);
+    const pointMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+    pointMesh = new THREE.Mesh(pointGeometry, pointMaterial);
+    scene.add(pointMesh);
+
+    // Initialize data history
+    dataHistory = [];
 }
 
-function toggleDarkMode() {
-    darkModeEnabled = !darkModeEnabled;
-    document.documentElement.setAttribute('data-theme', darkModeEnabled ? 'dark' : 'light');
-    // アイコンの表示を更新
-     toggleDarkModeButton.querySelector('.material-symbols-outlined').textContent = darkModeEnabled ? 'light_mode' : 'dark_mode';
+function toggleVisualizationMode() {
+    vizMode = vizMode === 'shader' ? 'graph' : 'shader';
+    setVisualizationMode(vizMode);
 }
 
-function toggleCustomizationPanel() {
-    customizationPanelVisible = !customizationPanelVisible;
-    customizationPanel.classList.toggle('hidden', !customizationPanelVisible);
-}
+function setVisualizationMode(mode) {
+    vizMode = mode;
+    // Update button text/icon
+    toggleVizModeButton.querySelector('.material-symbols-outlined').textContent = vizMode === 'shader' ? 'area_chart' : 'blur_on';
+    toggleVizModeButton.title = vizMode === 'shader' ? 'Switch to Graph Viz' : 'Switch to Shader Viz';
 
-function updateMultiplierDisplay(event) {
-    const slider = event.target;
-    const valueDisplay = document.getElementById(slider.id.replace('Multiplier', 'Value'));
-    const value = parseFloat(slider.value);
-    valueDisplay.textContent = `${value.toFixed(1)}x`;
+    // Manage visibility of visualization elements
+    const isShader = vizMode === 'shader';
+    if (backgroundScene.children[0]) backgroundScene.children[0].visible = isShader; // The shader plane
+    if (graphLine) graphLine.visible = !isShader;
+    // Only show point/shaded area if in graph mode AND data exists (checked inside updateGraphVisuals)
+    if (pointMesh) pointMesh.visible = !isShader && dataHistory.length > 0; // Initial visibility state
+    if (graphShadedAreaMesh) graphShadedAreaMesh.visible = !isShader && dataHistory.length >= 2; // Initial visibility state
 
-    // グローバル変数にも反映
-    if (slider.id === 'intensityMultiplier') manualIntensityMultiplier = value;
-    if (slider.id === 'varietyMultiplier') manualVarietyMultiplier = value;
-    if (slider.id === 'highlightMultiplier') manualHighlightMultiplier = value;
 
-    // シークバー操作中や再生中でない場合、即時反映のためにupdateVisualsを呼ぶ
-    if (!isPlaying && !isSeeking && sensorData.length > 0) {
-        const currentRow = sensorData[currentIndex];
-         if (currentRow) {
-             // multiplierだけ適用して描画更新
-             updateVisuals(currentRow, { applyManualMultipliersOnly: true });
+    // Re-render immediately to show the change if not playing/seeking
+    if (!isPlaying && !isSeeking) {
+         if (sensorData.length > 0 && currentIndex >= 0) {
+             // Update visuals based on the new mode's requirements using the current data
+             if (vizMode === 'shader') {
+                 updateShaderVisuals(sensorData[currentIndex]);
+             } else { // vizMode === 'graph'
+                 // For graph, rebuild history and update geometry based on current time
+                 rebuildGraphHistory(sensorData[currentIndex].timestamp);
+                 updateGraphVisuals(sensorData[currentIndex]); // Update graph geometry based on history
+             }
+              renderer.clear();
+              if (vizMode === 'shader') {
+                   renderer.render(backgroundScene, backgroundCamera);
+               } else {
+                   renderer.render(scene, camera);
+               }
+         } else {
+             // No data, render default state for the mode
              renderer.clear();
-             renderer.render(backgroundScene, backgroundCamera);
+             if (vizMode === 'shader') {
+                 renderer.render(backgroundScene, backgroundCamera);
+             } else {
+                 // Graph mode with no data: render empty graph scene
+                 if (graphGeometry) graphGeometry.setDrawRange(0, 0);
+                  if (graphShadedAreaGeometry) graphShadedAreaGeometry.setDrawRange(0, 0);
+                 if (pointMesh) pointMesh.visible = false;
+                 graphLine.visible = (vizMode === 'graph'); // Keep line/mesh objects visible, but empty
+                 graphShadedAreaMesh.visible = (vizMode === 'graph');
+                 renderer.render(scene, camera);
+             }
          }
     }
 }
 
 
-function handleFileLoad(event) {
-    const file = event.target.files[0];
-    if (file) {
-        csvFileNameDisplay.textContent = file.name;
-        Papa.parse(file, {
-            header: true, dynamicTyping: true, skipEmptyLines: true,
-            complete: function(results) {
-                // timestampがnullでない、数値である、他の主要な列（例：sessionColor, sessionEmotion）が存在するか確認
-                sensorData = results.data.filter(row =>
-                    row.timestamp != null && typeof row.timestamp === 'number' &&
-                    row.sessionColor != null && row.sessionEmotion != null
-                );
-                if (sensorData.length > 0) {
-                    sensorData.sort((a, b) => a.timestamp - b.timestamp);
-                    const firstTs = sensorData[0].timestamp;
-                    const lastTs = sensorData[sensorData.length - 1].timestamp;
-                    const totalDurationMs = lastTs - firstTs;
-
-                    // データが存在しない場合や無効なdurationの場合のチェック
-                    if (totalDurationMs <= 0 || isNaN(totalDurationMs)) {
-                         alert("データが短すぎるか、無効なタイムスタンプ範囲です。");
-                         resetStateAfterLoadError();
-                         return;
-                    }
-
-
-                    seekBar.max = totalDurationMs;
-                    seekBar.value = 0;
-                    totalTimeDisplay.textContent = formatTime(totalDurationMs);
-                    currentTimeDisplay.textContent = formatTime(0);
-                    
-                    resetAnimation(); // データのロード完了時にリセット
-                    playButton.disabled = false;
-                    resetButton.disabled = false;
-                    seekBar.disabled = false;
-
-                    // 初期vis/audioパラメータ設定
-                    if (sensorData.length > 0) {
-                        updateVisuals(sensorData[0]); // 最初のデータで表示を初期化
-                        // updateAudioも最初のデータで初期化 (isPlaying=falseなので音は出ないがパラメータは設定される)
-                        const initialEmotionFactor = getEmotionFactor(sensorData[0].sessionEmotion);
-                        updateAudio(sensorData[0], initialEmotionFactor);
-                    }
-
-                } else {
-                    alert("有効なデータが見つかりませんでした。タイムスタンプ、sessionColor, sessionEmotion列などを確認してください。");
-                    resetStateAfterLoadError();
-                }
-            },
-            error: function(error) {
-                console.error("CSV Parse Error:", error);
-                alert("CSVファイルのパースに失敗しました。");
-                resetStateAfterLoadError();
-            }
-        });
-    }
-}
-
-function resetStateAfterLoadError() {
-    sensorData = [];
-    csvFileNameDisplay.textContent = "N/A";
-    currentDataDisplay.innerHTML = "";
-    totalTimeDisplay.textContent = formatTime(0);
-    currentTimeDisplay.textContent = formatTime(0);
-    seekBar.max = 0;
-    seekBar.value = 0;
-    seekBar.disabled = true;
-    playButton.disabled = true;
-    pauseButton.disabled = true;
-    resetButton.disabled = true;
-    isPlaying = false;
-    if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
-    // シェーダーユニフォームもリセット
-    if (bgShaderMaterial) {
-        bgShaderMaterial.uniforms.uBaseColor.value.setRGB(0.2, 0.3, 0.7);
-        bgShaderMaterial.uniforms.uHighlightIntensity.value = 0.1;
-        bgShaderMaterial.uniforms.uEmotionSpeed.value = 0.5;
-        bgShaderMaterial.uniforms.uEmotionIntensity.value = 0.3;
-        bgShaderMaterial.uniforms.uColorVariety.value = 0.2;
-        bgShaderMaterial.uniforms.uTime.value = 0.0;
-        delete bgShaderMaterial.uniforms.uTime.lastTime;
-    }
-    // オーディオもリセット
-    if (audioContext && audioContext.state !== 'closed') {
-        audioContext.close().then(() => {
-            isAudioInitialized = false;
-             currentAudioParams = { frequency: 440, filterFreq: 2500, filterQ: 1, gain: 0 };
-        });
-    } else {
-         isAudioInitialized = false;
-          currentAudioParams = { frequency: 440, filterFreq: 2500, filterQ: 1, gain: 0 };
-    }
-     // 初期レンダリングで画面をデフォルトに戻す
-     if (renderer && backgroundScene && backgroundCamera) {
-         renderer.render(backgroundScene, backgroundCamera);
-     }
-}
-
-
-function playAnimation() {
-    if (sensorData.length === 0 || currentIndex >= sensorData.length) return;
-    if (!isAudioInitialized) initAudio();
-
-    // オーディオコンテキストが一時停止している場合、再開
-    if (audioContext && audioContext.state === 'suspended') {
-        audioContext.resume().then(() => {
-             // ゲインをフェードイン
-            if (gainNode) gainNode.gain.setTargetAtTime(0.08, audioContext.currentTime, 0.1); // 最大ゲインを少し上げる
-        });
-    } else {
-         // 最初からの再生、または一時停止からの再開だがstateがsuspendedでない場合
-         if (gainNode) gainNode.gain.setTargetAtTime(0.08, audioContext.currentTime, 0.1);
-    }
-
-
-    isPlaying = true;
-    playButton.disabled = true;
-    pauseButton.disabled = false;
-
-    // 現在のシークバーの値に基づいてアニメーション開始時刻を調整
-    const currentElapsedCsvTime = parseFloat(seekBar.value); // ミリ秒
-    // performance.now() はミリ秒、currentElapsedCsvTime もミリ秒
-    // actualStartTime は performance.now() の値
-    // 経過ミリ秒 = (performance.now() - actualStartTime) * playbackSpeed
-    // currentElapsedCsvTime = (performanceNow - actualStartTime) * playbackSpeed
-    // currentElapsedCsvTime / playbackSpeed = performanceNow - actualStartTime
-    // actualStartTime = performanceNow - (currentElapsedCsvTime / playbackSpeed)
-    actualStartTime = performance.now() - (currentElapsedCsvTime / playbackSpeed);
-
-    // shader uTime の継続処理
-    // 再開時に shader time の lastTime を現在の performance.now() に設定
-    if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
-       bgShaderMaterial.uniforms.uTime.lastTime = performance.now();
-       // uTime.value 自体はアニメーションループで delta time が加算され続けるので、
-       // ここでリセットしたり大きく調整したりする必要はない。
-       // シークバー操作時は handleSeekBarChange で uTime.value がリセットされている。
-    }
-
-
-    if (!animationFrameId) { // requestAnimationFrameがまだ開始されていない場合のみ
-        animationFrameId = requestAnimationFrame(animate);
-    }
-}
-
-function pauseAnimation() {
-    if (!isPlaying) return; // 既に一時停止中の場合は何もしない
-
-    isPlaying = false;
-    playButton.disabled = false;
-    pauseButton.disabled = true;
-    if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
-
-    // ゲインをフェードアウトして音を止める
-    if (gainNode && audioContext) {
-        gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.1);
-    }
-
-    // AudioContextを一時停止してリソースを節約
-    if (audioContext && audioContext.state === 'running') {
-       audioContext.suspend();
-    }
-}
-
-function resetAnimation() {
-    pauseAnimation(); // 再生中なら一時停止
-
-    currentIndex = 0;
-    seekBar.value = 0;
-    currentTimeDisplay.textContent = formatTime(0);
-
-    if (sensorData.length > 0) {
-        lastProcessedTimestamp = sensorData[0].timestamp;
-        updateVisuals(sensorData[0]); // 最初のフレームの表示に更新
-        playButton.disabled = false;
-         // オーディオパラメータも最初のフレームにリセット (音は出さない)
-        const initialEmotionFactor = getEmotionFactor(sensorData[0].sessionEmotion);
-        updateAudio(sensorData[0], initialEmotionFactor); // updateAudio内でgainNodeが0になるように制御されているはず
-    } else {
-        // データがない場合の状態リセットはhandleFileLoadのエラー処理にまとめる
-         resetStateAfterLoadError();
-         return; // 処理を終了
-    }
-
-    // シェーダーのuTimeをリセット
-    if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
-        bgShaderMaterial.uniforms.uTime.value = 0.0;
-        delete bgShaderMaterial.uniforms.uTime.lastTime; // lastTimeを削除して次回のanimateで再初期化させる
-    }
-
-    resetButton.disabled = true; // リセットボタンは押せない状態に
-     // シークバー操作中でなければ表示更新
-     if (!isSeeking && renderer && backgroundScene && backgroundCamera) {
-         renderer.clear();
-         renderer.render(backgroundScene, backgroundCamera);
-     }
-}
-
+// Modify animate function
 function animate() {
     if (!isPlaying) {
-         animationFrameId = null; // ループを停止したことを明示
+         animationFrameId = null;
          return;
     }
     animationFrameId = requestAnimationFrame(animate);
 
     const performanceNow = performance.now();
     const performanceElapsed = performanceNow - actualStartTime;
-    // ターゲットとするCSVの経過時間 (ミリ秒)
     const currentCsvElapsedTarget = (performanceElapsed * playbackSpeed);
-    // ターゲットとするCSVの絶対タイムスタンプ (ミリ秒)
-    const currentCsvTimestampTarget = sensorData[0].timestamp + currentCsvElapsedTarget;
+    // Ensure currentCsvElapsedTarget doesn't exceed total duration
+     const totalDurationMs = sensorData.length > 0 ? sensorData[sensorData.length - 1].timestamp - sensorData[0].timestamp : 0;
+     const cappedElapsedTarget = Math.min(totalDurationMs, currentCsvElapsedTarget);
 
-    // currentIndexを更新: ターゲットタイムスタンプ以下の最後のデータポイントを探す
+    const currentCsvTimestampTarget = sensorData.length > 0 ? sensorData[0].timestamp + cappedElapsedTarget : 0;
+
+
     let nextIndex = currentIndex;
+     // Ensure we don't go out of bounds
     while (nextIndex < sensorData.length - 1 && sensorData[nextIndex + 1].timestamp <= currentCsvTimestampTarget) {
         nextIndex++;
     }
-
-    // currentIndexが更新された場合、または強制更新が必要な場合にVisuals/Audioを更新
-    // isSeeking中はanimateが呼ばれないが、シーク終了時にhandleSeekBarChangeでupdateVisualsが呼ばれる
-    if (nextIndex !== currentIndex || currentIndex === 0) { // 最初のフレームは必ず更新
-        currentIndex = nextIndex;
-        const currentRow = sensorData[currentIndex];
-        if (currentRow) {
-            updateVisuals(currentRow);
-             // updateAudio もここで呼ぶ
-            const emotionFactor = getEmotionFactor(currentRow.sessionEmotion);
-            updateAudio(currentRow, emotionFactor);
-
-            lastProcessedTimestamp = currentRow.timestamp; // 更新されたタイムスタンプを記録
-        }
+     // Ensure the index corresponds to the capped time target if we jump ahead
+    if (sensorData.length > 0 && sensorData[nextIndex].timestamp > currentCsvTimestampTarget) {
+         // This shouldn't happen with the while loop condition, but as a safeguard:
+         // If the current index timestamp is past the target, find the correct index again from the start
+         nextIndex = 0;
+         while (nextIndex < sensorData.length - 1 && sensorData[nextIndex + 1].timestamp <= currentCsvTimestampTarget) {
+              nextIndex++;
+         }
     }
 
 
-    // シェーダーのuTimeを更新
-    if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
-        const lastTime = bgShaderMaterial.uniforms.uTime.lastTime || performanceNow; // 初回またはリセット後のためのフォールバック
-        const deltaTime = (performanceNow - lastTime) / 1000.0; // デルタタイムを秒で計算
-        // uTimeは累積時間なので、デルタタイムを加算
-        bgShaderMaterial.uniforms.uTime.value += deltaTime;
+    if (nextIndex !== currentIndex || currentIndex === 0) { // Always update on first frame or index change
+        currentIndex = nextIndex;
+        const currentRow = sensorData[currentIndex];
+        if (currentRow) {
+            // Update visuals based on current mode
+            if (vizMode === 'shader') {
+                updateShaderVisuals(currentRow);
+            } else { // vizMode === 'graph'
+                 // Add current point to history
+                const scaledY = updateGraphVisualsHelper(currentRow); // Calculate value
+                const currentTimestamp = currentRow.timestamp;
+                // Filter old points from history *before* adding the new one
+                const windowStartTime = currentTimestamp - HISTORY_WINDOW_MS;
+                dataHistory = dataHistory.filter(point => point.timestamp >= windowStartTime);
+                // Add the new point
+                dataHistory.push({ timestamp: currentTimestamp, value: scaledY });
+                 // Cap history size
+                 if (dataHistory.length > MAX_HISTORY_POINTS) {
+                     dataHistory = dataHistory.slice(dataHistory.length - MAX_HISTORY_POINTS);
+                 }
+                updateGraphVisuals(currentRow); // Update geometry based on the new history
+            }
+
+            // Update audio regardless of mode
+            const emotionFactor = getEmotionFactor(currentRow.sessionEmotion);
+            updateAudio(currentRow, emotionFactor);
+
+            lastProcessedTimestamp = currentRow.timestamp;
+        }
+    }
+
+    // Update shader uTime only if in shader mode
+    if (vizMode === 'shader' && bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
+        const lastTime = bgShaderMaterial.uniforms.uTime.lastTime || performanceNow;
+        const deltaTime = (performanceNow - lastTime) / 1000.0;
+        bgShaderMaterial.uniforms.uTime.value += deltaTime * playbackSpeed; // uTime should also scale with playback speed
         bgShaderMaterial.uniforms.uTime.lastTime = performanceNow;
-        // NaNチェック (まれに発生しうる)
         if(isNaN(bgShaderMaterial.uniforms.uTime.value)) bgShaderMaterial.uniforms.uTime.value = 0;
     }
 
 
-    // シークバーと時間の表示を更新
+    // Update seek bar and time display regardless of mode
     if (!isSeeking && sensorData.length > 0) {
-        // シークバーは経過時間 (ms) を反映
-        seekBar.value = Math.max(0, Math.min(parseFloat(seekBar.max), currentCsvElapsedTarget));
-        currentTimeDisplay.textContent = formatTime(currentCsvElapsedTarget);
+        seekBar.value = Math.max(0, Math.min(parseFloat(seekBar.max), cappedElapsedTarget)); // Use capped time
+        currentTimeDisplay.textContent = formatTime(cappedElapsedTarget); // Use capped time
     }
 
-    // 描画
-    renderer.clear(); // 毎フレームクリア
-    renderer.render(backgroundScene, backgroundCamera); // 背景をレンダリング
+    // Render based on current mode
+    renderer.clear(); // Clear the buffer
+    if (vizMode === 'shader') {
+        renderer.render(backgroundScene, backgroundCamera); // Render shader scene
+    } else { // vizMode === 'graph'
+        renderer.render(scene, camera); // Render graph scene
+    }
 
-    // アニメーション終了判定
-    if (currentIndex >= sensorData.length - 1 && currentCsvTimestampTarget >= sensorData[sensorData.length-1].timestamp) {
-        pauseAnimation(); // 一時停止
-        resetButton.disabled = false; // リセットボタンを有効化
-        // 終了時にシークバーと時間を正確に表示
+    // Animation end check
+    if (sensorData.length > 0 && currentIndex >= sensorData.length - 1 && cappedElapsedTarget >= totalDurationMs) {
+        pauseAnimation();
+        resetButton.disabled = false;
         seekBar.value = seekBar.max;
         currentTimeDisplay.textContent = totalTimeDisplay.textContent;
+         // Ensure visuals are updated to the very last frame upon finishing
+         if (vizMode === 'shader') {
+              updateShaderVisuals(sensorData[sensorData.length - 1]);
+         } else {
+             rebuildGraphHistory(sensorData[sensorData.length - 1].timestamp); // Rebuild history up to end
+             updateGraphVisuals(sensorData[sensorData.length - 1]); // Update graph
+         }
+         renderer.clear();
+         if (vizMode === 'shader') {
+              renderer.render(backgroundScene, backgroundCamera);
+         } else {
+              renderer.render(scene, camera);
+         }
     }
 }
 
-// updateVisuals 関数の引数にオプションを追加
-function updateVisuals(data, options = {}) {
+
+// Rename original updateVisuals to updateShaderVisuals
+function updateShaderVisuals(data, options = {}) {
     if (!data || !bgShaderMaterial) return;
 
-    // デフォルトオプション
     const defaultOptions = {
-        applyManualMultipliersOnly: false // trueの場合、CSVデータに基づく変動はスキップし、manual multiplierだけを適用
+        applyManualMultipliersOnly: false
     };
     const finalOptions = { ...defaultOptions, ...options };
 
-    // データ表示を更新
-    if (!finalOptions.applyManualMultipliersOnly) {
+    // Update data display (always show data regardless of viz mode)
+    if (!finalOptions.applyManualMultipliersOnly) { // Only update data display if not just applying multipliers
         let dataStr = "";
-        // 表示したいキーリスト。orient系は今回は除外したまま
         const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval', 'photoTakenId'];
         for(const key of keysToShow){
-            if(data[key] !== undefined && data[key] !== null){ // nullまたはundefinedでないことを確認
+            if(data[key] !== undefined && data[key] !== null){
                 let value = data[key];
                  if (typeof value === 'number') {
                     if (!Number.isInteger(value)) {
-                        value = value.toFixed(2); // 小数点以下2桁に丸め
+                        value = value.toFixed(2);
                     }
-                    // temperature_celsius と decibels に単位を追加
                     if(key === 'temperature_celsius') value += ' °C';
                     if(key === 'decibels') value += ' dB';
                 }
@@ -567,155 +484,507 @@ function updateVisuals(data, options = {}) {
         currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
     }
 
+    // --- Update Shader Uniforms ---
+    // Only update shader uniforms if currently in shader mode OR if applyManualMultipliersOnly is true (for slider updates while paused in shader mode)
+    if (vizMode === 'shader' || (finalOptions.applyManualMultipliersOnly && vizMode === 'shader')) { // Explicitly check vizMode
+         const lerpFactor = isPlaying ? 0.15 : 1.0;
 
-    // --- シェーダーユニフォームの更新 ---
-    // 補間を強くして変化を滑らかにする
-    const lerpFactor = isPlaying ? 0.15 : 1.0; // 再生中は滑らかに、停止中は即時反映
+         if (!finalOptions.applyManualMultipliersOnly) {
+             let baseColorData = parseSessionColor(data.sessionColor);
+             if (!baseColorData || typeof baseColorData.r === 'undefined') {
+                 baseColorData = { r: 0.4, g: 0.4, b: 0.6 };
+             }
+             const targetBaseColor = new THREE.Color(baseColorData.r, baseColorData.g, baseColorData.b);
+             bgShaderMaterial.uniforms.uBaseColor.value.lerp(targetBaseColor, lerpFactor);
 
-    if (!finalOptions.applyManualMultipliersOnly) {
-        // CSVデータに基づく値を取得/計算
-        let baseColorData = parseSessionColor(data.sessionColor);
-        if (!baseColorData || typeof baseColorData.r === 'undefined') {
-            baseColorData = { r: 0.4, g: 0.4, b: 0.6 }; // デフォルト色
-        }
-        const targetBaseColor = new THREE.Color(baseColorData.r, baseColorData.g, baseColorData.b);
-        bgShaderMaterial.uniforms.uBaseColor.value.lerp(targetBaseColor, lerpFactor);
+             let dataHighlight = 0.05;
+             if (data.illuminance != null && typeof data.illuminance === 'number') {
+                  const minLogLux = Math.log(1);
+                  const maxLogLux = Math.log(10001);
+                  const logLux = Math.log(Math.max(1, data.illuminance + 1));
+                  const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
+                  dataHighlight += luxNorm * 1.5;
+             }
+             if (data.decibels != null && typeof data.decibels === 'number') {
+                 const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
+                 dataHighlight += decibelNorm * 0.6;
+             }
+             const finalHighlight = Math.max(0.0, Math.min(3.0, dataHighlight * manualHighlightMultiplier));
+             bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(
+                  bgShaderMaterial.uniforms.uHighlightIntensity.value,
+                  finalHighlight,
+                  lerpFactor
+              );
 
+             let emotionFactor = getEmotionFactor(data.sessionEmotion);
+             if (!emotionFactor || typeof emotionFactor.speedFactor === 'undefined') {
+                 emotionFactor = { speedFactor: 1.0, colorVariety: 1.0, sizeVariety: 1.0, particleMovement: 1.0, apertureFactor: 1.0 };
+             }
 
-        let dataHighlight = 0.05; // 基本強度
-        if (data.illuminance != null && typeof data.illuminance === 'number') {
-             // illuminanceの影響度を上げる（例：対数的に反応するなど工夫も可能）
-             // 対数スケールでマッピング (0-10000ルクス想定)
-             const minLogLux = Math.log(1); // 仮に1ルクスから
-             const maxLogLux = Math.log(10001); // 10000ルクスまで
-             const logLux = Math.log(Math.max(1, data.illuminance + 1)); // 0ルクスでもlog(1)=0になるように+1
-             const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
-             dataHighlight += luxNorm * 1.5; // 影響度をさらに上げる (最大1.5加算)
-        }
-        if (data.decibels != null && typeof data.decibels === 'number') {
-            // デシベルがマイナスの場合も考慮し、絶対値やマッピングで調整
-            // -40dB を 0, 0dB を 0.5, 30dB を 1 にマッピングする例
-            const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
-            dataHighlight += decibelNorm * 0.6; // 影響度を上げる (最大0.6加算)
-        }
-         // マニュアル乗数を適用
-        const finalHighlight = Math.max(0.0, Math.min(3.0, dataHighlight * manualHighlightMultiplier)); // 最大値を調整
-        bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(
-             bgShaderMaterial.uniforms.uHighlightIntensity.value,
-             finalHighlight,
-             lerpFactor
-         );
+             // Effective speed affects the shader animation speed directly
+             const effectiveSpeed = emotionFactor.speedFactor * playbackSpeed;
+             bgShaderMaterial.uniforms.uEmotionSpeed.value = THREE.MathUtils.lerp(
+                 bgShaderMaterial.uniforms.uEmotionSpeed.value,
+                 effectiveSpeed,
+                 lerpFactor
+             );
 
-        let emotionFactor = getEmotionFactor(data.sessionEmotion);
-        if (!emotionFactor || typeof emotionFactor.speedFactor === 'undefined') {
-            emotionFactor = { speedFactor: 1.0, colorVariety: 1.0, sizeVariety: 1.0, particleMovement: 1.0, apertureFactor: 1.0 };
-        }
+             const dataIntensity = (emotionFactor.particleMovement * 0.7 + 0.1);
+             const finalIntensity = dataIntensity * manualIntensityMultiplier;
+             bgShaderMaterial.uniforms.uEmotionIntensity.value = THREE.MathUtils.lerp(
+                 bgShaderMaterial.uniforms.uEmotionIntensity.value,
+                 Math.max(0.1, Math.min(2.0, finalIntensity)),
+                 lerpFactor
+             );
 
-        // speedFactor を playbackSpeed と掛け合わせることで、CSVの再生速度と感情の速度を両方反映
-        // uEmotionSpeed はシェーダー内の時間進行に直接影響
-        const effectiveSpeed = emotionFactor.speedFactor * playbackSpeed;
-        bgShaderMaterial.uniforms.uEmotionSpeed.value = THREE.MathUtils.lerp(
-            bgShaderMaterial.uniforms.uEmotionSpeed.value,
-            effectiveSpeed,
-            lerpFactor
-        );
+             const dataVariety = emotionFactor.colorVariety * 0.5;
+             const finalVariety = dataVariety * manualVarietyMultiplier;
+             bgShaderMaterial.uniforms.uColorVariety.value = THREE.MathUtils.lerp(
+                 bgShaderMaterial.uniforms.uColorVariety.value,
+                 Math.max(0.1, Math.min(1.5, finalVariety)),
+                 lerpFactor
+             );
 
-        // particleMovement を EmotionIntensity に反映させつつ、マニュアル乗数を適用
-        // uEmotionIntensity は色の変化、FBMスケール、ビネット強度に影響
-        const dataIntensity = (emotionFactor.particleMovement * 0.7 + 0.1); // 0.1～1.85 程度 (particleMovementが2.5の場合)
-        const finalIntensity = dataIntensity * manualIntensityMultiplier;
-        bgShaderMaterial.uniforms.uEmotionIntensity.value = THREE.MathUtils.lerp(
-            bgShaderMaterial.uniforms.uEmotionIntensity.value,
-            Math.max(0.1, Math.min(2.0, finalIntensity)), // 最小値を設定、最大値を調整
-            lerpFactor
-        );
+         } else { // applyManualMultipliersOnly is true
+             const lerpFactorManual = 1.0; // Apply multipliers instantly
 
-        // colorVariety を uColorVariety に反映させつつ、マニュアル乗数を適用
-        // uColorVariety は色の多様性、color1/color2のオフセット範囲に影響
-        const dataVariety = emotionFactor.colorVariety * 0.5; // 0.1～0.95 程度 (colorVarietyが1.9の場合)
-        const finalVariety = dataVariety * manualVarietyMultiplier;
-        bgShaderMaterial.uniforms.uColorVariety.value = THREE.MathUtils.lerp(
-            bgShaderMaterial.uniforms.uColorVariety.value,
-            Math.max(0.1, Math.min(1.5, finalVariety)), // 最小値を設定、最大値を調整
-            lerpFactor
-        );
+             const currentCalculatedHighlightBase = bgShaderMaterial.uniforms.uHighlightIntensity.value / (manualHighlightMultiplier || 1.0);
+             const currentCalculatedIntensityBase = bgShaderMaterial.uniforms.uEmotionIntensity.value / (manualIntensityMultiplier || 1.0);
+             const currentCalculatedVarietyBase = bgShaderMaterial.uniforms.uColorVariety.value / (manualVarietyMultiplier || 1.0);
 
-    } else {
-         // applyManualMultipliersOnly が true の場合、現在のデータ値は使わず、
-         // 現在のシェーダーユニフォーム値にマニュアル乗数のみを適用して lerp する
-         // これはシークや停止中にスライダーを動かした時に表示を更新するために使う
-         const currentIntensity = bgShaderMaterial.uniforms.uEmotionIntensity.value;
-         const currentVariety = bgShaderMaterial.uniforms.uColorVariety.value;
-         const currentHighlight = bgShaderMaterial.uniforms.uHighlightIntensity.value;
-         const currentSpeed = bgShaderMaterial.uniforms.uEmotionSpeed.value; // スピードも手動調整の影響を受けるようにする？
+             const targetHighlight = Math.max(0.0, Math.min(3.0, currentCalculatedHighlightBase * manualHighlightMultiplier));
+             const targetIntensity = Math.max(0.1, Math.min(2.0, currentCalculatedIntensityBase * manualIntensityMultiplier));
+             const targetVariety = Math.max(0.1, Math.min(1.5, currentCalculatedVarietyBase * manualVarietyMultiplier));
 
-         // 現在の値に直接乗数を適用してターゲット値を計算
-         // ただし lerp は既存の値から新しいターゲット値への補間なので、
-         // ここでのlerpFactorは即時反映させたい場合は1.0にすべき。
-         // このパスは再生中でない場合に呼ばれる想定なので、lerpFactorは1.0で良い
-         const lerpFactorManual = 1.0; // マニュアル操作時は即時反映
+             bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(bgShaderMaterial.uniforms.uHighlightIntensity.value, targetHighlight, lerpFactorManual);
+             bgShaderMaterial.uniforms.uEmotionIntensity.value = THREE.MathUtils.lerp(bgShaderMaterial.uniforms.uEmotionIntensity.value, targetIntensity, lerpFactorManual);
+             bgShaderMaterial.uniforms.uColorVariety.value = THREE.MathUtils.lerp(bgShaderMaterial.uniforms.uColorVariety.value, targetVariety, lerpFactorManual);
+         }
 
-         // uEmotionSpeed は playbackSpeed と感情の両方に影響されるが、マニュアル調整の対象外とする
-         // その代わり uTime の進行速度が uEmotionSpeed に影響される
+         // Photo flash effect - still applies in shader mode
+        if (data.photoTakenId === 1) {
+            if (bgShaderMaterial) {
+                const currentCalculatedHighlight = bgShaderMaterial.uniforms.uHighlightIntensity.value;
+                const flashBoost = 1.5;
+                const flashTargetHighlight = Math.min(3.5, currentCalculatedHighlight + flashBoost);
+                const flashDuration = 150;
 
-         const targetIntensity = Math.max(0.1, Math.min(2.0, (currentIntensity / (manualIntensityMultiplier || 1.0)) * manualIntensityMultiplier)); // 現在値を元に乗数を再計算
-         const targetVariety = Math.max(0.1, Math.min(1.5, (currentVariety / (manualVarietyMultiplier || 1.0)) * manualVarietyMultiplier));
-         const targetHighlight = Math.max(0.0, Math.min(3.0, (currentHighlight / (manualHighlightMultiplier || 1.0)) * manualHighlightMultiplier));
+                // Only manually render the flash if paused and in shader mode
+                const needsRender = !isPlaying && !isSeeking && vizMode === 'shader';
 
-          // 現在の値から新しいターゲット値へ補間 (実質即時反映)
-         bgShaderMaterial.uniforms.uEmotionIntensity.value = THREE.MathUtils.lerp(currentIntensity, targetIntensity, lerpFactorManual);
-         bgShaderMaterial.uniforms.uColorVariety.value = THREE.MathUtils.lerp(currentVariety, targetVariety, lerpFactorManual);
-         bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(currentHighlight, targetHighlight, lerpFactorManual);
+                if (needsRender) renderer.clear();
 
-         // uEmotionSpeed はデータと playbackSpeed に依存するため、マニュアル操作では変更しない
-         // shader の時間進行に uEmotionSpeed が影響するので、playbackSpeed の変更はここでなくても animate で反映される
-    }
+                bgShaderMaterial.uniforms.uHighlightIntensity.value = flashTargetHighlight;
+                if (needsRender) renderer.render(backgroundScene, backgroundCamera);
 
+                setTimeout(() => {
+                     if (bgShaderMaterial) {
+                        // Lerp back to the value calculated from data + multipliers
+                         // Re-calculate the intended value without the flash boost
+                         let dataHighlight = 0.05;
+                          if (data.illuminance != null && typeof data.illuminance === 'number') {
+                             const minLogLux = Math.log(1); const maxLogLux = Math.log(10001);
+                             const logLux = Math.log(Math.max(1, data.illuminance + 1));
+                             const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
+                             dataHighlight += luxNorm * 1.5;
+                          }
+                          if (data.decibels != null && typeof data.decibels === 'number') {
+                              const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
+                              dataHighlight += decibelNorm * 0.6;
+                          }
+                          const originalHighlight = Math.max(0.0, Math.min(3.0, dataHighlight * manualHighlightMultiplier));
 
-    // 写真撮影時のフラッシュエフェクト
-    if (data.photoTakenId === 1) {
-        if (bgShaderMaterial) {
-             // データに基づくハイライト値 + マニュアル乗数適用後の値を取得
-            const currentCalculatedHighlight = bgShaderMaterial.uniforms.uHighlightIntensity.value;
-            // フラッシュは一時的にハイライト強度を既存の値に加算して強くする
-            const flashBoost = 1.5; // フラッシュによる追加強度
-            const flashTargetHighlight = Math.min(3.5, currentCalculatedHighlight + flashBoost); // 最大値を少し上げる
-            const flashDuration = 150; // ミリ秒
-
-            // アニメーションループ内で処理されている場合、renderer.renderはループが担当
-            // 停止中に呼ばれた場合はここでレンダリングをトリガーする必要がある
-            const needsRender = !isPlaying && !isSeeking;
-
-            if (needsRender) renderer.clear(); // 停止中は手動クリア
-
-            // フェードイン/アウトでフラッシュ効果を滑らかに
-            const flashInDuration = flashDuration * 0.3; // フェードイン短め
-            const flashOutDuration = flashDuration * 0.7; // フェードアウト長め
-
-            // 一時的に強度を上げて、タイマーで戻す
-            bgShaderMaterial.uniforms.uHighlightIntensity.value = flashTargetHighlight;
-            if (needsRender) renderer.render(backgroundScene, backgroundCamera); // 強度変更後のレンダリング
-
-            setTimeout(() => {
-                 if (bgShaderMaterial) {
-                    // 元のハイライト値に戻す (lerpで滑らかに)
-                    bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(
-                         bgShaderMaterial.uniforms.uHighlightIntensity.value,
-                         currentCalculatedHighlight,
-                         1.0 // 即時補完に近い感じで戻す
-                     );
-                     if (needsRender) {
-                        renderer.clear();
-                        renderer.render(backgroundScene, backgroundCamera); // 戻した後のレンダリング
+                        bgShaderMaterial.uniforms.uHighlightIntensity.value = THREE.MathUtils.lerp(
+                             bgShaderMaterial.uniforms.uHighlightIntensity.value,
+                             originalHighlight, // Lerp back to the value without flash boost
+                             1.0 // Instant return for simplicity after the flash
+                         );
+                         if (needsRender) {
+                            renderer.clear();
+                            renderer.render(backgroundScene, backgroundCamera);
+                         }
                      }
-                 }
-            }, flashDuration);
+                }, flashDuration);
 
+            }
         }
     }
-    // オーディオ更新はupdateVisuals内で呼ばれるようになったので削除
-    // updateAudio(data, emotionFactor); // これを animate ループ内で呼ぶように変更
 }
+
+
+// New function to update graph visuals
+function updateGraphVisuals(data) {
+    // Check if in graph mode before proceeding with graph updates
+    if (vizMode !== 'graph' || !graphGeometry || !pointMesh || !graphShadedAreaGeometry || !graphShadedAreaMaterial) {
+        // Ensure graph elements are hidden if not in graph mode
+        if (graphLine) graphLine.visible = false;
+        if (pointMesh) pointMesh.visible = false;
+        if (graphShadedAreaMesh) graphShadedAreaMesh.visible = false;
+        return;
+    }
+
+
+    // Update data display (always update data display)
+    // This part is also done in updateShaderVisuals, maybe move it outside?
+    // Let's keep it in both for simplicity, it doesn't hurt.
+    let dataStr = "";
+    const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval', 'photoTakenId'];
+    for(const key of keysToShow){
+        if(data[key] !== undefined && data[key] !== null){
+            let value = data[key];
+             if (typeof value === 'number') {
+                if (!Number.isInteger(value)) {
+                    value = value.toFixed(2);
+                }
+                if(key === 'temperature_celsius') value += ' °C';
+                if(key === 'decibels') value += ' dB';
+            }
+            dataStr += `${key}: ${value}\n`;
+        }
+    }
+    currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
+
+
+    // Clear graph visuals if no data history
+    if (dataHistory.length === 0) {
+        if (graphGeometry) graphGeometry.setDrawRange(0, 0);
+        if (graphShadedAreaGeometry) graphShadedAreaGeometry.setDrawRange(0, 0);
+        if (pointMesh) pointMesh.visible = false;
+        // Keep line/mesh objects visible but empty
+        if (graphLine) graphLine.visible = true;
+        if (graphShadedAreaMesh) graphShadedAreaMesh.visible = true;
+        return;
+    }
+
+
+    // --- Update Graph Geometry and Point ---
+
+    // Calculate the visible width at Z=0 for the perspective camera
+    const vFOV = THREE.MathUtils.degToRad(camera.fov);
+    const viewHeightAtZero = 2 * Math.tan( vFOV / 2 ) * camera.position.z;
+    const viewWidthAtZero = viewHeightAtZero * camera.aspect;
+    const xRange = viewWidthAtZero;
+
+
+    // Update graph line geometry positions
+    const linePositions = graphGeometry.attributes.position.array;
+    let linePositionIndex = 0;
+
+    const currentTimestamp = data.timestamp;
+    const minHistoryTimestamp = dataHistory.length > 0 ? dataHistory[0].timestamp : currentTimestamp; // Should have history points here
+    const historyDuration = currentTimestamp - minHistoryTimestamp;
+
+
+    for (let i = 0; i < dataHistory.length; i++) {
+        const point = dataHistory[i];
+        const elapsedInHistory = point.timestamp - minHistoryTimestamp;
+        const xNorm = (historyDuration > 0) ? (elapsedInHistory / historyDuration) : 0;
+        const xPos = xNorm * xRange - xRange / 2; // Map normalized time to X range (-xRange/2 to +xRange/2)
+
+        linePositions[linePositionIndex++] = xPos;
+        linePositions[linePositionIndex++] = point.value; // Y (already scaled -1 to 1)
+        linePositions[linePositionIndex++] = 0; // Z
+    }
+     // Clear unused positions for the line
+    for (let i = linePositionIndex; i < MAX_HISTORY_POINTS * 3; i++) {
+        linePositions[i] = 0;
+    }
+    graphGeometry.attributes.position.needsUpdate = true;
+    graphGeometry.setDrawRange(0, dataHistory.length);
+
+
+    // Update graph shaded area geometry
+    const shadedAreaPositions = graphShadedAreaGeometry.attributes.position.array;
+    const shadedAreaIndices = graphShadedAreaGeometry.index.array;
+    let shadedPosIndex = 0;
+    let shadedIdxIndex = 0;
+
+    // Map color from sessionColor to shaded area material
+     const baseColorData = parseSessionColor(data.sessionColor);
+     if (baseColorData) {
+         graphShadedAreaMaterial.color.setRGB(baseColorData.r, baseColorData.g, baseColorData.b);
+     }
+
+    // Only draw shaded area if at least two points exist
+    if (dataHistory.length >= 2) {
+         const baseLineY = -1.0; // The Y coordinate for the base of the shaded area
+
+         for (let i = 0; i < dataHistory.length - 1; i++) {
+            const p1 = dataHistory[i];
+            const p2 = dataHistory[i+1];
+
+             // Get scaled X positions for p1 and p2 (using the same xRange)
+            const elapsedInHistory1 = p1.timestamp - minHistoryTimestamp;
+            const xNorm1 = (historyDuration > 0) ? (elapsedInHistory1 / historyDuration) : 0;
+            const xPos1 = xNorm1 * xRange - xRange / 2;
+
+            const elapsedInHistory2 = p2.timestamp - minHistoryTimestamp;
+            const xNorm2 = (historyDuration > 0) ? (elapsedInHistory2 / historyDuration) : 0;
+            const xPos2 = xNorm2 * xRange - xRange / 2;
+
+            const yPos1 = p1.value;
+            const yPos2 = p2.value;
+
+            // Vertices for the quad (p1, p2, base_p1, base_p2)
+            const v1_index = shadedPosIndex / 3; // Index of the current vertex group
+
+            // Top-left (from line)
+            shadedAreaPositions[shadedPosIndex++] = xPos1;
+            shadedAreaPositions[shadedPosIndex++] = yPos1;
+            shadedAreaPositions[shadedPosIndex++] = 0;
+
+            // Top-right (from line)
+            shadedAreaPositions[shadedPosIndex++] = xPos2;
+            shadedAreaPositions[shadedPosIndex++] = yPos2;
+            shadedAreaPositions[shadedPosIndex++] = 0;
+
+            // Bottom-left (on base line)
+            shadedAreaPositions[shadedPosIndex++] = xPos1;
+            shadedAreaPositions[shadedPosIndex++] = baseLineY;
+            shadedAreaPositions[shadedPosIndex++] = 0;
+
+            // Bottom-right (on base line)
+            shadedAreaPositions[shadedPosIndex++] = xPos2;
+            shadedAreaPositions[shadedPosIndex++] = baseLineY;
+            shadedAreaPositions[shadedPosIndex++] = 0;
+
+            // Indices for the two triangles forming the quad (v1, v2, v3, v4)
+            // Vertices: 0=TL, 1=TR, 2=BL, 3=BR
+            // Indices: (0, 2, 3), (0, 3, 1)
+             shadedAreaIndices[shadedIdxIndex++] = v1_index; // TL
+             shadedAreaIndices[shadedIdxIndex++] = v1_index + 2; // BL
+             shadedAreaIndices[shadedIdxIndex++] = v1_index + 3; // BR
+
+             shadedAreaIndices[shadedIdxIndex++] = v1_index; // TL
+             shadedAreaIndices[shadedIdxIndex++] = v1_index + 3; // BR
+             shadedAreaIndices[shadedIdxIndex++] = v1_index + 1; // TR
+         }
+     }
+
+     // Clear unused positions for the shaded area
+     for (let i = shadedPosIndex; i < MAX_HISTORY_POINTS * 4 * 3; i++) {
+         shadedAreaPositions[i] = 0;
+     }
+     // Clear unused indices
+      for (let i = shadedIdxIndex; i < (MAX_HISTORY_POINTS - 1) * 6; i++) {
+          shadedAreaIndices[i] = 0;
+      }
+
+    graphShadedAreaGeometry.attributes.position.needsUpdate = true;
+    graphShadedAreaGeometry.index.needsUpdate = true;
+    graphShadedAreaGeometry.setDrawRange(0, shadedIdxIndex); // Draw based on number of indices
+
+
+    // Update the position and visibility of the current point sphere
+    if (vizMode === 'graph' && dataHistory.length > 0) {
+        const lastPoint = dataHistory[dataHistory.length - 1];
+        // The sphere position is the last point on the line
+        // Find its calculated X position using the same logic
+        const elapsedInHistory = lastPoint.timestamp - minHistoryTimestamp;
+        const xNorm = (historyDuration > 0) ? (elapsedInHistory / historyDuration) : 0;
+        const xPos = xNorm * xRange - xRange / 2;
+        pointMesh.position.set(xPos, lastPoint.value, 0);
+        pointMesh.visible = true;
+    } else {
+        pointMesh.visible = false; // Hide sphere if not in graph mode or no data
+    }
+
+     // Ensure graph objects are visible only in graph mode (redundant with setVisualizationMode but safe)
+     if (graphLine) graphLine.visible = (vizMode === 'graph');
+     if (graphShadedAreaMesh) graphShadedAreaMesh.visible = (vizMode === 'graph');
+     // Shaded area is only drawn if >= 2 points, visibility set by drawRange
+}
+
+
+// Helper function to calculate the y-value for the graph
+function updateGraphVisualsHelper(data) {
+    if (!data) return 0.0;
+
+    let plotValue = 0.5; // Default center value
+    if (data.sessionEmotion) {
+        const emotionFactor = getEmotionFactor(data.sessionEmotion);
+        const intensity = (emotionFactor.particleMovement * 0.7 + 0.1) * manualIntensityMultiplier;
+        const variety = emotionFactor.colorVariety * 0.5 * manualVarietyMultiplier;
+        plotValue = (intensity + variety) / 2.0;
+        plotValue = Math.max(0, Math.min(1, (plotValue - 0.2) / 3.8)); // Map 0.2-4.0 to 0-1
+    }
+     let sensorBoost = 0;
+     if (data.illuminance != null && typeof data.illuminance === 'number') {
+        const minLogLux = Math.log(1);
+        const maxLogLux = Math.log(10001);
+        const logLux = Math.log(Math.max(1, data.illuminance + 1));
+        const luxNorm = Math.min(1.0, Math.max(0.0, (logLux - minLogLux) / (maxLogLux - minLogLux)));
+        sensorBoost += luxNorm * 0.5;
+     }
+     if (data.decibels != null && typeof data.decibels === 'number') {
+         const decibelNorm = Math.min(1.0, Math.max(0.0, (data.decibels + 40) / 70.0));
+         sensorBoost += decibelNorm * 0.3;
+     }
+      sensorBoost *= manualHighlightMultiplier;
+
+     plotValue = Math.max(0, Math.min(1, plotValue + sensorBoost));
+
+     // Scale plotValue to Y range (-1 to 1 in the scene)
+     const scaledY = plotValue * 2.0 - 1.0;
+     return scaledY;
+}
+
+
+// Helper function to rebuild graph history upon seeking/reset
+function rebuildGraphHistory(seekAbsoluteTimestamp) {
+    if (sensorData.length === 0) {
+        dataHistory = [];
+        return;
+    }
+
+    const windowStartTime = seekAbsoluteTimestamp - HISTORY_WINDOW_MS;
+
+    dataHistory = [];
+    for (let i = 0; i < sensorData.length; i++) {
+        const row = sensorData[i];
+        if (row.timestamp >= windowStartTime && row.timestamp <= seekAbsoluteTimestamp) {
+             const scaledY = updateGraphVisualsHelper(row);
+             dataHistory.push({ timestamp: row.timestamp, value: scaledY });
+        } else if (row.timestamp > seekAbsoluteTimestamp) {
+            break;
+        }
+    }
+
+    if (dataHistory.length > MAX_HISTORY_POINTS) {
+         dataHistory = dataHistory.slice(dataHistory.length - MAX_HISTORY_POINTS);
+     }
+}
+
+// Modify handleSeekBarInput
+function handleSeekBarInput() {
+    isSeeking = true;
+    const seekTimeMs = parseFloat(seekBar.value);
+    currentTimeDisplay.textContent = formatTime(seekTimeMs);
+
+    if (sensorData.length > 0) {
+         const seekTargetElapsedCsvTime = parseFloat(seekBar.value);
+         const seekTargetAbsoluteCsvTime = sensorData[0].timestamp + seekTargetElapsedCsvTime;
+         let tempIndex = 0;
+         for (let i = 0; i < sensorData.length; i++) {
+             if (sensorData[i].timestamp <= seekTargetAbsoluteCsvTime) {
+                 tempIndex = i;
+             } else {
+                 break;
+             }
+         }
+        const currentRow = sensorData[tempIndex];
+        if (currentRow) {
+             // Update data display immediately
+             let dataStr = "";
+             const keysToShow = ['timestamp', 'sessionColor', 'sessionEmotion', 'temperature_celsius', 'illuminance', 'decibels', 'accelY', 'steps_in_interval', 'photoTakenId'];
+             for(const key of keysToShow){
+                 if(currentRow[key] !== undefined && currentRow[key] !== null){
+                     let value = currentRow[key];
+                      if (typeof value === 'number') {
+                         if (!Number.isInteger(value)) {
+                             value = value.toFixed(2);
+                         }
+                         if(key === 'temperature_celsius') value += ' °C';
+                         if(key === 'decibels') value += ' dB';
+                     }
+                     dataStr += `${key}: ${value}\n`;
+                 }
+             }
+             currentDataDisplay.innerHTML = `<pre>${dataStr}</pre>`;
+
+             // Update visualization visuals based on current mode while seeking
+             if (vizMode === 'shader') {
+                  updateShaderVisuals(currentRow, { applyManualMultipliersOnly: !isPlaying }); // Apply multipliers only if paused
+
+                  if (!isPlaying) {
+                      renderer.clear();
+                      renderer.render(backgroundScene, backgroundCamera);
+                  }
+             } else { // vizMode === 'graph'
+                 // Rebuild history up to the seeked point
+                 rebuildGraphHistory(seekTargetAbsoluteCsvTime);
+                 // Update graph geometry based on the history and the data point at the seeked time (for pointMesh)
+                 updateGraphVisuals(currentRow);
+
+                  if (!isPlaying) {
+                       renderer.clear();
+                       renderer.render(scene, camera);
+                  }
+             }
+             // Audio params are updated but gain should be 0 due to isSeeking (controlled in updateAudio)
+             const emotionFactor = getEmotionFactor(currentRow.sessionEmotion);
+             updateAudio(currentRow, emotionFactor);
+        }
+    }
+}
+
+// Modify handleSeekBarChange
+function handleSeekBarChange() {
+    isSeeking = false; // End seeking
+    if (sensorData.length === 0) return;
+
+    const seekTargetElapsedCsvTime = parseFloat(seekBar.value);
+    const seekTargetAbsoluteCsvTime = sensorData[0].timestamp + seekTargetElapsedCsvTime;
+
+    let newIndex = 0;
+    for (let i = 0; i < sensorData.length; i++) {
+        if (sensorData[i].timestamp <= seekTargetAbsoluteCsvTime) {
+            newIndex = i;
+        } else {
+            break;
+        }
+    }
+    currentIndex = newIndex;
+
+    actualStartTime = performance.now() - (seekTargetElapsedCsvTime / playbackSpeed);
+
+    // Rebuild graph history for the new seek point regardless of mode
+    rebuildGraphHistory(seekTargetAbsoluteCsvTime);
+
+    // Update visuals and audio for the new current point
+    if (sensorData[currentIndex]) {
+      lastProcessedTimestamp = sensorData[currentIndex].timestamp;
+      if (vizMode === 'shader') {
+        updateShaderVisuals(sensorData[currentIndex]);
+      } else {
+        updateGraphVisuals(sensorData[currentIndex]);
+      }
+       const emotionFactor = getEmotionFactor(sensorData[currentIndex].sessionEmotion);
+       updateAudio(sensorData[currentIndex], emotionFactor);
+    }
+
+    // Reset shader uTime regardless of mode, as it's relative to the start of play
+    if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
+        bgShaderMaterial.uniforms.uTime.value = 0.0;
+        delete bgShaderMaterial.uniforms.uTime.lastTime;
+    }
+
+    if (isPlaying) {
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(animate);
+         // Audio resume/fade in logic remains the same
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                 if (gainNode) gainNode.gain.setTargetAtTime(Math.min(0.15, Math.max(0, currentAudioParams.gain)), audioContext.currentTime, 0.1);
+            });
+        } else if (gainNode) {
+             gainNode.gain.setTargetAtTime(Math.min(0.15, Math.max(0, currentAudioParams.gain)), audioContext.currentTime, 0.1);
+        }
+    } else {
+        // Not playing, render the updated state at the seeked position
+        renderer.clear();
+        if (vizMode === 'shader') {
+             renderer.render(backgroundScene, backgroundCamera);
+        } else {
+             renderer.render(scene, camera);
+        }
+    }
+}
+
+
+// Helper functions (parseSessionColor, getEmotionFactor, formatTime, initAudio, updateAudio)
+// These are already in the original code and don't need mode-specific changes, just ensure they are called correctly.
+// updateAudio is called in animate and handleSeekBarChange/Input, which is correct.
 
 function parseSessionColor(colorName) {
     switch (colorName) {
@@ -740,35 +1009,49 @@ function getEmotionFactor(emotionName) {
 }
 
 function onWindowResize() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
     if (camera && renderer && backgroundCamera) {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
-        // 背景用カメラはOrthographicなので aspect 比率ではなく直接サイズを調整する
-        // ただし、背景Planeが固定サイズ(-1 to 1)でカメラも固定(-1 to 1)なので調整は不要
+
+        // Orthographic camera for background doesn't need aspect update, but size might if it wasn't fixed -1 to 1
         // backgroundCamera.left = -width / height;
         // backgroundCamera.right = width / height;
         // backgroundCamera.updateProjectionMatrix();
 
         renderer.setSize(width, height);
-        if (bgShaderMaterial) {
-             // シェーダー内で画面サイズを考慮する場合 (今回はUV座標使用のため不要だが、将来のために)
-             // bgShaderMaterial.uniforms.iResolution.value.set(width, height, 1);
-        }
-         // リサイズ後に表示を更新
-         if (sensorData.length > 0 && currentIndex >= 0) {
-              updateVisuals(sensorData[currentIndex]); // 現在のデータで表示パラメータを更新
-              if (!isPlaying && !isSeeking) { // 再生中でなければ手動でレンダリング
+
+        // Update visuals for the current frame after resize
+        // Only render if not playing and not seeking, and data exists
+        if (!isPlaying && !isSeeking && sensorData.length > 0 && currentIndex >= 0) {
+             if (vizMode === 'shader') {
+                  updateShaderVisuals(sensorData[currentIndex]);
                   renderer.clear();
                   renderer.render(backgroundScene, backgroundCamera);
-              }
-         } else { // データがない場合はデフォルト画面をレンダリング
-             if (renderer && backgroundScene && backgroundCamera) {
+             } else { // vizMode === 'graph'
+                 // Recalculate graph geometry with new aspect ratio
+                 // No need to rebuild history, just update the geometry using the existing history
+                 updateGraphVisuals(sensorData[currentIndex]); // This recalculates positions based on current aspect
                  renderer.clear();
-                 renderer.render(backgroundScene, backgroundCamera);
+                 renderer.render(scene, camera);
              }
-         }
+        } else if (!isPlaying && !isSeeking) {
+           // If no data, render the default scene based on mode
+             renderer.clear();
+             if (vizMode === 'shader') {
+                 renderer.render(backgroundScene, backgroundCamera);
+             } else {
+                  // Graph mode with no data: render empty graph scene
+                  if (graphGeometry) graphGeometry.setDrawRange(0, 0);
+                   if (graphShadedAreaGeometry) graphShadedAreaGeometry.setDrawRange(0, 0);
+                  if (pointMesh) pointMesh.visible = false;
+                  graphLine.visible = (vizMode === 'graph'); // Ensure objects are visible
+                  graphShadedAreaMesh.visible = (vizMode === 'graph');
+                  renderer.render(scene, camera);
+             }
+        }
     }
 }
 
@@ -810,8 +1093,6 @@ function initAudio() {
 
 function updateAudio(data, emotionFactor) {
     if (!isAudioInitialized || !audioContext || !oscillator || !filterNode || !gainNode || audioContext.state === 'closed') {
-        // オーディオが無効、またはコンテキストが閉じられている場合は何もしない
-        // ただし、オーディオが suspended の場合はパラメータ更新は行う (resume時に反映される可能性があるため)
          if (!isAudioInitialized || audioContext.state === 'closed') return;
     }
 
@@ -822,7 +1103,7 @@ function updateAudio(data, emotionFactor) {
     let targetFreq = 440; // デフォルト周波数 (A4)
     let targetFilterFreq = 2500; // デフォルトフィルター周波数
     let targetFilterQ = 1; // デフォルトQ値
-    let targetGain = isPlaying ? 0.02 : 0; // 基本ゲイン (再生中のみ音を出す)
+    let targetGain = isPlaying && !isSeeking ? 0.02 : 0; // 基本ゲイン (再生中かつ非シーク中のみ音を出す)
 
     // 温度 -> 周波数
     if (data.temperature_celsius != null && typeof data.temperature_celsius === 'number') {
@@ -842,32 +1123,32 @@ function updateAudio(data, emotionFactor) {
     const effectiveSpeed = emotionFactor.speedFactor * playbackSpeed; // 再生速度も考慮
     switch (data.sessionEmotion) {
         case "楽しい":
-            oscillator.type = 'triangle'; // より柔らかい音色
-            targetFreq *= (1.0 + effectiveSpeed * 0.2); // 速度で少しピッチ上昇
+            oscillator.type = 'triangle';
+            targetFreq *= (1.0 + effectiveSpeed * 0.2);
             targetFilterFreq = 3000 + emotionFactor.particleMovement * 800 * effectiveSpeed;
             targetFilterQ = 1.5 + emotionFactor.sizeVariety * 0.5;
-            targetGain += emotionFactor.apertureFactor * 0.02; // ゲインも少し上昇
+            targetGain += emotionFactor.apertureFactor * 0.02;
             break;
         case "悲しい":
             oscillator.type = 'sine';
-            targetFreq *= (0.8 / Math.sqrt(effectiveSpeed)); // 速度が速いほどピッチ低下を抑える
-            targetFilterFreq = 600 + emotionFactor.colorVariety * 300 / effectiveSpeed; // 速度が遅いほどフィルターが狭まる
+            targetFreq *= (0.8 / Math.sqrt(effectiveSpeed));
+            targetFilterFreq = 600 + emotionFactor.colorVariety * 300 / effectiveSpeed;
             targetFilterQ = 0.9;
-            targetGain *= 0.5; // ゲイン低下
+            targetGain *= 0.5;
             break;
         case "怒り":
-            oscillator.type = 'sawtooth'; // より鋭い音色
-            targetFreq *= (1.2 * effectiveSpeed); // 速度でピッチ上昇
-            targetFilterFreq = 1500 + Math.random() * 1000 * effectiveSpeed; // ランダム性を加える
-            targetFilterQ = 3 + Math.random() * 2; // Q値を高く
-            targetGain += emotionFactor.apertureFactor * 0.05; // ゲイン上昇
+            oscillator.type = 'sawtooth';
+            targetFreq *= (1.2 * effectiveSpeed);
+            targetFilterFreq = 1500 + Math.random() * 1000 * effectiveSpeed;
+            targetFilterQ = 3 + Math.random() * 2;
+            targetGain += emotionFactor.apertureFactor * 0.05;
             break;
         case "穏やか":
-            oscillator.type = 'sine'; // 穏やかな音色
-            targetFreq *= (1.0 / Math.sqrt(effectiveSpeed)); // 速度が速いほどピッチ低下を抑える
+            oscillator.type = 'sine';
+            targetFreq *= (1.0 / Math.sqrt(effectiveSpeed));
             targetFilterFreq = 2000 * Math.sqrt(effectiveSpeed);
             targetFilterQ = 1.2;
-            targetGain *= 0.8; // ゲインを少し抑える
+            targetGain *= 0.8;
             break;
         default: // その他/デフォルト
             oscillator.type = 'sine';
@@ -877,28 +1158,26 @@ function updateAudio(data, emotionFactor) {
             break;
     }
 
-    // パラメータを更新 (setTargetAtTimeで滑らかに)
-    // 周波数範囲を制限
+    // Apply parameters smoothly, clamp values
     const finalFreq = Math.max(50, Math.min(10000, targetFreq));
     if (finalFreq !== currentAudioParams.frequency) {
         oscillator.frequency.setTargetAtTime(finalFreq, currentTime, smoothTime);
         currentAudioParams.frequency = finalFreq;
     }
 
-     const finalFilterFreq = Math.max(100, Math.min(8000, targetFilterFreq)); // フィルター周波数範囲制限
+    const finalFilterFreq = Math.max(100, Math.min(8000, targetFilterFreq));
     if (finalFilterFreq !== currentAudioParams.filterFreq) {
         filterNode.frequency.setTargetAtTime(finalFilterFreq, currentTime, smoothTime);
         currentAudioParams.filterFreq = finalFilterFreq;
     }
 
-    const finalFilterQ = Math.max(0.1, Math.min(10, targetFilterQ)); // Q値範囲制限
+    const finalFilterQ = Math.max(0.1, Math.min(10, targetFilterQ));
     if (finalFilterQ !== currentAudioParams.filterQ) {
         filterNode.Q.setTargetAtTime(finalFilterQ, currentTime, smoothTime);
          currentAudioParams.filterQ = finalFilterQ;
     }
 
-    // ゲイン範囲を制限し、再生状態を考慮
-    const finalGain = isPlaying ? Math.min(0.15, Math.max(0, targetGain)) : 0; // 最大ゲイン調整, 非再生時は0
+    const finalGain = isPlaying && !isSeeking ? Math.min(0.15, Math.max(0, targetGain)) : 0; // Ensure gain is 0 if not playing or seeking
     if (finalGain !== currentAudioParams.gain) {
         gainNode.gain.setTargetAtTime(finalGain, currentTime, smoothTime);
         currentAudioParams.gain = finalGain;
@@ -907,63 +1186,60 @@ function updateAudio(data, emotionFactor) {
 
     // steps_in_interval があれば短い効果音を追加
     if (data.steps_in_interval > 0 && typeof data.steps_in_interval === 'number') {
-        // ステップ数に応じて短いパーカッシブな音を生成
-        // 前回のステップ処理から一定時間経過しているかチェックする方が良いかもしれない
-        if (!updateAudio.lastStepTime || (currentTime - updateAudio.lastStepTime > 0.1)) { // 短いクールダウン
+        if (!updateAudio.lastStepTime || (currentTime - updateAudio.lastStepTime > 0.1)) {
              const stepOsc = audioContext.createOscillator();
              const stepGain = audioContext.createGain();
              const stepFilter = audioContext.createBiquadFilter();
 
              stepOsc.type = 'triangle';
-             const stepPitch = 400 + Math.random() * 400 + data.steps_in_interval * 20; // ステップ数でピッチを少し上げる
+             const stepPitch = 400 + Math.random() * 400 + data.steps_in_interval * 20;
              stepOsc.frequency.setValueAtTime(stepPitch, currentTime);
 
-             stepFilter.type = 'bandpass'; // バンドパスフィルター
+             stepFilter.type = 'bandpass';
              const filterCenterFreq = 800 + data.steps_in_interval * 50;
              stepFilter.frequency.setValueAtTime(filterCenterFreq, currentTime);
              stepFilter.Q.setValueAtTime(5 + data.steps_in_interval * 0.5, currentTime);
 
-             stepGain.gain.setValueAtTime(0.05 * Math.min(data.steps_in_interval / 5, 1), currentTime); // ステップ数でゲイン調整 (最大5ステップでフルゲイン)
-             stepGain.gain.exponentialRampToValueAtTime(0.0001, currentTime + 0.15); // 短い減衰
+             stepGain.gain.setValueAtTime(0.05 * Math.min(data.steps_in_interval / 5, 1), currentTime);
+             stepGain.gain.exponentialRampToValueAtTime(0.0001, currentTime + 0.15);
 
              stepOsc.connect(stepFilter);
              stepFilter.connect(stepGain);
              stepGain.connect(audioContext.destination);
 
              stepOsc.start(currentTime);
-             stepOsc.stop(currentTime + 0.15); // 短い音
+             stepOsc.stop(currentTime + 0.15);
 
-             updateAudio.lastStepTime = currentTime; // 最終ステップ処理時間を記録
+             updateAudio.lastStepTime = currentTime;
         }
     }
 
 
     // photoTakenId があれば短いクリック音を追加
     if (data.photoTakenId === 1 && typeof data.photoTakenId === 'number') {
-         // 前回の写真処理から一定時間経過しているかチェック
-         if (!updateAudio.lastPhotoTime || (currentTime - updateAudio.lastPhotoTime > 0.5)) { // 短いクールダウン
+         if (!updateAudio.lastPhotoTime || (currentTime - updateAudio.lastPhotoTime > 0.5)) {
             const clickOsc = audioContext.createOscillator();
             const clickGain = audioContext.createGain();
-            const clickFilter = audioContext.createBiquadFilter(); // フィルターを追加
+            const clickFilter = audioContext.createBiquadFilter();
 
-            clickOsc.type = 'square'; // クリック感のある波形
-            clickOsc.frequency.setValueAtTime(2500, currentTime); // 高めの周波数
+            clickOsc.type = 'square';
+            clickOsc.frequency.setValueAtTime(2500, currentTime);
 
-            clickFilter.type = 'highpass'; // ハイパスフィルターで低音をカット
+            clickFilter.type = 'highpass';
             clickFilter.frequency.setValueAtTime(1500, currentTime);
             clickFilter.Q.setValueAtTime(1.0, currentTime);
 
-            clickGain.gain.setValueAtTime(0.15, currentTime); // 少し大きめのゲイン
-            clickGain.gain.exponentialRampToValueAtTime(0.0001, currentTime + 0.1); // 短い減衰
+            clickGain.gain.setValueAtTime(0.15, currentTime);
+            clickGain.gain.exponentialRampToValueAtTime(0.0001, currentTime + 0.1);
 
-            clickOsc.connect(clickFilter); // オシレーター -> フィルター
-            clickFilter.connect(clickGain); // フィルター -> ゲイン
+            clickOsc.connect(clickFilter);
+            clickFilter.connect(clickGain);
             clickGain.connect(audioContext.destination);
 
             clickOsc.start(currentTime);
-            clickOsc.stop(currentTime + 0.1); // 短い音
+            clickOsc.stop(currentTime + 0.1);
 
-            updateAudio.lastPhotoTime = currentTime; // 最終写真処理時間を記録
+            updateAudio.lastPhotoTime = currentTime;
          }
     }
 }
@@ -972,103 +1248,11 @@ updateAudio.lastStepTime = 0;
 updateAudio.lastPhotoTime = 0;
 
 
-function handleSeekBarInput() {
-    isSeeking = true;
-    const seekTimeMs = parseFloat(seekBar.value);
-    currentTimeDisplay.textContent = formatTime(seekTimeMs);
-
-    // シークバー移動中も表示を更新するために updateVisuals を呼ぶ
-    if (sensorData.length > 0) {
-         const seekTargetElapsedCsvTime = parseFloat(seekBar.value);
-         const seekTargetAbsoluteCsvTime = sensorData[0].timestamp + seekTargetElapsedCsvTime;
-         let tempIndex = 0;
-         for (let i = 0; i < sensorData.length; i++) {
-             if (sensorData[i].timestamp <= seekTargetAbsoluteCsvTime) {
-                 tempIndex = i;
-             } else {
-                 break;
-             }
-         }
-         // 仮のcurrentIndexでupdateVisualsを呼び出し、表示のみ更新
-         // オーディオパラメータも更新されるが、isSeeking中はgainが0なので音は出ない
-         updateVisuals(sensorData[tempIndex]);
-         // シークバー移動中はanimateループが停止している可能性があるので、手動でレンダリング
-         renderer.clear();
-         renderer.render(backgroundScene, backgroundCamera);
-    }
-}
-
-function handleSeekBarChange() {
-    isSeeking = false;
-    if (sensorData.length === 0) return;
-
-    const seekTargetElapsedCsvTime = parseFloat(seekBar.value); // シーク完了時の経過時間 (ms)
-    const seekTargetAbsoluteCsvTime = sensorData[0].timestamp + seekTargetElapsedCsvTime; // シーク完了時の絶対タイムスタンプ
-
-    let newIndex = 0;
-    // シークした位置に対応するcurrentIndexを見つける
-    for (let i = 0; i < sensorData.length; i++) {
-        if (sensorData[i].timestamp <= seekTargetAbsoluteCsvTime) {
-            newIndex = i;
-        } else {
-            break;
-        }
-    }
-    currentIndex = newIndex; // currentIndexを更新
-
-    // アニメーション開始時刻を再計算して、シーク位置から再生が始まるようにする
-    // 経過ミリ秒 = (performance.now() - actualStartTime) * playbackSpeed
-    // seekTargetElapsedCsvTime = (performanceNow_at_seek_end - actualStartTime) * playbackSpeed
-    // actualStartTime = performanceNow_at_seek_end - (seekTargetElapsedCsvTime / playbackSpeed)
-    actualStartTime = performance.now() - (seekTargetElapsedCsvTime / playbackSpeed);
-
-    // シークした位置のデータで表示とオーディオを即時更新
-    if (sensorData[currentIndex]) {
-      lastProcessedTimestamp = sensorData[currentIndex].timestamp;
-      updateVisuals(sensorData[currentIndex]);
-       const emotionFactor = getEmotionFactor(sensorData[currentIndex].sessionEmotion);
-       updateAudio(sensorData[currentIndex], emotionFactor); // オーディオパラメータも更新
-    }
-
-    // シェーダーのuTimeもシーク位置に合わせてリセットまたは調整する必要があるか？
-    // uTimeは単に時間経過によるアニメーション用なので、シーク時はリセットで良い
-    if (bgShaderMaterial && bgShaderMaterial.uniforms.uTime) {
-        bgShaderMaterial.uniforms.uTime.value = 0.0; // シーク時はshader timeをリセット
-        delete bgShaderMaterial.uniforms.uTime.lastTime; // 次のanimateでlastTimeが再初期化されるように削除
-    }
-
-
-    // 再生中だった場合はアニメーションを再開
-    if (isPlaying) {
-        if (animationFrameId) cancelAnimationFrame(animationFrameId); // 念のため既存のアニメーションフレームをキャンセル
-        animationFrameId = requestAnimationFrame(animate); // 新しい位置から再開
-         // オーディオを再開/フェードイン
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume().then(() => {
-                 if (gainNode) gainNode.gain.setTargetAtTime(Math.min(0.15, Math.max(0, currentAudioParams.gain)), audioContext.currentTime, 0.1);
-            });
-        } else if (gainNode) {
-             gainNode.gain.setTargetAtTime(Math.min(0.15, Math.max(0, currentAudioParams.gain)), audioContext.currentTime, 0.1);
-        }
-
-    } else {
-        // 再生中でない場合は、シーク位置で一度レンダリングして表示を更新
-        if (renderer && backgroundScene && backgroundCamera) {
-            renderer.clear();
-            renderer.render(backgroundScene, backgroundCamera);
-        }
-         // 再生中でない場合もオーディオのパラメータは更新されるが、ゲインは0になっているはず
-    }
-}
-
 function formatTime(ms) {
     if (isNaN(ms) || ms < 0) ms = 0;
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
-    // ミリ秒も表示する場合はこちら
-    // const milliseconds = Math.floor((ms % 1000) / 10); // 1/100秒まで
-    // return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
@@ -1077,4 +1261,3 @@ window.addEventListener('resize', onWindowResize);
 
 // 初期化処理を呼び出し
 init();
-// 初回のレンダリングはinitの中で行うように変更
