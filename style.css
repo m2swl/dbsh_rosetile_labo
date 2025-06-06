@@ -225,6 +225,28 @@ body {
     color: var(--md-sys-color-on-surface-variant-light);
 }
 
+.qr-code-image {
+  /* サイズを指定 */
+  width: 200px;  /* 例: 幅を200ピクセルに */
+  height: 200px; /* 例: 高さを200ピクセルに (正方形の場合) */
+  /* もしアスペクト比を保ちたい場合は、widthかheightのどちらか一方だけを指定し、もう一方は auto にします */
+  /* height: auto; */
+
+
+  /* 角を丸くする */
+  border-radius: 10px; /* 例: 角の半径を10ピクセルに */
+
+  /* マージン（外側の余白）を設定して、他の要素との間隔を調整 */
+  margin: 20px; /* 例: 全方向に20ピクセルのマージン */
+
+  /* 中央揃えにする (親要素がブロックレベル要素でテキスト中央揃えでない場合) */
+  display: block; /* img要素をブロック要素として扱う */
+  margin-left: auto;
+  margin-right: auto;
+
+  padding-top: 2em;
+}
+
 /* Responsive adjustments */
 @media (max-width: 640px) { /* Adjust breakpoint if cards don't fit well */
     .project-grid {
