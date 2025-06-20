@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Postcard Generator</title>
+    <link rel="icon" href="./assets/icons/favicon.ico">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#FFFFFF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Postcard Gen">
+    <link rel="apple-touch-icon" href="./assets/icons/iosicon-512x512.png">
+
+    <!-- Google Fonts & Material Symbols -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Sans+JP:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+
+    <!-- Stylesheet -->
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+    <!-- 1. 上部ナビゲーションバー -->
+    <header class="app-header">
+        <h1>Postcard Generator</h1>
+    </header>
+
+    <!-- 2. 中央のメインコンテンツ -->
+    <main class="main-content">
+        <!-- A. はがき生成画面 -->
+        <section id="screen-generator" class="screen active">
+            <div class="generator-container">
+                <div class="controls-card">
+                    <h2>はがきをつくる</h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="steps">総歩数 (丸の総数)</label>
+                            <input type="number" id="steps" value="3000" min="100" max="20000" step="100">
+                        </div>
+                        <div class="form-group">
+                            <label for="temp">気温 °C (鮮やかさ)</label>
+                            <input type="number" id="temp" value="22" min="-10" max="40">
+                        </div>
+                        <div class="form-group">
+                            <label for="emotion">感情 (花びらの基本色)</label>
+                            <select id="emotion">
+                                <option value="楽しい">楽しい</option>
+                                <option value="うれしい">うれしい</option>
+                                <option value="穏やか">穏やか</option>
+                                <option value="悲しい">悲しい</option>
+                                <option value="怒り">怒り</option>
+                                <option value="不快">不快</option>
+                                <option value="恐ろしい">恐ろしい</option>
+                                <option value="なにもしない">なにもしない</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="degree">感情の度合い (濃淡・彩度)</label>
+                            <input type="range" id="degree" min="1" max="10" value="7">
+                            <span id="degree-value">7</span>
+                        </div>
+                    </div>
+                     <button id="generate-button" class="action-button">アートワークを生成</button>
+                </div>
+                <div class="canvas-card">
+                    <canvas id="postcard-canvas"></canvas>
+                    <button id="save-button" class="action-button secondary">ギャラリーに保存</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- B. ギャラリー画面 -->
+        <section id="screen-gallery" class="screen">
+            <h2>ギャラリー</h2>
+            <!-- 読み込み中に表示するスピナー -->
+            <div id="gallery-loader" class="loader" style="display: none;"></div>
+            <!-- 履歴がない場合に表示するメッセージ -->
+            <p id="no-gallery-message" style="display: none; text-align: center; color: var(--secondary-text-color);">まだ保存されたはがきがありません。</p>
+            <!-- 履歴カードが挿入されるコンテナ -->
+            <div id="gallery-grid" class="history-grid">
+                <!-- 保存されたはがきがここに動的に追加される -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 3. 下部タブバー -->
+    <nav class="bottom-nav">
+        <a href="#screen-generator" class="nav-item active" data-screen="screen-generator">
+            <span class="material-symbols-outlined">palette</span>
+            <span class="nav-label">ハガキ生成</span>
+        </a>
+        <a href="#screen-gallery" class="nav-item" data-screen="screen-gallery">
+            <span class="material-symbols-outlined">photo_library</span>
+            <span class="nav-label">ギャラリー</span>
+        </a>
+    </nav>
+    
+    <!-- JavaScript Files -->
+    <script src="script.js"></script>
+
+</body>
+</html>

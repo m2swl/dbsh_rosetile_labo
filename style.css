@@ -38,6 +38,12 @@
     --origami-color-surface-container: #FADEBC; /* Main Blue from image background */
     --origami-color-on-surface-container: #001f30; /* Dark Blue for text on blue bg */
 
+
+    /* Origami Theme (Light) - Based on the provided blue image */
+    --hagaki-color-primary: #1f2d3d; /* Darker Blue from icon for text/accents */
+    --hagaki-color-surface-container: #a7c4fa; /* Main Blue from image background */
+    --hagaki-color-on-surface-container: #001f30; /* Dark Blue for text on blue bg */
+
     /* Typography - MD3 scales (approximate) */
     --md-sys-typescale-headline-large-font-family-name: 'Noto Sans JP';
     --md-sys-typescale-headline-large-font-weight: 700;
@@ -210,6 +216,17 @@ body {
 }
 .project-card-origami .body-medium {
     color: var(--origami-color-on-surface-container);
+}
+
+.project-card-hagaki {
+    background-color: var(--hagaki-color-surface-container);
+}
+.project-card-hagaki .title-large,
+.project-card-hagaki .card-icon {
+    color: var(--hagaki-color-primary);
+}
+.project-card-hagaki .body-medium {
+    color: var(--hagaki-color-on-surface-container);
 }
 
 
