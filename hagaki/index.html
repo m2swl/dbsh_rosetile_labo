@@ -35,16 +35,9 @@
                 <div class="controls-card">
                     <h2>はがきをつくる</h2>
                     <div class="form-grid">
+                        <!-- 感情 (色を決定) -->
                         <div class="form-group">
-                            <label for="steps">総歩数 (丸の総数)</label>
-                            <input type="number" id="steps" value="3000" min="100" max="20000" step="100">
-                        </div>
-                        <div class="form-group">
-                            <label for="temp">気温 °C (鮮やかさ)</label>
-                            <input type="number" id="temp" value="22" min="-10" max="40">
-                        </div>
-                        <div class="form-group">
-                            <label for="emotion">感情 (花びらの基本色)</label>
+                            <label for="emotion">感情 (基本の色)</label>
                             <select id="emotion">
                                 <option value="楽しい">楽しい</option>
                                 <option value="うれしい">うれしい</option>
@@ -56,10 +49,32 @@
                                 <option value="なにもしない">なにもしない</option>
                             </select>
                         </div>
+                         <!-- 感情の度合い (にじみの大きさ) -->
                         <div class="form-group">
-                            <label for="degree">感情の度合い (濃淡・彩度)</label>
-                            <input type="range" id="degree" min="1" max="10" value="7">
-                            <span id="degree-value">7</span>
+                            <label for="mood">感情の度合い (にじみの大きさ)</label>
+                            <input type="range" id="mood" min="1" max="10" value="7">
+                            <span id="mood-value">7</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="steps">歩数 (インクの数)</label>
+                            <input type="number" id="steps" value="8500" min="0" max="20000" step="100">
+                        </div>
+                        <div class="form-group">
+                            <label for="hertz">周りの周波数 (にじみの柔らかさ)</label>
+                            <input type="range" id="hertz" min="40" max="60" value="50" step="1">
+                            <span id="hertz-value">50</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="maxTemp">最高気温 (°C)</label>
+                            <input type="number" id="maxTemp" value="28.5" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="minTemp">最低気温 (°C)</label>
+                            <input type="number" id="minTemp" value="19.2" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="dateText">日付 (例: 2025-06-20)</label>
+                            <input type="text" id="dateText" value="2025-06-20">
                         </div>
                     </div>
                      <button id="generate-button" class="action-button">アートワークを生成</button>
@@ -74,10 +89,8 @@
         <!-- B. ギャラリー画面 -->
         <section id="screen-gallery" class="screen">
             <h2>ギャラリー</h2>
-            <!-- 読み込み中に表示するスピナー -->
-            <div id="gallery-loader" class="loader" style="display: none;"></div>
             <!-- 履歴がない場合に表示するメッセージ -->
-            <p id="no-gallery-message" style="display: none; text-align: center; color: var(--secondary-text-color);">まだ保存されたはがきがありません。</p>
+            <p id="no-gallery-message" style="display: none; text-align: center; color: var(--secondary-text);">まだ保存されたはがきがありません。</p>
             <!-- 履歴カードが挿入されるコンテナ -->
             <div id="gallery-grid" class="history-grid">
                 <!-- 保存されたはがきがここに動的に追加される -->

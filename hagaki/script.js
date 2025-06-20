@@ -9,153 +9,184 @@ document.addEventListener('DOMContentLoaded', () => {
     const galleryGrid = document.getElementById('gallery-grid');
     const noGalleryMessage = document.getElementById('no-gallery-message');
 
-    // 入力フォーム
-    const stepsInput = document.getElementById('steps');
-    const tempInput = document.getElementById('temp');
+    // --- 入力フォーム ---
     const emotionSelect = document.getElementById('emotion');
-    const degreeInput = document.getElementById('degree');
-    const degreeValue = document.getElementById('degree-value');
+    const moodInput = document.getElementById('mood');
+    const moodValue = document.getElementById('mood-value');
+    const stepsInput = document.getElementById('steps');
+    const hertzInput = document.getElementById('hertz');
+    const hertzValue = document.getElementById('hertz-value');
+    const maxTempInput = document.getElementById('maxTemp');
+    const minTempInput = document.getElementById('minTemp');
+    const dateTextInput = document.getElementById('dateText');
 
-    // 感情と色のマッピング
-    const emotionColors = {
-        '楽しい': '255, 204, 0',    // 黄
-        'うれしい': '255, 153, 130', // オレンジ
-        '穏やか': '143, 235, 115', // 黄緑
-        '悲しい': '73, 133, 206',   // 青
-        '怒り': '217, 50, 50',    // 赤
-        '不快': '96, 70, 175',    // 紫
-        '恐ろしい': '46, 140, 81',    // 緑
-        'なにもしない': '220, 220, 220', // 白に近いグレー
+    // --- 定数と設定 ---
+    canvas.width = 1000;
+    canvas.height = 1480;
+
+    const emotionHues = {
+        '楽しい': 50, 'うれしい': 35, '穏やか': 90, '悲しい': 220,
+        '怒り': 10, '不快': 280, '恐ろしい': 150, 'なにもしない': -1 // -1は特別扱い
     };
 
-    // --- 初期設定 ---
-    // Canvasの解像度を設定 (表示サイズと合わせる)
-    canvas.width = 400;
-    canvas.height = 592; // 10:14.8 の比率
-
+    // --- ヘルパー関数 (Processing互換) ---
+    const random = (min, max) => min + Math.random() * (max - min);
+    const map = (n, start1, stop1, start2, stop2) => ((n - start1) / (stop1 - start1)) * (stop2 - start2) + start2;
+    const constrain = (n, low, high) => Math.max(Math.min(n, high), low);
+    
+    // Box-Muller transform for gaussian random distribution
+    let spareRandom = null;
+    function randomGaussian() {
+        if (spareRandom !== null) {
+            const val = spareRandom;
+            spareRandom = null;
+            return val;
+        }
+        let u, v, s;
+        do {
+            u = Math.random() * 2 - 1;
+            v = Math.random() * 2 - 1;
+            s = u * u + v * v;
+        } while (s >= 1 || s === 0);
+        s = Math.sqrt(-2.0 * Math.log(s) / s);
+        spareRandom = v * s;
+        return u * s;
+    }
 
     // --- イベントリスナー ---
-    // タブ切り替え
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const targetScreenId = item.getAttribute('data-screen');
-
-            screens.forEach(screen => {
-                screen.classList.toggle('active', screen.id === targetScreenId);
-            });
-
-            navItems.forEach(nav => {
-                nav.classList.toggle('active', nav.getAttribute('data-screen') === targetScreenId);
-            });
-            
-            if (targetScreenId === 'screen-gallery') {
-                loadGallery();
-            }
+            screens.forEach(screen => screen.classList.toggle('active', screen.id === targetScreenId));
+            navItems.forEach(nav => nav.classList.toggle('active', nav.getAttribute('data-screen') === targetScreenId));
+            if (targetScreenId === 'screen-gallery') loadGallery();
         });
     });
 
-    // 生成ボタン
     generateButton.addEventListener('click', generateArtwork);
-    
-    // 保存ボタン
     saveButton.addEventListener('click', saveToGallery);
 
-    // 度合いスライダーの値表示を更新
-    degreeInput.addEventListener('input', () => {
-        degreeValue.textContent = degreeInput.value;
-    });
+    moodInput.addEventListener('input', () => moodValue.textContent = moodInput.value);
+    hertzInput.addEventListener('input', () => hertzValue.textContent = hertzInput.value);
 
-
-    // --- 関数 ---
-    /**
-     * 入力値に基づいてアートワークを生成しCanvasに描画する
-     */
+    // --- メイン描画関数 ---
     function generateArtwork() {
         // 1. 入力値を取得
-        const steps = parseInt(stepsInput.value, 10);
-        const temp = parseInt(tempInput.value, 10);
         const emotion = emotionSelect.value;
-        const degree = parseInt(degreeInput.value, 10);
+        const mood = parseInt(moodInput.value, 10);
+        const steps = parseInt(stepsInput.value, 10);
+        const hertz = parseFloat(hertzInput.value);
+        const maxTemp = parseFloat(maxTempInput.value);
+        const minTemp = parseFloat(minTempInput.value);
+        const dateText = dateTextInput.value;
 
         // 2. 描画パラメータを計算
-        const numCircles = Math.max(50, Math.floor(steps / 20)); // 丸の総数
-        const baseColor = emotionColors[emotion]; // 基本色(RGB)
+        const tempRange = constrain(maxTemp - minTemp, 0, 20);
         
-        // 気温に応じて鮮やかさを調整 (-10℃で50%, 40℃で150%)
-        const saturation = Math.round(((temp + 10) / 50) * 100 + 50); 
-        ctx.filter = `saturate(${saturation}%)`;
+        // ★ 感情に基づいて基本の色相を決定
+        let baseHue = emotionHues[emotion];
+        if (baseHue === -1) { // 「なにもしない」の場合
+            baseHue = map(tempRange, 0, 20, 10, 50); // 元のロジックを使用
+        }
 
-        // 3. Canvasをクリア
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // 背景色を少し暗く設定
-        ctx.fillStyle = '#f0f4f8';
+        const blobCount = Math.floor(map(steps, 0, 20000, 40, 200));
+        const softness = map(hertz, 40, 60, 10, 40);
+        const maxBlobSize = map(mood, 1, 10, 80, 200);
+
+        // 3. 描画開始
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // 背景
+        ctx.fillStyle = '#FCFAF5'; // 和紙っぽいベージュ (HSB(36, 10, 98))
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // 4. 丸を描画
-        for (let i = 0; i < numCircles; i++) {
-            const x = Math.random() * canvas.width;
-            const y = Math.random() * canvas.height;
-            
-            // 度合いに応じて丸の濃淡（アルファ値）とサイズを調整
-            const alpha = 0.1 + (degree / 10) * 0.4 + Math.random() * 0.3; // 0.1-0.8
-            const radius = 10 + (degree / 10) * 20 + Math.random() * 20; // 10-50
+        // ブロブ描画
+        for (let i = 0; i < blobCount; i++) {
+            const cx = canvas.width * randomGaussian() * 0.2 + canvas.width / 2;
+            const cy = canvas.height * randomGaussian() * 0.2 + canvas.height / 2;
 
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2, false);
-            ctx.fillStyle = `rgba(${baseColor}, ${alpha})`;
-            ctx.fill();
+            const blobSize = random(maxBlobSize * 0.4, maxBlobSize);
+            const hue = (baseHue + random(-10, 10)) % 360;
+            // 「なにもしない」なら彩度を低く、そうでなければ落ち着いた彩度に
+            const sat = (emotion === 'なにもしない') ? random(5, 15) : random(20, 40);
+            const bri = random(60, 90); // CSS HSLのLightnessに合わせるため調整
+
+            for (let j = 0; j < Math.floor(random(4, 8)); j++) {
+                const r = blobSize * random(0.4, 1.0);
+                const alpha = map(j, 0, 10, 0.06, 0.01) * 2;
+                ctx.fillStyle = `hsla(${hue}, ${sat}%, ${bri}%, ${alpha})`;
+                ctx.beginPath();
+                ctx.ellipse(
+                    cx + random(-softness, softness),
+                    cy + random(-softness, softness),
+                    r / 2,
+                    (r * random(0.6, 1.2)) / 2,
+                    0, 0, Math.PI * 2
+                );
+                ctx.fill();
+            }
         }
         
-        // フィルターをリセット
-        ctx.filter = 'none';
-    }
+        // 紙テクスチャ
+        ctx.globalCompositeOperation = 'multiply';
+        // 粒子ノイズ
+        for (let i = 0; i < 6000; i++) {
+            const x = random(0, canvas.width);
+            const y = random(0, canvas.height);
+            const g = random(85, 100);
+            const a = random(1, 4) / 100;
+            ctx.fillStyle = `hsla(36, 10%, ${g}%, ${a})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+        // 繊維っぽい細線
+        for (let i = 0; i < 200; i++) {
+            const x = random(0, canvas.width);
+            const y = random(0, canvas.height);
+            const len = random(10, 40);
+            ctx.strokeStyle = `hsla(36, 5%, 80%, 0.03)`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + len);
+            ctx.stroke();
+        }
+        ctx.globalCompositeOperation = 'source-over'; // ブレンドモードを戻す
 
-    /**
-     * 現在のCanvasの内容を画像としてローカルストレージに保存する
-     */
+        // 墨で日付
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.font = "42px 'Noto Sans JP', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(dateText, canvas.width / 2, canvas.height - 80);
+    }
+    
+    // --- ギャラリー機能 ---
     function saveToGallery() {
         const imageDataUrl = canvas.toDataURL('image/png');
-        
-        // ローカルストレージから既存のギャラリーデータを取得
         let gallery = JSON.parse(localStorage.getItem('postcardGallery')) || [];
-        
-        // 新しい画像データを先頭に追加
         gallery.unshift(imageDataUrl);
-        
-        // ローカルストレージに保存
         localStorage.setItem('postcardGallery', JSON.stringify(gallery));
-        
         alert('ギャラリーに保存しました！');
     }
 
-    /**
-     * ローカルストレージからギャラリーを読み込んで表示する
-     */
     function loadGallery() {
-        galleryGrid.innerHTML = ''; // グリッドをクリア
+        galleryGrid.innerHTML = '';
         const gallery = JSON.parse(localStorage.getItem('postcardGallery')) || [];
-
-        if (gallery.length === 0) {
-            noGalleryMessage.style.display = 'block';
-        } else {
-            noGalleryMessage.style.display = 'none';
-            gallery.forEach(imageDataUrl => {
-                const card = document.createElement('div');
-                card.className = 'gallery-card';
-                
-                const img = document.createElement('img');
-                img.src = imageDataUrl;
-                img.alt = '保存されたはがき';
-                
-                card.appendChild(img);
-                galleryGrid.appendChild(card);
-            });
-        }
+        noGalleryMessage.style.display = gallery.length === 0 ? 'block' : 'none';
+        
+        gallery.forEach(imageDataUrl => {
+            const card = document.createElement('div');
+            card.className = 'gallery-card';
+            const img = document.createElement('img');
+            img.src = imageDataUrl;
+            img.alt = '保存されたはがき';
+            card.appendChild(img);
+            galleryGrid.appendChild(card);
+        });
     }
 
-
     // --- 初期化処理 ---
-    // ページ読み込み時に一度アートワークを生成して表示
     generateArtwork();
 });
