@@ -85,7 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Particle Texture ---
     const createParticleTexture = () => {
-        const particleTextureSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><defs><radialGradient id="grad1" cx="50%" cy="50%" r="50%" fx="50%" fy="50%"><stop offset="0%" style="stop-color:white;stop-opacity:1" /><stop offset="100%" style="stop-color:white;stop-opacity:0" /></radialGradient></defs><rect width="64" height="64" fill="url(#grad1)"/></svg>`;
+        // グラデーションのない、くっきりした円のSVGに変更
+        const particleTextureSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="white"/></svg>`;
         const particleTextureUrl = `data:image/svg+xml;base64,${btoa(particleTextureSVG)}`;
         return new THREE.TextureLoader().load(particleTextureUrl);
     };
@@ -127,9 +128,10 @@ document.addEventListener('DOMContentLoaded', () => {
             map: particleTexture,
             sizeAttenuation: true,
             transparent: true,
-            alphaTest: 0.01,
+            opacity: 0.7, // 全体を半透明にする
+            alphaTest: 0.5, // 輪郭をくっきりさせる
             depthWrite: false,
-            blending: THREE.AdditiveBlending,
+            blending: THREE.NormalBlending, // 通常の重ね合わせに変更
         });
 
         particlesMesh = new THREE.Points(geometry, material);
