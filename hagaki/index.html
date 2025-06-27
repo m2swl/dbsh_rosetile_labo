@@ -32,24 +32,29 @@
         <!-- A. はがき生成画面 -->
         <section id="screen-generator" class="screen active">
             <div class="generator-container">
-                <div class="controls-card">
+                <div class="canvas-card">
+                    <canvas id="postcard-canvas"></canvas>
+                    <button id="open-settings" class="action-button">数値設定</button>
+                    <button id="save-button" class="action-button secondary">ギャラリーに保存</button>
+                </div>
+                <div class="controls-card" id="controls-card" style="display: none;">
                     <h2>はがきをつくる</h2>
                     <div class="form-grid">
                         <!-- 感情 (色を決定) -->
                         <div class="form-group">
                             <label for="emotion">感情 (基本の色)</label>
-                            <select id="emotion">
-                                <option value="楽しい">楽しい</option>
-                                <option value="うれしい">うれしい</option>
-                                <option value="穏やか">穏やか</option>
-                                <option value="悲しい">悲しい</option>
-                                <option value="怒り">怒り</option>
-                                <option value="不快">不快</option>
-                                <option value="恐ろしい">恐ろしい</option>
+                            <select id="emotion" class="vibrant-colors">
+                                <option value="楽しい" style="color: #FF4500;">楽しい</option>
+                                <option value="うれしい" style="color: #FFD700;">うれしい</option>
+                                <option value="穏やか" style="color: #32CD32;">穏やか</option>
+                                <option value="悲しい" style="color: #1E90FF;">悲しい</option>
+                                <option value="怒り" style="color: #DC143C;">怒り</option>
+                                <option value="不快" style="color: #8A2BE2;">不快</option>
+                                <option value="恐ろしい" style="color: #4B0082;">恐ろしい</option>
                                 <option value="なにもしない">なにもしない</option>
                             </select>
                         </div>
-                         <!-- 感情の度合い (にじみの大きさ) -->
+                        <!-- 感情の度合い (にじみの大きさ) -->
                         <div class="form-group">
                             <label for="mood">感情の度合い (にじみの大きさ)</label>
                             <input type="range" id="mood" min="1" max="10" value="7">
@@ -78,10 +83,6 @@
                         </div>
                     </div>
                      <button id="generate-button" class="action-button">アートワークを生成</button>
-                </div>
-                <div class="canvas-card">
-                    <canvas id="postcard-canvas"></canvas>
-                    <button id="save-button" class="action-button secondary">ギャラリーに保存</button>
                 </div>
             </div>
         </section>

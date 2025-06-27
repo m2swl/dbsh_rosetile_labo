@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctx = canvas.getContext('2d');
     const galleryGrid = document.getElementById('gallery-grid');
     const noGalleryMessage = document.getElementById('no-gallery-message');
+    const openSettings = document.getElementById('open-settings');
+    const controlsCard = document.getElementById('controls-card');
 
     // --- 入力フォーム ---
     const emotionSelect = document.getElementById('emotion');
@@ -24,9 +26,16 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.width = 1000;
     canvas.height = 1480;
 
-    const emotionHues = {
-        '楽しい': 50, 'うれしい': 35, '穏やか': 90, '悲しい': 220,
-        '怒り': 10, '不快': 280, '恐ろしい': 150, 'なにもしない': -1 // -1は特別扱い
+    // 感情ごとの16進数カラーコード
+    const emotionColors = {
+        'うれしい': '#ff8005',
+        '楽しい': '#f2b40c',
+        '穏やか': '#94e020',
+        '悲しい': '#1374f0',
+        '怒り': '#e60d0d',
+        '不快': '#5c19e6',
+        '恐ろしい': '#33cc70',
+        'なにもしない': '#737c8c'
     };
 
     // --- ヘルパー関数 (Processing互換) ---
@@ -70,6 +79,25 @@ document.addEventListener('DOMContentLoaded', () => {
     moodInput.addEventListener('input', () => moodValue.textContent = moodInput.value);
     hertzInput.addEventListener('input', () => hertzValue.textContent = hertzInput.value);
 
+    openSettings.addEventListener('click', () => {
+        controlsCard.style.display = 'block';
+        controlsCard.classList.add('show');
+    });
+
+    // 外側クリックやEscで閉じる
+    document.addEventListener('mousedown', (e) => {
+        if (controlsCard.style.display === 'block' && !controlsCard.contains(e.target) && e.target !== openSettings) {
+            controlsCard.style.display = 'none';
+            controlsCard.classList.remove('show');
+        }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && controlsCard.style.display === 'block') {
+            controlsCard.style.display = 'none';
+            controlsCard.classList.remove('show');
+        }
+    });
+
     // --- メイン描画関数 ---
     function generateArtwork() {
         // 1. 入力値を取得
@@ -84,11 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. 描画パラメータを計算
         const tempRange = constrain(maxTemp - minTemp, 0, 20);
         
-        // ★ 感情に基づいて基本の色相を決定
-        let baseHue = emotionHues[emotion];
-        if (baseHue === -1) { // 「なにもしない」の場合
-            baseHue = map(tempRange, 0, 20, 10, 50); // 元のロジックを使用
-        }
+        // ★ 感情に基づいて基本の色を決定
+        let baseColor = emotionColors[emotion];
+        if (!baseColor) baseColor = '#737c8c'; // 万一未定義ならグレー
 
         const blobCount = Math.floor(map(steps, 0, 20000, 40, 200));
         const softness = map(hertz, 40, 60, 10, 40);
@@ -108,15 +134,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const cy = canvas.height * randomGaussian() * 0.2 + canvas.height / 2;
 
             const blobSize = random(maxBlobSize * 0.4, maxBlobSize);
-            const hue = (baseHue + random(-10, 10)) % 360;
-            // 「なにもしない」なら彩度を低く、そうでなければ落ち着いた彩度に
-            const sat = (emotion === 'なにもしない') ? random(5, 15) : random(20, 40);
-            const bri = random(60, 90); // CSS HSLのLightnessに合わせるため調整
-
+            // 色をHSLでランダムに揺らす（明度・彩度のみ）
+            let h, s, l;
+            if (baseColor) {
+                // HEX→HSL変換
+                [h, s, l] = hexToHSL(baseColor);
+                s = random(s * 0.8, s * 1.1); // 彩度を少し揺らす
+                l = random(l * 0.8, l * 1.1); // 明度を少し揺らす
+            } else {
+                h = 220; s = 15; l = 60;
+            }
             for (let j = 0; j < Math.floor(random(4, 8)); j++) {
                 const r = blobSize * random(0.4, 1.0);
                 const alpha = map(j, 0, 10, 0.06, 0.01) * 2;
-                ctx.fillStyle = `hsla(${hue}, ${sat}%, ${bri}%, ${alpha})`;
+                ctx.fillStyle = `hsla(${h}, ${s}%, ${l}%, ${alpha})`;
                 ctx.beginPath();
                 ctx.ellipse(
                     cx + random(-softness, softness),
@@ -185,6 +216,37 @@ document.addEventListener('DOMContentLoaded', () => {
             card.appendChild(img);
             galleryGrid.appendChild(card);
         });
+    }
+
+    // HEX→HSL変換関数を追加
+    function hexToHSL(H) {
+        // HEX→RGB
+        let r = 0, g = 0, b = 0;
+        if (H.length == 4) {
+            r = "0x" + H[1] + H[1];
+            g = "0x" + H[2] + H[2];
+            b = "0x" + H[3] + H[3];
+        } else if (H.length == 7) {
+            r = "0x" + H[1] + H[2];
+            g = "0x" + H[3] + H[4];
+            b = "0x" + H[5] + H[6];
+        }
+        r /= 255; g /= 255; b /= 255;
+        let max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h, s, l = (max + min) / 2;
+        if (max == min) {
+            h = s = 0; // achromatic
+        } else {
+            let d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                case g: h = (b - r) / d + 2; break;
+                case b: h = (r - g) / d + 4; break;
+            }
+            h /= 6;
+        }
+        return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
     }
 
     // --- 初期化処理 ---
