@@ -5,36 +5,47 @@ document.addEventListener('DOMContentLoaded', () => {
         Discomfort: 'Discomfort', Fear: 'Fear', Neutral: 'Neutral',
     };
 
-    const EMOTION_COLORS = {
-        [Emotion.Joy]: [30 / 360, 1.0, 0.5],
-        [Emotion.Fun]: [43 / 360, 0.9, 0.52],
-        [Emotion.Calm]: [78 / 360, 0.75, 0.69],
-        [Emotion.Sad]: [215 / 360, 0.9, 0.51],
-        [Emotion.Anger]: [0 / 360, 0.89, 0.48],
-        [Emotion.Discomfort]: [271 / 360, 0.78, 0.53],
-        [Emotion.Fear]: [145 / 360, 0.6, 0.5],
-        [Emotion.Neutral]: [220 / 360, 0.08, 0.5],
+    const EMOTION_COLORS = { /* (変更なし) */
+        [Emotion.Joy]: [30 / 360, 1.0, 0.5], [Emotion.Fun]: [43 / 360, 0.9, 0.52],
+        [Emotion.Calm]: [78 / 360, 0.75, 0.69], [Emotion.Sad]: [215 / 360, 0.9, 0.51],
+        [Emotion.Anger]: [0 / 360, 0.89, 0.48], [Emotion.Discomfort]: [271 / 360, 0.78, 0.53],
+        [Emotion.Fear]: [145 / 360, 0.6, 0.5], [Emotion.Neutral]: [220 / 360, 0.08, 0.5],
     };
 
-    const EMOTION_LABELS = {
+    const EMOTION_LABELS = { /* (変更なし) */
         [Emotion.Joy]: 'うれしい (Joy)', [Emotion.Fun]: '楽しい (Fun)',
         [Emotion.Calm]: '穏やか (Calm)', [Emotion.Sad]: '悲しい (Sad)',
         [Emotion.Anger]: '怒り (Anger)', [Emotion.Discomfort]: '不快 (Discomfort)',
         [Emotion.Fear]: '恐ろしい (Fear)', [Emotion.Neutral]: 'なにもしない (Neutral)',
     };
+    
+    // 追加: 感情ごとの動きのパラメータ
+    const EMOTION_MOVEMENT_PARAMS = {
+        [Emotion.Joy]:      { speed: 0.8, sway: 0.8, lifespan: [5, 9], size: 1.2 },
+        [Emotion.Fun]:      { speed: 1.0, sway: 1.2, lifespan: [4, 8], size: 1.1 },
+        [Emotion.Calm]:     { speed: 0.3, sway: 0.2, lifespan: [10, 15], size: 1.0 },
+        [Emotion.Sad]:      { speed: 0.2, sway: 0.3, lifespan: [12, 18], size: 0.8 },
+        [Emotion.Anger]:    { speed: 2.5, sway: 0.1, lifespan: [2, 4], size: 1.3 },
+        [Emotion.Discomfort]:{ speed: 0.5, sway: 2.0, lifespan: [8, 12], size: 0.9 },
+        [Emotion.Fear]:     { speed: 1.2, sway: 3.0, lifespan: [6, 10], size: 1.0 },
+        [Emotion.Neutral]:  { speed: 0.4, sway: 0.4, lifespan: [9, 14], size: 1.0 },
+    };
 
     // --- State ---
     let settings = {
-        micVolume: 1.0, totalSteps: 2000, scatter: 5,
+        micVolume: 1.5, totalSteps: 1500, scatter: 5,
         temperature: 0.5, emotion: Emotion.Calm, emotionIntensity: 7,
     };
     let orientation = { alpha: 0, beta: 90, gamma: 0 };
-    const LERP_FACTOR = 0.1; // Smoothing factor
+    const LERP_FACTOR = 0.1;
 
     // --- Three.js variables ---
-    let scene, camera, renderer, particlesMesh, particleTexture;
+    let scene, camera, renderer, clock;
+    let particleGroups = []; // 変更: 複数のパーティクルグループを管理
+    let particleTextures = []; // 変更: 複数のテクスチャを保持
 
     // --- DOM Elements ---
+    // (変更なし)
     const startScreen = document.getElementById('start-screen');
     const mainUI = document.getElementById('main-ui');
     const canvasContainer = document.getElementById('canvas-container');
@@ -59,8 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
         emotionIntensity: document.getElementById('emotionIntensity-value'),
     };
 
+
     // --- Device Orientation ---
-    const requestPermission = async () => {
+    const requestPermission = async () => { /* (変更なし) */
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
             try {
                 const permissionState = await DeviceOrientationEvent.requestPermission();
@@ -69,13 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Device orientation permission request failed.", error);
                 return false;
             }
-        } else {
-            return true; // For browsers that don't require permission
-        }
+        } else { return true; }
         return false;
     };
-
-    const handleDeviceOrientation = (event) => {
+    const handleDeviceOrientation = (event) => { /* (変更なし) */
         orientation = {
             alpha: event.alpha !== null ? (orientation.alpha * (1 - LERP_FACTOR) + event.alpha * LERP_FACTOR) : orientation.alpha,
             beta: event.beta !== null ? (orientation.beta * (1 - LERP_FACTOR) + event.beta * LERP_FACTOR) : orientation.beta,
@@ -84,136 +93,197 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Particle Texture ---
-    const createParticleTexture = () => {
-        // グラデーションのない、くっきりした円のSVGに変更
-        const particleTextureSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="white"/></svg>`;
-        const particleTextureUrl = `data:image/svg+xml;base64,${btoa(particleTextureSVG)}`;
-        return new THREE.TextureLoader().load(particleTextureUrl);
+    // 変更: 複数のテクスチャを生成
+    const createParticleTextures = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        const textures = [];
+
+        // 1. くっきりした円
+        ctx.clearRect(0, 0, 64, 64);
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(32, 32, 30, 0, Math.PI * 2);
+        ctx.fill();
+        textures.push(new THREE.CanvasTexture(canvas.cloneNode(true)));
+
+        // 2. ぼやけた円
+        ctx.clearRect(0, 0, 64, 64);
+        const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        gradient.addColorStop(0, 'rgba(255,255,255,1)');
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 64, 64);
+        textures.push(new THREE.CanvasTexture(canvas.cloneNode(true)));
+
+        // 3. 十字のきらめき
+        ctx.clearRect(0, 0, 64, 64);
+        ctx.fillStyle = 'white';
+        ctx.fillRect(28, 10, 8, 44);
+        ctx.fillRect(10, 28, 44, 8);
+        textures.push(new THREE.CanvasTexture(canvas.cloneNode(true)));
+
+        return textures;
     };
 
-    // --- Particles Logic ---
-    function createOrUpdateParticles() {
-        if (particlesMesh) {
-            scene.remove(particlesMesh);
-            particlesMesh.geometry.dispose();
-            particlesMesh.material.dispose();
-        }
 
-        const { totalSteps, scatter, emotion, emotionIntensity, temperature, micVolume } = settings;
-        const particlesCount = Math.floor(totalSteps);
-        const positions = new Float32Array(particlesCount * 3);
-        const colors = new Float32Array(particlesCount * 3);
-        const color = new THREE.Color();
+    function createOrUpdateParticles() {
+        // 既存のパーティクルをシーンから削除
+        particleGroups.forEach(group => scene.remove(group.mesh));
+        particleGroups = [];
+
+        const { totalSteps, emotion, emotionIntensity, temperature, micVolume, scatter } = settings;
+        const particlesPerShape = Math.floor(totalSteps / particleTextures.length);
+        if (particlesPerShape === 0) return;
+
         const [hue, baseSat, baseLight] = EMOTION_COLORS[emotion];
-        
         const saturation = 0.1 + (baseSat - 0.1) * (emotionIntensity / 10);
         const lightness = baseLight + (temperature * 0.2);
+        const movementParams = EMOTION_MOVEMENT_PARAMS[emotion];
 
-        for (let i = 0; i < particlesCount; i++) {
-            const theta = Math.random() * 2 * Math.PI;
-            const phi = Math.acos(2 * Math.random() - 1);
-            const r = Math.pow(Math.random(), 0.7) * scatter;
-            positions.set([r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)], i * 3);
-            color.setHSL(hue, saturation, lightness);
-            colors.set([color.r, color.g, color.b], i * 3);
-        }
+        particleTextures.forEach(texture => {
+            const positions = new Float32Array(particlesPerShape * 3);
+            const colors = new Float32Array(particlesPerShape * 3);
+            const customData = []; // 個々のパーティクルの情報を格納
 
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            for (let i = 0; i < particlesPerShape; i++) {
+                const color = new THREE.Color();
+                color.setHSL(hue, saturation, lightness);
+                colors.set([color.r, color.g, color.b], i * 3);
 
-        const material = new THREE.PointsMaterial({
-            size: micVolume * 0.05,
-            vertexColors: true,
-            map: particleTexture,
-            sizeAttenuation: true,
-            transparent: true,
-            opacity: 0.7, // 全体を半透明にする
-            alphaTest: 0.5, // 輪郭をくっきりさせる
-            depthWrite: false,
-            blending: THREE.NormalBlending, // 通常の重ね合わせに変更
+                const sizeScale = (Math.random() * 0.8 + 0.6) * movementParams.size;
+                const life = THREE.MathUtils.randFloat(movementParams.lifespan[0], movementParams.lifespan[1]);
+
+                customData[i] = {
+                    initialPosition: new THREE.Vector3(
+                        (Math.random() - 0.5) * scatter * 2,
+                        -scatter / 2 - Math.random() * (scatter),
+                        (Math.random() - 0.5) * scatter * 2
+                    ),
+                    velocity: new THREE.Vector3(0, (Math.random() * 0.5 + 0.5) * movementParams.speed * (scatter/5), 0),
+                    lifespan: life,
+                    age: -Math.random() * life, // 開始タイミングをずらす
+                    size: sizeScale,
+                    swayFactor: (Math.random() - 0.5) * 2, // 揺れの方向と強さ
+                };
+                positions.set([customData[i].initialPosition.x, customData[i].initialPosition.y, customData[i].initialPosition.z], i * 3);
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: micVolume * 0.15, //基準サイズを調整
+                vertexColors: true,
+                map: texture,
+                sizeAttenuation: true,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending, // 光が重なるような表現に
+            });
+
+            const points = new THREE.Points(geometry, material);
+            const group = { mesh: points, data: customData };
+            particleGroups.push(group);
+            scene.add(points);
         });
-
-        particlesMesh = new THREE.Points(geometry, material);
-        scene.add(particlesMesh);
     }
     
     // --- Scene Setup ---
     function initScene() {
+        clock = new THREE.Clock();
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 0.1;
+        camera.position.z = 8; // カメラを引く
 
         renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer.setClearColor(0xffffff);
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         canvasContainer.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0x404040, 0.5));
-        const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-        pointLight.position.set(10, 10, 10);
-        scene.add(pointLight);
+        scene.add(new THREE.AmbientLight(0xcccccc, 1.0));
         
-        particleTexture = createParticleTexture();
+        particleTextures = createParticleTextures();
         createOrUpdateParticles();
 
         window.addEventListener('resize', onWindowResize, false);
-
         animate();
     }
 
     // --- Animation Loop ---
-    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-    const q0 = new THREE.Quaternion();
-    const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
-
     function animate() {
         requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+        const movementParams = EMOTION_MOVEMENT_PARAMS[settings.emotion];
 
-        // Particle rotation
-        if (particlesMesh) {
-            particlesMesh.rotation.y += 0.0005;
-        }
+        particleGroups.forEach(group => {
+            const positions = group.mesh.geometry.attributes.position.array;
+            const opacities = group.mesh.material;
+            const FADE_DURATION = 1.5;
 
-        // Camera orientation
-        if (orientation.alpha !== null && orientation.beta !== null && orientation.gamma !== null) {
+            let totalAge = 0;
+            for (let i = 0; i < group.data.length; i++) {
+                const p = group.data[i];
+                p.age += delta;
+                totalAge += p.age;
+                
+                if (p.age > p.lifespan) {
+                    p.age = -Math.random() * p.lifespan / 2;
+                    positions[i * 3] = p.initialPosition.x;
+                    positions[i * 3 + 1] = p.initialPosition.y;
+                    positions[i * 3 + 2] = p.initialPosition.z;
+                    continue;
+                }
+                if (p.age < 0) continue;
+
+                // 揺れの計算
+                const sway = Math.sin(p.age * 0.5 * movementParams.speed) * p.swayFactor * movementParams.sway * settings.scatter / 10;
+                
+                positions[i * 3] += sway * delta;
+                positions[i * 3 + 1] += p.velocity.y * delta;
+                positions[i * 3 + 2] += sway * delta / 2; // Z方向にも少し揺れ
+            }
+
+            group.mesh.geometry.attributes.position.needsUpdate = true;
+            // フェードイン・アウトはマテリアル全体のOpacityで簡易的に表現
+            const averageAgeRatio = (totalAge / group.data.length) / group.data[0].lifespan;
+            opacities.opacity = Math.sin(averageAgeRatio * Math.PI) * 0.8;
+        });
+
+        if (orientation.alpha !== null) {
             const alpha = THREE.MathUtils.degToRad(orientation.alpha);
             const beta = THREE.MathUtils.degToRad(orientation.beta);
             const gamma = THREE.MathUtils.degToRad(orientation.gamma);
-
-            euler.set(beta, alpha, -gamma, 'YXZ');
-            camera.quaternion.setFromEuler(euler);
-            camera.quaternion.multiply(q1);
-            
-            const screenOrientation = window.screen.orientation.angle;
-            q0.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -screenOrientation * Math.PI / 180);
-            camera.quaternion.multiply(q0);
+            const euler = new THREE.Euler(beta, alpha, -gamma, 'YXZ');
+            const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+            const q0 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -window.screen.orientation.angle * Math.PI / 180);
+            camera.quaternion.setFromEuler(euler).multiply(q1).multiply(q0);
         }
 
         renderer.render(scene, camera);
     }
     
-    function onWindowResize() {
+    function onWindowResize() { /* (変更なし) */
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    // --- UI and Event Handling ---
-    function updateValueDisplay(key, value) {
+    function updateValueDisplay(key, value) { /* (変更なし) */
         let displayValue = value;
         if (typeof value === 'number') {
             displayValue = value.toFixed(key === 'temperature' || key === 'micVolume' || key === 'scatter' ? 2 : 0);
         }
-        if (key === 'temperature') displayValue += "°C";
-        
         if (valueDisplays[key]) {
              valueDisplays[key].textContent = displayValue;
         }
     }
 
     function initUI() {
-        // Populate emotion select
         Object.entries(EMOTION_LABELS).forEach(([key, label]) => {
             const option = document.createElement('option');
             option.value = key;
@@ -222,7 +292,6 @@ document.addEventListener('DOMContentLoaded', () => {
             emotionSelect.appendChild(option);
         });
 
-        // Initialize sliders and value displays
         for (const key in sliders) {
             sliders[key].value = settings[key];
             updateValueDisplay(key, settings[key]);
@@ -232,9 +301,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 settings[key] = value;
                 updateValueDisplay(key, value);
                 
-                // Update particles
                 if (key === 'micVolume') {
-                    if (particlesMesh) particlesMesh.material.size = value * 0.05;
+                    // 変更: 全てのパーティクルグループのサイズを更新
+                    particleGroups.forEach(group => {
+                        group.mesh.material.size = value * 0.15;
+                    });
                 } else {
                     createOrUpdateParticles();
                 }
@@ -246,16 +317,13 @@ document.addEventListener('DOMContentLoaded', () => {
            createOrUpdateParticles();
         });
 
-        // Panel toggle for mobile
         controlsPanel.classList.add(window.innerWidth < 768 ? 'closed' : 'open');
         settingsToggle.addEventListener('click', () => {
             controlsPanel.classList.toggle('open');
             controlsPanel.classList.toggle('closed');
         });
 
-        // Capture
         captureButton.addEventListener('click', () => {
-            // Render one more frame to ensure it's up to date
             renderer.render(scene, camera);
             const dataUrl = renderer.domElement.toDataURL('image/png');
             const link = document.createElement('a');
@@ -265,7 +333,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- App Start ---
     startButton.addEventListener('click', async () => {
         const granted = await requestPermission();
         if (granted) {

@@ -6,7 +6,7 @@ body, html {
     width: 100%;
     margin: 0;
     padding: 0;
-    background-color: #000;
+    background-color: #ffffff; /* 変更: 黒から白へ */
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
@@ -17,12 +17,12 @@ body, html {
 
 /* Custom slider track */
 input[type="range"]::-webkit-slider-runnable-track {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.1); /* 変更: 明るい背景用に調整 */
     height: 4px;
     border-radius: 2px;
 }
 input[type="range"]::-moz-range-track {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.1); /* 変更: 明るい背景用に調整 */
     height: 4px;
     border-radius: 2px;
 }
@@ -30,28 +30,31 @@ input[type="range"]::-moz-range-track {
 input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 16px;
-    height: 16px;
+    width: 18px; /* 変更 */
+    height: 18px; /* 変更 */
     border-radius: 50%;
-    background: #ffffff;
+    background: #ffffff; /* 変更 */
+    border: 1px solid rgba(0,0,0,0.15); /* 追加 */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* 追加 */
     cursor: pointer;
-    margin-top: -6px; /* Center thumb on track */
+    margin-top: -7px; /* 調整 */
 }
 input[type="range"]::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
+    width: 18px; /* 変更 */
+    height: 18px; /* 変更 */
     border-radius: 50%;
-    background: #ffffff;
+    background: #ffffff; /* 変更 */
     cursor: pointer;
-    border: none;
+    border: 1px solid rgba(0,0,0,0.15); /* 追加 */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* 追加 */
 }
 
 .value-display {
     font-family: monospace;
-    background-color: rgba(0,0,0,0.2);
+    background-color: rgba(0,0,0,0.05); /* 変更 */
     padding: 2px 6px;
     border-radius: 4px;
-    color: white;
+    color: #374151; /* 変更: (text-gray-700) */
 }
 
 #controls-panel {
